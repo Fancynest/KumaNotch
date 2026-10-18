@@ -44,6 +44,7 @@ export const translations = {
     missing: 'Hilang',
     clearAll: 'Bersihkan',
     dragOutHint: 'Geser keluar untuk share',
+    backToHome: 'Kembali',
   },
   en: {
     quickTimer: 'Quick Timer',
@@ -79,6 +80,7 @@ export const translations = {
     missing: 'Missing',
     clearAll: 'Clear All',
     dragOutHint: 'Drag out to share',
+    backToHome: 'Back',
   },
 }
 

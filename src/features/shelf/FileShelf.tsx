@@ -15,6 +15,7 @@ import {
   UploadCloud,
   AlertTriangle,
   GripVertical,
+  ChevronLeft,
 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import {
@@ -27,9 +28,10 @@ import { getT } from '../../core/i18n'
 
 interface FileShelfProps {
   isDragOver?: boolean
+  onBack?: () => void
 }
 
-export function FileShelf({ isDragOver = false }: FileShelfProps) {
+export function FileShelf({ isDragOver = false, onBack }: FileShelfProps) {
   const t = getT()
   const [items, setItems] = useState<ShelfItem[]>(() => globalShelfEngine.getItems())
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -86,10 +88,20 @@ export function FileShelf({ isDragOver = false }: FileShelfProps) {
   }
 
   return (
-    <div className="flex flex-col gap-1.5 w-full">
+    <div className="flex flex-col gap-1.5 w-full h-full justify-between">
       {/* Shelf Header */}
-      <div className="flex items-center justify-between px-0.5">
+      <div className="flex items-center justify-between px-0.5 shrink-0">
         <div className="flex items-center gap-1.5">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white text-[10px] font-medium transition-all active:scale-95 mr-0.5"
+              title={t.backToHome}
+            >
+              <ChevronLeft className="w-3 h-3 text-white/50" />
+              <span>{t.backToHome}</span>
+            </button>
+          )}
           <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">
             {t.fileShelf}
           </span>
@@ -111,28 +123,31 @@ export function FileShelf({ isDragOver = false }: FileShelfProps) {
 
       {/* Drop Target or Items List */}
       <div
-        className={`relative w-full rounded-xl transition-all duration-200 ${
+        className={`relative w-full rounded-xl transition-all duration-200 flex-1 flex flex-col justify-center ${
           isDragOver
             ? 'border-2 border-dashed border-amber-400 bg-amber-500/15 p-3'
             : items.length === 0
             ? 'border border-dashed border-white/15 bg-white/[0.03] p-3'
-            : 'border border-white/10 bg-white/[0.03] p-1'
+            : 'border border-white/10 bg-white/[0.03] p-1 justify-start'
         }`}
       >
         {isDragOver ? (
-          <div className="flex flex-col items-center justify-center py-2 text-amber-300 animate-pulse gap-1">
-            <UploadCloud className="w-5 h-5" />
+          <div className="flex flex-col items-center justify-center py-6 text-amber-300 animate-pulse gap-1">
+            <UploadCloud className="w-6 h-6" />
             <span className="text-xs font-medium">{t.dropFilesHere}</span>
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-2 text-white/40 gap-1">
-            <UploadCloud className="w-5 h-5 text-white/30" />
-            <span className="text-[11px] text-center leading-tight font-medium">
+          <div className="flex flex-col items-center justify-center py-6 text-white/40 gap-1.5">
+            <UploadCloud className="w-6 h-6 text-white/30" />
+            <span className="text-[11px] text-center leading-tight font-medium text-white/70">
               {t.emptyShelfDesc}
+            </span>
+            <span className="text-[10px] text-white/30 font-medium">
+              {t.dragOutHint}
             </span>
           </div>
         ) : (
-          <div className="flex flex-col gap-1 max-h-[105px] overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-white/20">
+          <div className="flex flex-col gap-1 max-h-[135px] overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-white/20">
             {items.map((item) => (
               <div
                 key={item.id}

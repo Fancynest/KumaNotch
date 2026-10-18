@@ -5,6 +5,8 @@ import {
   Pause,
   RotateCcw,
   ChevronDown,
+  ChevronRight,
+  Folder,
   Timer as TimerIcon,
   Sparkles,
   Bell,
@@ -135,6 +137,14 @@ export default function App() {
 
   // Drag and drop listener for File Shelf (Spec Fase 3)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [homePage, setHomePage] = useState<number>(0)
+  const [shelfCount, setShelfCount] = useState(() => globalShelfEngine.getItems().length)
+
+  useEffect(() => {
+    return globalShelfEngine.subscribe((items) => {
+      setShelfCount(items.length)
+    })
+  }, [])
 
   useEffect(() => {
     let unlisten: (() => void) | undefined
@@ -143,10 +153,12 @@ export default function App() {
         .onDragDropEvent((event) => {
           if (event.payload.type === 'enter' || event.payload.type === 'over') {
             setIsDragOver(true)
+            setHomePage(1)
           } else if (event.payload.type === 'leave') {
             setIsDragOver(false)
           } else if (event.payload.type === 'drop') {
             setIsDragOver(false)
+            setHomePage(1)
             if (event.payload.paths && event.payload.paths.length > 0) {
               globalShelfEngine.addPaths(event.payload.paths)
               setExpandedActivity('home')
@@ -499,145 +511,206 @@ export default function App() {
         }`}
       >
 
-          {/* 1. EXPANDED HOME VIEW */}
+          {/* 1. EXPANDED HOME VIEW (Horizontal Multi-Page Pager) */}
           {currentView === 'home' && (
             <div
-              className="absolute inset-0 px-5 py-4 flex flex-col gap-2.5 text-white cursor-default overflow-hidden"
+              className="absolute inset-0 flex flex-col justify-between text-white cursor-default overflow-hidden select-none"
               onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => {
+                if (e.deltaX > 25) {
+                  setHomePage(1)
+                } else if (e.deltaX < -25) {
+                  setHomePage(0)
+                }
+              }}
             >
-              <div>
-                <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">
-                  {dateStr}
-                </span>
-                <div className="text-3xl font-bold tracking-tight text-white/95 mt-0.5">
-                  {timeStr}
-                </div>
+              {/* Horizontal Slider Content */}
+              <div className="relative flex-1 w-full overflow-hidden">
+                <motion.div
+                  animate={{ x: homePage === 0 ? '0%' : '-50%' }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                  className="flex w-[200%] h-full"
+                >
+                  {/* Page 0: Clock & Quick Timer */}
+                  <div className="w-1/2 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between">
+                    <div>
+                      {/* Top Bar: Date & Shelf Navigation Pill */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">
+                          {dateStr}
+                        </span>
+
+                        <button
+                          onClick={() => setHomePage(1)}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[10px] font-medium transition-all active:scale-95"
+                          title={t.fileShelf}
+                        >
+                          <Folder className="w-3 h-3 text-amber-400" />
+                          <span>{t.fileShelf}</span>
+                          {shelfCount > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full bg-amber-400/25 text-amber-300 text-[9px] font-mono font-bold">
+                              {shelfCount}
+                            </span>
+                          )}
+                          <ChevronRight className="w-3 h-3 text-white/40" />
+                        </button>
+                      </div>
+
+                      <div className="text-3xl font-bold tracking-tight text-white/95 mt-1 font-mono">
+                        {timeStr}
+                      </div>
+                    </div>
+
+                    {/* Quick Timer Presets */}
+                    <div className="flex flex-col gap-1.5 pt-0.5">
+                      <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
+                        {t.quickTimer}
+                      </span>
+
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {[
+                          {
+                            label: '5m',
+                            action: () => {
+                              globalTimerEngine.startTimer(5)
+                              setExpandedActivity(null)
+                            },
+                          },
+                          {
+                            label: '15m',
+                            action: () => {
+                              globalTimerEngine.startTimer(15)
+                              setExpandedActivity(null)
+                            },
+                          },
+                          {
+                            label: '25m',
+                            action: () => {
+                              globalTimerEngine.startTimer(25)
+                              setExpandedActivity(null)
+                            },
+                          },
+                          {
+                            label: t.focus,
+                            action: () => {
+                              globalTimerEngine.startPomodoro('focus', 1)
+                              setExpandedActivity(null)
+                            },
+                            highlight: true,
+                          },
+                          {
+                            label: t.custom,
+                            action: () => setShowCustomInput(!showCustomInput),
+                            active: showCustomInput,
+                          },
+                        ].map((preset) => (
+                          <button
+                            key={preset.label}
+                            onClick={preset.action}
+                            className={`py-1.5 px-1 rounded-xl text-xs font-medium transition-all text-center active:scale-95 ${
+                              preset.active
+                                ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
+                                : preset.highlight
+                                ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30'
+                                : 'bg-white/10 hover:bg-white/20 text-white'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {showCustomInput && (
+                        <form onSubmit={handleStartCustom} className="flex items-center gap-1.5 mt-1 pt-1 border-t border-white/10">
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={customHours}
+                              onChange={(e) => handleDurationInput(e.target.value, 99, setCustomHours)}
+                              onFocus={(e) => e.target.select()}
+                              onBlur={() => {
+                                if (!customHours) setCustomHours('0')
+                              }}
+                              className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                              placeholder="0"
+                            />
+                            <span className="text-[11px] text-white/50 font-mono">{t.hourUnit}</span>
+                          </div>
+                          <span className="text-white/30 text-xs font-mono">:</span>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={customMins}
+                              onChange={(e) => handleDurationInput(e.target.value, 59, setCustomMins)}
+                              onFocus={(e) => e.target.select()}
+                              onBlur={() => {
+                                if (!customMins) setCustomMins('0')
+                              }}
+                              className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                              placeholder="0"
+                              autoFocus
+                            />
+                            <span className="text-[11px] text-white/50 font-mono">{t.minUnit}</span>
+                          </div>
+                          <span className="text-white/30 text-xs font-mono">:</span>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={customSecs}
+                              onChange={(e) => handleDurationInput(e.target.value, 59, setCustomSecs)}
+                              onFocus={(e) => e.target.select()}
+                              onBlur={() => {
+                                if (!customSecs) setCustomSecs('0')
+                              }}
+                              className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                              placeholder="0"
+                            />
+                            <span className="text-[11px] text-white/50 font-mono">{t.secUnit}</span>
+                          </div>
+                          <button
+                            type="submit"
+                            className="px-3.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-colors ml-auto active:scale-95 shadow-sm"
+                          >
+                            {t.start}
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Page 1: Dedicated File Shelf */}
+                  <div className="w-1/2 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between">
+                    <FileShelf
+                      isDragOver={isDragOver}
+                      onBack={() => setHomePage(0)}
+                    />
+                  </div>
+                </motion.div>
               </div>
 
-              {/* Quick Timer Presets */}
-              <div className="flex flex-col gap-1.5 pt-0.5">
-                <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
-                  {t.quickTimer}
-                </span>
-
-                <div className="grid grid-cols-5 gap-1.5">
-                  {[
-                    {
-                      label: '5m',
-                      action: () => {
-                        globalTimerEngine.startTimer(5)
-                        setExpandedActivity(null)
-                      },
-                    },
-                    {
-                      label: '15m',
-                      action: () => {
-                        globalTimerEngine.startTimer(15)
-                        setExpandedActivity(null)
-                      },
-                    },
-                    {
-                      label: '25m',
-                      action: () => {
-                        globalTimerEngine.startTimer(25)
-                        setExpandedActivity(null)
-                      },
-                    },
-                    {
-                      label: t.focus,
-                      action: () => {
-                        globalTimerEngine.startPomodoro('focus', 1)
-                        setExpandedActivity(null)
-                      },
-                      highlight: true,
-                    },
-                    {
-                      label: t.custom,
-                      action: () => setShowCustomInput(!showCustomInput),
-                      active: showCustomInput,
-                    },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      onClick={preset.action}
-                      className={`py-1.5 px-1 rounded-xl text-xs font-medium transition-all text-center active:scale-95 ${
-                        preset.active
-                          ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
-                          : preset.highlight
-                          ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30'
-                          : 'bg-white/10 hover:bg-white/20 text-white'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-
-                {showCustomInput && (
-                  <form onSubmit={handleStartCustom} className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-white/10">
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={customHours}
-                        onChange={(e) => handleDurationInput(e.target.value, 99, setCustomHours)}
-                        onFocus={(e) => e.target.select()}
-                        onBlur={() => {
-                          if (!customHours) setCustomHours('0')
-                        }}
-                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
-                        placeholder="0"
-                      />
-                      <span className="text-[11px] text-white/50 font-mono">{t.hourUnit}</span>
-                    </div>
-                    <span className="text-white/30 text-xs font-mono">:</span>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={customMins}
-                        onChange={(e) => handleDurationInput(e.target.value, 59, setCustomMins)}
-                        onFocus={(e) => e.target.select()}
-                        onBlur={() => {
-                          if (!customMins) setCustomMins('0')
-                        }}
-                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
-                        placeholder="0"
-                        autoFocus
-                      />
-                      <span className="text-[11px] text-white/50 font-mono">{t.minUnit}</span>
-                    </div>
-                    <span className="text-white/30 text-xs font-mono">:</span>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={customSecs}
-                        onChange={(e) => handleDurationInput(e.target.value, 59, setCustomSecs)}
-                        onFocus={(e) => e.target.select()}
-                        onBlur={() => {
-                          if (!customSecs) setCustomSecs('0')
-                        }}
-                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
-                        placeholder="0"
-                      />
-                      <span className="text-[11px] text-white/50 font-mono">{t.secUnit}</span>
-                    </div>
-                    <button
-                      type="submit"
-                      className="px-3.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-colors ml-auto active:scale-95 shadow-sm"
-                    >
-                      {t.start}
-                    </button>
-                  </form>
-                )}
+              {/* Bottom Pagination Dots */}
+              <div className="flex items-center justify-center gap-1.5 pb-2 pt-0.5 shrink-0">
+                <button
+                  onClick={() => setHomePage(0)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    homePage === 0 ? 'w-4 bg-white' : 'w-1.5 bg-white/25 hover:bg-white/50'
+                  }`}
+                  aria-label="Clock & Timer"
+                />
+                <button
+                  onClick={() => setHomePage(1)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    homePage === 1 ? 'w-4 bg-amber-400' : 'w-1.5 bg-white/25 hover:bg-white/50'
+                  }`}
+                  aria-label="File Shelf"
+                />
               </div>
-
-              {/* 3. File Shelf (Spec Fase 3) */}
-              <FileShelf isDragOver={isDragOver} />
             </div>
           )}
 

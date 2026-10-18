@@ -21,7 +21,7 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   singleMusic: { width: 280, height: 58 },
   split: { width: 320, height: 58 },
   dropTarget: { width: 260, height: 72 },
-  home: { width: 390, height: 320 },
+  home: { width: 390, height: 260 },
   expandedMusic: { width: 400, height: 230 },
   expandedTimer: { width: 370, height: 220 },
   alert: { width: 370, height: 210 },
@@ -59,7 +59,7 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
   },
   home: {
     width: 350,
-    height: 280,
+    height: 220,
     borderRadius: 36,
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)',
     y: 0,
