@@ -6,7 +6,6 @@ import {
   RotateCcw,
   ChevronDown,
   Timer as TimerIcon,
-  Clock,
   Sparkles,
   Bell,
   Coffee,
@@ -34,6 +33,17 @@ const springTransition: Transition = {
   stiffness: 420,
   damping: 32,
   mass: 0.8,
+}
+
+// Format clock time respecting system OS 12h/24h preferences
+function formatClockTime(now: Date, mode: 'auto' | '12h' | '24h' = 'auto'): string {
+  if (mode === '12h') {
+    return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+  if (mode === '24h') {
+    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+  }
+  return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
 type IslandView = 'droplet' | 'idle' | 'singleTimer' | 'home' | 'expandedTimer' | 'alert'
@@ -86,10 +96,23 @@ export default function App() {
     !('__TAURI_INTERNALS__' in window)
   const [showDevControls, setShowDevControls] = useState(isBrowserDev)
 
+  // User system clock format preference ('auto' | '12h' | '24h')
+  const [clockFormat, setClockFormat] = useState<'auto' | '12h' | '24h'>('auto')
+
+  // Query OS 12h/24h time setting from Windows via Tauri
+  useEffect(() => {
+    invoke<string>('get_system_time_format')
+      .then((fmt) => {
+        if (fmt === '12h' || fmt === '24h') {
+          setClockFormat(fmt)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   // System Clock state
   const [timeStr, setTimeStr] = useState(() => {
-    const d = new Date()
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+    return formatClockTime(new Date(), 'auto')
   })
   const [dateStr, setDateStr] = useState(() => {
     return new Date().toLocaleDateString('id-ID', {
@@ -235,11 +258,11 @@ export default function App() {
     return () => clearTimeout(dwellTimer)
   }, [isDwelling, displayState])
 
-  // Align clock updates to minute boundaries
+  // Align clock updates to minute boundaries and follow system 12h/24h setting
   useEffect(() => {
     const updateTime = () => {
       const now = new Date()
-      setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
+      setTimeStr(formatClockTime(now, clockFormat))
       setDateStr(now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' }))
     }
 
@@ -257,7 +280,7 @@ export default function App() {
       clearTimeout(timeoutId)
       clearInterval(intervalId)
     }
-  }, [])
+  }, [clockFormat])
 
   // Collapse on Escape
   useEffect(() => {
@@ -817,9 +840,8 @@ export default function App() {
               transition={{ duration: 0.14 }}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
-              className="w-full h-full px-3 flex items-center justify-center gap-2 text-white"
+              className="w-full h-full px-3 flex items-center justify-center text-white"
             >
-              <Clock className="w-3.5 h-3.5 text-white/70" />
               <span className="text-xs font-semibold text-white/95 font-mono tracking-tight">
                 {timeStr}
               </span>

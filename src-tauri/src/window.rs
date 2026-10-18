@@ -58,6 +58,39 @@ pub fn resize_island(app: AppHandle, width: f64, height: f64) -> Result<(), Stri
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_system_time_format() -> String {
+    #[cfg(windows)]
+    {
+        unsafe extern "system" {
+            fn GetLocaleInfoEx(
+                lpLocaleName: *const u16,
+                LCType: u32,
+                lpLCData: *mut u16,
+                cchData: i32,
+            ) -> i32;
+        }
+        let mut buf = [0u16; 64];
+        let len = unsafe {
+            GetLocaleInfoEx(
+                std::ptr::null(), // LOCALE_NAME_USER_DEFAULT
+                0x00000079,       // LOCALE_SSHORTTIME
+                buf.as_mut_ptr(),
+                buf.len() as i32,
+            )
+        };
+        if len > 0 {
+            let s = String::from_utf16_lossy(&buf[..(len as usize).saturating_sub(1)]);
+            if s.contains('H') {
+                return "24h".to_string();
+            } else if s.contains('h') {
+                return "12h".to_string();
+            }
+        }
+    }
+    "auto".to_string()
+}
+
 pub fn setup_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(window) = app.get_webview_window("main") {
         if let Ok(Some(monitor)) = window.current_monitor() {

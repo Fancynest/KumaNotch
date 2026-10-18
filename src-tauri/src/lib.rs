@@ -20,6 +20,7 @@ pub fn run() {
         }))
         .invoke_handler(tauri::generate_handler![
             window::resize_island,
+            window::get_system_time_format,
             detector::get_app_mode
         ])
         .setup(|app| {
