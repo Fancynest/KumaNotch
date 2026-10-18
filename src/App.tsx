@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { motion, type Transition } from 'framer-motion'
+import { motion, AnimatePresence, type Transition } from 'framer-motion'
 import {
   Play,
   Pause,
@@ -259,39 +259,11 @@ export default function App() {
   useEffect(() => {
     if (targetView === currentView) return
 
-    const prevSize = currentWindowSizeRef.current
     const nextSize = WINDOW_SIZES[targetView]
-    const isExpanding = nextSize.width > prevSize.width || nextSize.height > prevSize.height
-
-    let isMounted = true
-
-    if (isExpanding) {
-      // EXPAND FLOW:
-      // 1. Resize OS window first so expansion is never clipped
-      // 2. Trigger shell animation on the next frame after layout settles
-      resizeWindow(nextSize.width, nextSize.height).then(() => {
-        if (!isMounted) return
-        currentWindowSizeRef.current = nextSize
-        requestAnimationFrame(() => {
-          if (!isMounted) return
-          setCurrentView(targetView)
-          setShellConfig(SHELL_CONFIGS[targetView])
-        })
-      })
-    } else {
-      // COLLAPSE FLOW:
-      // Resize OS window IMMEDIATELY (same frame) to eliminate ghost artifacts
-      // in the transparent region. The shell clips for the first few spring frames
-      // but content is centered + overflow-hidden so it's invisible.
-      currentWindowSizeRef.current = nextSize
-      resizeWindow(nextSize.width, nextSize.height)
-      setCurrentView(targetView)
-      setShellConfig(SHELL_CONFIGS[targetView])
-    }
-
-    return () => {
-      isMounted = false
-    }
+    currentWindowSizeRef.current = nextSize
+    resizeWindow(nextSize.width, nextSize.height)
+    setCurrentView(targetView)
+    setShellConfig(SHELL_CONFIGS[targetView])
   }, [targetView, currentView])
 
   const handleAnimationComplete = () => {
@@ -554,36 +526,30 @@ export default function App() {
         />
       )}
 
-      {/* SINGLE PERSISTENT SHELL */}
-      <motion.div
-        animate={{
-          width: shellConfig.width,
-          height: shellConfig.height,
-          borderRadius: shellConfig.borderRadius,
-          boxShadow: shellConfig.boxShadow,
-          y: shellConfig.y,
-          x: '-50%',
-        }}
-        transition={springTransition}
-        onAnimationComplete={handleAnimationComplete}
-        onClick={handleShellClick}
-        onMouseEnter={() => currentView === 'droplet' && setIsDwelling(true)}
-        onMouseLeave={() => setIsDwelling(false)}
-        style={{
-          position: 'absolute',
-          top: 8,
-          left: currentView === 'split' ? 'calc(50% - 21px)' : '50%',
-          transformOrigin: 'top center',
-          transition: 'left 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
-        }}
-        className={`bg-black border overflow-hidden cursor-pointer z-40 ${
-          currentView === 'alert'
-            ? 'border-amber-500/50'
-            : currentView === 'dropTarget'
-            ? 'border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-            : 'border-white/20'
-        }`}
-      >
+      {/* CENTERED SHELL & SPLIT ROW CONTAINER */}
+      <div className="pt-2 flex items-center justify-center gap-2.5 z-40">
+        {/* SINGLE PERSISTENT SHELL */}
+        <motion.div
+          animate={{
+            width: shellConfig.width,
+            height: shellConfig.height,
+            borderRadius: shellConfig.borderRadius,
+            boxShadow: shellConfig.boxShadow,
+            y: shellConfig.y,
+          }}
+          transition={springTransition}
+          onAnimationComplete={handleAnimationComplete}
+          onClick={handleShellClick}
+          onMouseEnter={() => currentView === 'droplet' && setIsDwelling(true)}
+          onMouseLeave={() => setIsDwelling(false)}
+          className={`bg-black border overflow-hidden cursor-pointer relative shrink-0 ${
+            currentView === 'alert'
+              ? 'border-amber-500/50'
+              : currentView === 'dropTarget'
+              ? 'border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+              : 'border-white/20'
+          }`}
+        >
 
           {/* 1. EXPANDED HOME VIEW (Horizontal Multi-Page Pager) */}
           {currentView === 'home' && (
@@ -1109,77 +1075,72 @@ export default function App() {
           )}
       </motion.div>
 
-      {/* DETACHED SECONDARY BUBBLE (Dynamic Island Split Mode) */}
-      <motion.div
-        initial={false}
-        animate={{
-          scale: currentView === 'split' ? 1 : 0,
-          opacity: currentView === 'split' ? 1 : 0,
-          x: '-50%',
-          y: shellConfig.y,
-        }}
-        transition={springTransition}
-        whileHover={{ scale: currentView === 'split' ? 1.12 : 0 }}
-        whileTap={{ scale: currentView === 'split' ? 0.92 : 0 }}
-        onClick={(e) => {
-          e.stopPropagation()
-          setExpandedActivity('timer')
-        }}
-        style={{
-          position: 'absolute',
-          top: 8,
-          left: currentView === 'split' ? 'calc(50% + 53px)' : '50%',
-          width: 32,
-          height: 32,
-          pointerEvents: currentView === 'split' ? 'auto' : 'none',
-          transformOrigin: 'center center',
-          transition: 'left 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
-        }}
-        className="rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer z-40 overflow-hidden"
-        title="Timer"
-      >
-        {/* Progress Ring */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <svg className="w-full h-full -rotate-90 p-0.5" viewBox="0 0 32 32">
-            <circle
-              cx="16"
-              cy="16"
-              r="13"
-              fill="none"
-              stroke="rgba(255, 255, 255, 0.15)"
-              strokeWidth="2.5"
-            />
-            <circle
-              cx="16"
-              cy="16"
-              r="13"
-              fill="none"
-              stroke={isPomodoroBreak ? '#10b981' : '#ff9500'}
-              strokeWidth="2.5"
-              strokeDasharray={81.68}
-              strokeDashoffset={81.68 * (1 - timerProgress)}
-              strokeLinecap="round"
-              className="transition-all duration-300"
-            />
-          </svg>
-        </div>
+        {/* DETACHED SECONDARY BUBBLE (Dynamic Island Split Mode) */}
+        <AnimatePresence>
+          {currentView === 'split' && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0, width: 0 }}
+              animate={{ scale: 1, opacity: 1, width: 32 }}
+              exit={{ scale: 0, opacity: 0, width: 0 }}
+              transition={springTransition}
+              whileHover={{ scale: 1.12 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setExpandedActivity('timer')
+              }}
+              style={{
+                height: 32,
+                transformOrigin: 'center center',
+              }}
+              className="rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+              title="Timer"
+            >
+              {/* Progress Ring */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg className="w-full h-full -rotate-90 p-0.5" viewBox="0 0 32 32">
+                  <circle
+                    cx="16"
+                    cy="16"
+                    r="13"
+                    fill="none"
+                    stroke="rgba(255, 255, 255, 0.15)"
+                    strokeWidth="2.5"
+                  />
+                  <circle
+                    cx="16"
+                    cy="16"
+                    r="13"
+                    fill="none"
+                    stroke={isPomodoroBreak ? '#10b981' : '#ff9500'}
+                    strokeWidth="2.5"
+                    strokeDasharray={81.68}
+                    strokeDashoffset={81.68 * (1 - timerProgress)}
+                    strokeLinecap="round"
+                    className="transition-all duration-300"
+                  />
+                </svg>
+              </div>
 
-        {/* Animated Flipping Hourglass Icon */}
-        <motion.div
-          animate={isTimerRunning ? {
-            rotate: [0, 0, 180, 180, 360],
-          } : { rotate: 0 }}
-          transition={{
-            duration: 5.0,
-            repeat: Infinity,
-            ease: "easeInOut",
-            times: [0, 0.38, 0.50, 0.88, 1.0],
-          }}
-          className="flex items-center justify-center text-amber-400 z-10"
-        >
-          <Hourglass className="w-3.5 h-3.5 fill-amber-400/25" />
-        </motion.div>
-      </motion.div>
+              {/* Animated Flipping Hourglass Icon */}
+              <motion.div
+                animate={isTimerRunning ? {
+                  rotate: [0, 0, 180, 180, 360],
+                } : { rotate: 0 }}
+                transition={{
+                  duration: 5.0,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  times: [0, 0.38, 0.50, 0.88, 1.0],
+                }}
+                className="flex items-center justify-center text-amber-400 z-10"
+              >
+                <Hourglass className="w-3.5 h-3.5 fill-amber-400/25" />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Dev Controls - Visible ONLY when developing in standard browser, never inside Tauri window */}
       {isBrowserDev && showDevControls && (

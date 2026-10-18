@@ -16,9 +16,6 @@ unsafe extern "system" {
 const SWP_NOZORDER: u32 = 0x0004;
 const SWP_NOACTIVATE: u32 = 0x0010;
 const SWP_SHOWWINDOW: u32 = 0x0040;
-const SWP_NOCOPYBITS: u32 = 0x0100;
-const SWP_NOOWNERZORDER: u32 = 0x0200;
-const SWP_NOSENDCHANGING: u32 = 0x0400;
 
 pub fn set_window_bounds(window: &tauri::WebviewWindow, x: i32, y: i32, width: u32, height: u32) {
     #[cfg(windows)]
@@ -32,10 +29,9 @@ pub fn set_window_bounds(window: &tauri::WebviewWindow, x: i32, y: i32, width: u
                     y,
                     width as i32,
                     height as i32,
-                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOCOPYBITS | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING,
+                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW,
                 );
             }
-            return;
         }
     }
     let _ = window.set_size(PhysicalSize::new(width, height));
@@ -45,7 +41,14 @@ pub fn set_window_bounds(window: &tauri::WebviewWindow, x: i32, y: i32, width: u
 #[tauri::command]
 pub fn resize_island(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
-        if let Ok(Some(monitor)) = window.current_monitor() {
+        let monitor = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .or_else(|| window.primary_monitor().ok().flatten())
+            .or_else(|| window.available_monitors().ok().and_then(|m| m.into_iter().next()));
+
+        if let Some(monitor) = monitor {
             let scale_factor = monitor.scale_factor();
             let monitor_size = monitor.size();
             let monitor_pos = monitor.position();
@@ -97,7 +100,14 @@ pub fn get_system_time_format() -> String {
 
 pub fn setup_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(window) = app.get_webview_window("main") {
-        if let Ok(Some(monitor)) = window.current_monitor() {
+        let monitor = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .or_else(|| window.primary_monitor().ok().flatten())
+            .or_else(|| window.available_monitors().ok().and_then(|m| m.into_iter().next()));
+
+        if let Some(monitor) = monitor {
             let scale_factor = monitor.scale_factor();
             let monitor_size = monitor.size();
             let monitor_pos = monitor.position();
