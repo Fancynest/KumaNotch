@@ -9,6 +9,7 @@ import {
   Clock,
   Sparkles,
 } from 'lucide-react'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { WINDOW_SIZES, resizeWindow, type WindowSize } from './core/windowSizing'
 
 // Authentic Apple Dynamic Island spring transition curve
@@ -81,6 +82,58 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Collapse on window blur / loss of focus
+  useEffect(() => {
+    const handleBlur = () => {
+      setExpandedActivity(null)
+    }
+    window.addEventListener('blur', handleBlur)
+
+    let unlisten: (() => void) | undefined
+    try {
+      const win = getCurrentWebviewWindow()
+      win.onFocusChanged(({ payload: focused }) => {
+        if (!focused) {
+          setExpandedActivity(null)
+        }
+      }).then((fn) => {
+        unlisten = fn
+      }).catch(() => {})
+    } catch {}
+
+    return () => {
+      window.removeEventListener('blur', handleBlur)
+      if (unlisten) unlisten()
+    }
+  }, [])
+
+  // Inactivity auto-collapse for Home (10s without mouse/keyboard interaction)
+  useEffect(() => {
+    if (expandedActivity !== 'home') return
+
+    let timer = setTimeout(() => {
+      setExpandedActivity(null)
+    }, 10000)
+
+    const resetInactivity = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        setExpandedActivity(null)
+      }, 10000)
+    }
+
+    window.addEventListener('mousemove', resetInactivity)
+    window.addEventListener('mousedown', resetInactivity)
+    window.addEventListener('keydown', resetInactivity)
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('mousemove', resetInactivity)
+      window.removeEventListener('mousedown', resetInactivity)
+      window.removeEventListener('keydown', resetInactivity)
+    }
+  }, [expandedActivity])
+
   // Determine current active mode
   const isSplit = musicActive && timerActive && !expandedActivity
 
@@ -113,20 +166,19 @@ export default function App() {
     }
   }, [expandedActivity, isSplit, musicActive, timerActive])
 
-  // Timer countdown effect
+  // Timer countdown effect - pure updater without side-effects
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>
-    if (timerActive && timerRunning && timerSeconds > 0) {
-      interval = setInterval(() => {
-        setTimerSeconds((prev) => {
-          if (prev <= 1) {
-            setTimerRunning(false)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
+    if (!timerActive || !timerRunning) return
+
+    if (timerSeconds <= 0) {
+      setTimerRunning(false)
+      return
     }
+
+    const interval = setInterval(() => {
+      setTimerSeconds((prev) => (prev > 0 ? prev - 1 : 0))
+    }, 1000)
+
     return () => clearInterval(interval)
   }, [timerActive, timerRunning, timerSeconds])
 
@@ -146,7 +198,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-start pt-3 select-none relative">
+    <div className="w-full h-full flex flex-col items-center justify-start pt-2 select-none relative">
       {/* Dynamic Island Container */}
       <div className="relative z-50 flex items-center justify-center">
         <AnimatePresence mode="popLayout">
@@ -156,7 +208,7 @@ export default function App() {
               key="expanded-home"
               layoutId="island-core"
               transition={springTransition}
-              className="bg-black text-white rounded-[36px] p-5 shadow-[0_8px_24px_rgba(0,0,0,0.8)] border border-white/20 w-[350px] flex flex-col gap-3"
+              className="bg-black text-white rounded-[36px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.6)] border border-white/20 w-[350px] flex flex-col gap-3"
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -206,7 +258,7 @@ export default function App() {
               key="expanded-timer"
               layoutId="island-core"
               transition={springTransition}
-              className="bg-black text-white rounded-[36px] p-5 shadow-[0_8px_24px_rgba(0,0,0,0.8)] border border-white/20 w-[330px] flex flex-col gap-3.5"
+              className="bg-black text-white rounded-[36px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.6)] border border-white/20 w-[330px] flex flex-col gap-3.5"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -268,7 +320,7 @@ export default function App() {
               transition={springTransition}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
-              className="bg-black text-white h-8 px-3.5 rounded-full flex items-center gap-2 cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.7)] border border-white/20"
+              className="bg-black text-white h-8 px-3.5 rounded-full flex items-center gap-2 cursor-pointer shadow-[0_2px_10px_rgba(0,0,0,0.45)] border border-white/20"
             >
               <TimerIcon className="w-3.5 h-3.5 text-[#ff9500]" />
               <span className="text-xs font-mono font-semibold text-white tracking-tight">
@@ -286,7 +338,7 @@ export default function App() {
               transition={springTransition}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
-              className="bg-black text-white h-8 px-3 rounded-full flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.7)] border border-white/20"
+              className="bg-black text-white h-8 px-3 rounded-full flex items-center justify-center gap-2 cursor-pointer shadow-[0_2px_10px_rgba(0,0,0,0.45)] border border-white/20"
             >
               <Clock className="w-3.5 h-3.5 text-white/70" />
               <span className="text-xs font-semibold text-white/95 font-mono tracking-tight">

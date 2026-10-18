@@ -5,15 +5,15 @@ export interface WindowSize {
   height: number
 }
 
-// Window sizes include >=40px padding to prevent box-shadow edge clipping
+// Window sizes include tight padding for lighter shadow without clipping
 export const WINDOW_SIZES: Record<string, WindowSize> = {
-  idle: { width: 220, height: 100 },
-  singleTimer: { width: 230, height: 100 },
-  singleMusic: { width: 330, height: 100 },
-  split: { width: 360, height: 100 },
-  home: { width: 440, height: 260 },
-  expandedMusic: { width: 460, height: 260 },
-  expandedTimer: { width: 420, height: 250 },
+  idle: { width: 170, height: 58 },
+  singleTimer: { width: 180, height: 58 },
+  singleMusic: { width: 280, height: 58 },
+  split: { width: 320, height: 58 },
+  home: { width: 390, height: 230 },
+  expandedMusic: { width: 400, height: 230 },
+  expandedTimer: { width: 370, height: 220 },
 }
 
 export async function resizeWindow(width: number, height: number) {

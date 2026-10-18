@@ -21,3 +21,16 @@ This document records architectural choices, deviations from the initial spec, a
   2. OS shadow disabled (`"shadow": false`), webview background explicitly transparent (`#00000000`).
   3. Removed `backdrop-blur`/`backdrop-filter` in favor of solid dark capsule (`bg-black/95` or `bg-black/90`).
   4. Cleaned out all mock demo state from production: first-run is idle clock capsule only.
+
+## Decision 003: Fase 1 Completion & Window/Tray Architecture
+- **Date**: 2026-10-18
+- **Context**: Completion of Fase 1 requirements from `KUMANOTCH_SPEC.md`: transparent click-blocking reduction, multi-monitor geometry, atomic positioning, tray cleanup, and timer reactivity.
+- **Decision**:
+  1. **Tightened Compact Bounds**: Reduced compact window height from 100px to 58px and softened CSS box-shadow (`shadow-[0_2px_10px_rgba(0,0,0,0.45)]`), cutting ~42px of transparent space below capsule while ensuring shadow is never clipped.
+  2. **Multi-Monitor & Atomic Win32 SetWindowPos**: Positioning now factors in `monitor.position()` (`x = monitor_pos.x + ...`, `y = monitor_pos.y + 8px * scale_factor`), moving and sizing the window in a single atomic Win32 `SetWindowPos` call (`SWP_NOZORDER | SWP_NOACTIVATE`) without coordinate jumping or flicker.
+  3. **Clean Startup**: Window is configured with `"visible": false` in `tauri.conf.json` and shown only after `setup_window` applies correct monitor bounds, preventing initial window flashing at wrong coordinates.
+  4. **Auto-Collapse Flow**: Expanded cards automatically collapse on focus loss (Tauri `onFocusChanged` + `blur`), 10 seconds of user inactivity on Home, or Escape key.
+  5. **Tray & Autostart**: Hidden unimplemented items (Settings, Personality); wired functional "Start with Windows" toggle via `tauri-plugin-autostart`.
+  6. **Timer Effect Reactivity**: Removed setState updater side-effects from timer countdown; state transition to stopped now runs cleanly outside updater callback.
+  7. **Cleanups**: Removed unused `@tauri-apps/plugin-shell`, removed Electron `electronAPI` typing from `vite-env.d.ts`, removed hardcoded file logging from `lib.rs` in favor of `tauri-plugin-log`, configured strict Content-Security-Policy (CSP), and updated `README.md`.
+
