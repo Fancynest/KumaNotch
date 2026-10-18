@@ -23,6 +23,7 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   home: { width: 390, height: 230 },
   expandedMusic: { width: 400, height: 230 },
   expandedTimer: { width: 370, height: 220 },
+  alert: { width: 370, height: 210 },
 }
 
 // Single persistent shell geometry configurations
@@ -42,7 +43,7 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     y: 0, // vertical center anchored at y = 24px (8 + 0 + 16)
   },
   singleTimer: {
-    width: 108,
+    width: 112,
     height: 32,
     borderRadius: 16,
     boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
@@ -60,6 +61,13 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     height: 175,
     borderRadius: 36,
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)',
+    y: 0,
+  },
+  alert: {
+    width: 330,
+    height: 165,
+    borderRadius: 36,
+    boxShadow: '0 4px 25px rgba(255, 149, 0, 0.45)',
     y: 0,
   },
 }

@@ -78,4 +78,23 @@ This document records architectural choices, deviations from the initial spec, a
 - **Recommendation & Outcome**:
   Option B delivers 60fps native DWM performance with 0 dropped frames, zero IPC hit-test lag, eliminates clipping artifacts, guarantees exact click-through bounds on underlying browser tabs/window controls, and keeps baseline RAM below 38MB.
 
+## Decision 007: Timestamp-Based Resilient Timer Engine, Activity Registry, and Web Audio Chime (Fase 2)
+- **Date**: 2026-10-18
+- **Context**: Implementation of Fase 2 from `KUMANOTCH_SPEC.md`. Traditional countdown timers that decrement an integer counter (`prev - 1`) fail when the system sleeps, throttles background webviews, or restarts.
+- **Decision**:
+  1. **Timestamp-Based Tracking (`endsAt`)**:
+     Timer duration is anchored strictly to an absolute epoch millisecond timestamp (`endsAt`). Remaining time is computed on-demand: `Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))`. If the laptop goes to sleep or background throttling occurs, upon resume the timer immediately re-synchronizes with true wall-clock time without drifting.
+  2. **Crash & Restart Persistence**:
+     State is automatically serialized to `localStorage` (`kumanotch_timer_state`). If KumaNotch is quit, restarted, or the machine reboots while a timer is running, the timer seamlessly rehydrates on launch. If the timer expired while the app was closed or sleeping, it immediately triggers the completion alert upon waking.
+  3. **Activity Registry (`core/activities.ts`)**:
+     Implemented an observable `ActivityRegistry` adhering to Section 5: priority-ranked activities (`alert: 100, hud: 90, timer: 70, indicator: 60, media: 50, calendar: 40`), auto-sorted by priority descending then `updatedAt` descending.
+  4. **Compact SVG Circular Progress Ring**:
+     Compact capsule displays an SVG circular progress ring (stroke-dashoffset based on `remainingSeconds / totalDurationSeconds`) with animated center pulse next to the mono `mm:ss` counter.
+  5. **Pomodoro Cycle Engine & Custom Input**:
+     Full Pomodoro state machine: Focus (25m), Short Break (5m), and Long Break (15m) with automatic cycle tracking (1..4), phase color coding (Amber for Focus, Emerald for Break), plus inline custom duration input.
+  6. **Synthesized Web Audio API Chime (`core/audio.ts`)**:
+     Built a zero-dependency bell chime using dual harmonic sine oscillators (C6 1046.5Hz, E6 1318.5Hz, G6 1567.98Hz) with exponential gain decay. Uses 0 KB external audio files, requires 0 disk I/O, and plays reliably on Windows without codec or asset-loading pitfalls.
+  7. **Auto-Expanding Completion Alert**:
+     Expired timer elevates to priority 100 (`alert`), auto-expanding from compact or droplet mode, sounding the chime, and presenting one-click next-phase action ("Mulai Istirahat", "Mulai Sesi Fokus", or "Ulangi Timer") with 30s auto-dismiss.
+
 
