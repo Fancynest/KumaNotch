@@ -19,7 +19,7 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   droplet: { width: 48, height: 48 },
   singleTimer: { width: 180, height: 58 },
   singleMusic: { width: 280, height: 58 },
-  split: { width: 320, height: 58 },
+  split: { width: 220, height: 58 },
   dropTarget: { width: 260, height: 72 },
   home: { width: 390, height: 260 },
   expandedMusic: { width: 400, height: 230 },
@@ -49,6 +49,13 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     borderRadius: 16,
     boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
     y: 0, // vertical center anchored at y = 24px (8 + 0 + 16)
+  },
+  split: {
+    width: 96,
+    height: 32,
+    borderRadius: 16,
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
+    y: 0,
   },
   singleTimer: {
     width: 118,

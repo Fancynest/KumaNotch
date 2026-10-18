@@ -45,6 +45,8 @@ export const translations = {
     clearAll: 'Bersihkan',
     dragOutHint: 'Geser keluar untuk share',
     backToHome: 'Kembali',
+    openTimer: 'Buka Timer',
+    activeTimer: 'Timer Aktif',
   },
   en: {
     quickTimer: 'Quick Timer',
@@ -81,6 +83,8 @@ export const translations = {
     clearAll: 'Clear All',
     dragOutHint: 'Drag out to share',
     backToHome: 'Back',
+    openTimer: 'Open Timer',
+    activeTimer: 'Active Timer',
   },
 }
 

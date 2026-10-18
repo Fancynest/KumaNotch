@@ -13,6 +13,7 @@ import {
   Coffee,
   Brain,
   UploadCloud,
+  Hourglass,
 } from 'lucide-react'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
@@ -55,7 +56,7 @@ function formatClockTime(now: Date, mode: 'auto' | '12h' | '24h' = 'auto'): stri
   return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
-type IslandView = 'droplet' | 'idle' | 'singleTimer' | 'home' | 'expandedTimer' | 'alert' | 'dropTarget'
+type IslandView = 'droplet' | 'idle' | 'split' | 'singleTimer' | 'home' | 'expandedTimer' | 'alert' | 'dropTarget'
 
 function getIslandView(
   displayState: 'capsule' | 'droplet',
@@ -69,7 +70,7 @@ function getIslandView(
   if (isDragOver) return 'dropTarget'
   if (displayState === 'droplet') return 'droplet'
   if (timerData && (timerData.status === 'running' || timerData.status === 'paused')) {
-    return 'singleTimer'
+    return 'split'
   }
   return 'idle'
 }
@@ -470,7 +471,7 @@ export default function App() {
 
   // Shell click handler
   const handleShellClick = () => {
-    if (currentView === 'idle') {
+    if (currentView === 'idle' || currentView === 'split') {
       setExpandedActivity('home')
     } else if (currentView === 'singleTimer') {
       setExpandedActivity('timer')
@@ -554,6 +555,7 @@ export default function App() {
           borderRadius: shellConfig.borderRadius,
           boxShadow: shellConfig.boxShadow,
           y: shellConfig.y,
+          x: currentView === 'split' ? 'calc(-50% - 20px)' : '-50%',
         }}
         transition={springTransition}
         onAnimationComplete={handleAnimationComplete}
@@ -564,7 +566,6 @@ export default function App() {
           position: 'absolute',
           top: 8,
           left: '50%',
-          x: '-50%',
           transformOrigin: 'top center',
         }}
         className={`bg-black border overflow-hidden cursor-pointer z-40 ${
@@ -623,6 +624,48 @@ export default function App() {
                         {timeStr}
                       </div>
                     </div>
+
+                    {/* Active Running Timer Banner if timer is ticking */}
+                    {isTimerActive && (
+                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 my-0.5">
+                        <div className="flex items-center gap-2">
+                          <motion.div
+                            animate={isTimerRunning ? { rotate: [0, 180, 180, 360] } : { rotate: 0 }}
+                            transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+                            className="text-amber-400"
+                          >
+                            <Hourglass className="w-3.5 h-3.5 fill-amber-400/20" />
+                          </motion.div>
+                          <span className="text-xs font-mono font-bold text-amber-300">
+                            {formatTimeDisplay(remainingSeconds)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (isTimerRunning) {
+                                globalTimerEngine.pause()
+                              } else {
+                                globalTimerEngine.resume()
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-medium transition-colors"
+                          >
+                            {isTimerRunning ? t.pause : t.resume}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExpandedActivity('timer')
+                            }}
+                            className="px-2.5 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-bold transition-transform active:scale-95"
+                          >
+                            {t.openTimer}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Quick Timer Presets */}
                     <div className="flex flex-col gap-1.5 pt-0.5">
@@ -803,12 +846,25 @@ export default function App() {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setExpandedActivity(null)}
-                  className="text-white/40 hover:text-white transition-colors p-1"
-                >
-                  <ChevronDown className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setExpandedActivity('home')
+                      setHomePage(1)
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[10px] font-medium transition-all active:scale-95"
+                    title={t.fileShelf}
+                  >
+                    <Folder className="w-3 h-3 text-amber-400" />
+                    <span>{t.fileShelf}</span>
+                  </button>
+                  <button
+                    onClick={() => setExpandedActivity(null)}
+                    className="text-white/40 hover:text-white transition-colors p-1"
+                  >
+                    <ChevronDown className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Massive time countdown */}
@@ -979,7 +1035,7 @@ export default function App() {
             >
               {/* Circular Progress Ring */}
               <div className="relative w-4 h-4 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 -rotate-90" viewBox="0 0 16 16">
+                <svg className="w-4 h-4 -rotate-90 absolute inset-0" viewBox="0 0 16 16">
                   <circle
                     cx="8"
                     cy="8"
@@ -1003,7 +1059,7 @@ export default function App() {
                 </svg>
                 {/* Center dot/indicator */}
                 <span
-                  className={`w-1 h-1 rounded-full ${
+                  className={`w-1.5 h-1.5 rounded-full absolute z-10 ${
                     isPomodoroBreak
                       ? 'bg-emerald-400 shadow-[0_0_4px_#10b981]'
                       : 'bg-[#ff9500] shadow-[0_0_4px_#ff9500]'
@@ -1018,8 +1074,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 6. IDLE CLOCK VIEW */}
-          {currentView === 'idle' && (
+          {/* 6. IDLE & SPLIT CLOCK VIEW */}
+          {(currentView === 'idle' || currentView === 'split') && (
             <motion.div
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
@@ -1043,6 +1099,77 @@ export default function App() {
               </span>
             </motion.div>
           )}
+      </motion.div>
+
+      {/* DETACHED SECONDARY BUBBLE (Dynamic Island Split Mode) */}
+      <motion.div
+        initial={false}
+        animate={{
+          scale: currentView === 'split' ? 1 : 0,
+          opacity: currentView === 'split' ? 1 : 0,
+          x: currentView === 'split' ? 'calc(-50% + 54px)' : '-50%',
+          y: shellConfig.y,
+        }}
+        transition={springTransition}
+        whileHover={{ scale: currentView === 'split' ? 1.12 : 0 }}
+        whileTap={{ scale: currentView === 'split' ? 0.92 : 0 }}
+        onClick={(e) => {
+          e.stopPropagation()
+          setExpandedActivity('timer')
+        }}
+        style={{
+          position: 'absolute',
+          top: 8,
+          left: '50%',
+          width: 32,
+          height: 32,
+          pointerEvents: currentView === 'split' ? 'auto' : 'none',
+          transformOrigin: 'center center',
+        }}
+        className="rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer z-40 overflow-hidden"
+        title="Timer"
+      >
+        {/* Progress Ring */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <svg className="w-full h-full -rotate-90 p-0.5" viewBox="0 0 32 32">
+            <circle
+              cx="16"
+              cy="16"
+              r="13"
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.15)"
+              strokeWidth="2.5"
+            />
+            <circle
+              cx="16"
+              cy="16"
+              r="13"
+              fill="none"
+              stroke={isPomodoroBreak ? '#10b981' : '#ff9500'}
+              strokeWidth="2.5"
+              strokeDasharray={81.68}
+              strokeDashoffset={81.68 * (1 - timerProgress)}
+              strokeLinecap="round"
+              className="transition-all duration-300"
+            />
+          </svg>
+        </div>
+
+        {/* Animated Flipping Hourglass Icon */}
+        <motion.div
+          animate={isTimerRunning ? {
+            rotate: [0, 180, 180, 360],
+          } : { rotate: 0 }}
+          transition={{
+            duration: 2.6,
+            repeat: Infinity,
+            ease: "easeInOut",
+            times: [0, 0.42, 0.58, 1],
+          }}
+          className="flex items-center justify-center text-amber-400 z-10"
+        >
+          <Hourglass className="w-3.5 h-3.5 fill-amber-400/25" />
+        </motion.div>
       </motion.div>
 
       {/* Dev Controls - Visible ONLY when developing in standard browser, never inside Tauri window */}
