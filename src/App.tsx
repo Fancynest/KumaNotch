@@ -1,16 +1,15 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence, type Transition } from 'framer-motion'
 import {
   Play,
   Pause,
-  SkipBack,
-  SkipForward,
   RotateCcw,
-  SlidersHorizontal,
   ChevronDown,
   Timer as TimerIcon,
-  Music,
+  Clock,
+  Sparkles,
 } from 'lucide-react'
+import { WINDOW_SIZES, resizeWindow, type WindowSize } from './core/windowSizing'
 
 // Authentic Apple Dynamic Island spring transition curve
 const springTransition: Transition = {
@@ -21,166 +20,182 @@ const springTransition: Transition = {
 }
 
 export default function App() {
-  // Activity states
-  const [musicActive, setMusicActive] = useState(true)
-  const [isPlaying, setIsPlaying] = useState(true)
-  const [currentTrackTime, setCurrentTrackTime] = useState(78) // in seconds (01:18)
-  const trackDuration = 214 // 03:34
+  // Activity states - First-run default: NO activities active
+  const musicActive = false
+  const [timerActive, setTimerActive] = useState(false)
+  const [timerRunning, setTimerRunning] = useState(false)
+  const [timerSeconds, setTimerSeconds] = useState(0)
 
-  const [timerActive, setTimerActive] = useState(true)
-  const [timerRunning, setTimerRunning] = useState(true)
-  const [timerSeconds, setTimerSeconds] = useState(14 * 60 + 52) // 14:52
+  // Expanded focus state: null (compact), 'home', 'timer', or 'music'
+  const [expandedActivity, setExpandedActivity] = useState<'home' | 'timer' | 'music' | null>(null)
 
-  // Expanded focus state: null (compact), 'music', or 'timer'
-  const [expandedActivity, setExpandedActivity] = useState<'music' | 'timer' | null>(null)
+  // Dev controls active ONLY in Vite development mode
+  const isDev = import.meta.env.DEV
+  const [showDevControls, setShowDevControls] = useState(isDev)
 
-  // Dev bar toggle
-  const [showDevControls, setShowDevControls] = useState(true)
+  // System Clock state
+  const [timeStr, setTimeStr] = useState(() => {
+    const d = new Date()
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+  })
+  const [dateStr, setDateStr] = useState(() => {
+    return new Date().toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    })
+  })
 
-  // Handle Mouse Pass-Through for Electron transparent window
-  const islandRef = useRef<HTMLDivElement>(null)
-
-  const handleMouseEnter = () => {
-    window.electronAPI?.setIgnoreMouseEvents(false)
-  }
-
-  const handleMouseLeave = () => {
-    if (!expandedActivity) {
-      window.electronAPI?.setIgnoreMouseEvents(true, { forward: true })
+  // Align clock updates to minute boundaries
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
+      setDateStr(now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' }))
     }
-  }
+
+    updateTime()
+    const now = new Date()
+    const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds()
+
+    let intervalId: ReturnType<typeof setInterval>
+    const timeoutId = setTimeout(() => {
+      updateTime()
+      intervalId = setInterval(updateTime, 60000)
+    }, msToNextMinute)
+
+    return () => {
+      clearTimeout(timeoutId)
+      clearInterval(intervalId)
+    }
+  }, [])
+
+  // Collapse on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setExpandedActivity(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Determine current active mode
+  const isSplit = musicActive && timerActive && !expandedActivity
+
+  // Choreographed window sizing
+  useEffect(() => {
+    let target: WindowSize = WINDOW_SIZES.idle
+    if (expandedActivity === 'home') {
+      target = WINDOW_SIZES.home
+    } else if (expandedActivity === 'timer') {
+      target = WINDOW_SIZES.expandedTimer
+    } else if (expandedActivity === 'music') {
+      target = WINDOW_SIZES.expandedMusic
+    } else if (isSplit) {
+      target = WINDOW_SIZES.split
+    } else if (timerActive) {
+      target = WINDOW_SIZES.singleTimer
+    } else if (musicActive) {
+      target = WINDOW_SIZES.singleMusic
+    }
+
+    if (expandedActivity) {
+      // Expand: resize window first so shadow and card are never clipped
+      resizeWindow(target.width, target.height)
+    } else {
+      // Collapse: wait for spring animation before shrinking window
+      const timer = setTimeout(() => {
+        resizeWindow(target.width, target.height)
+      }, 350)
+      return () => clearTimeout(timer)
+    }
+  }, [expandedActivity, isSplit, musicActive, timerActive])
 
   // Timer countdown effect
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>
     if (timerActive && timerRunning && timerSeconds > 0) {
       interval = setInterval(() => {
-        setTimerSeconds((prev) => (prev > 0 ? prev - 1 : 0))
+        setTimerSeconds((prev) => {
+          if (prev <= 1) {
+            setTimerRunning(false)
+            return 0
+          }
+          return prev - 1
+        })
       }, 1000)
     }
     return () => clearInterval(interval)
   }, [timerActive, timerRunning, timerSeconds])
 
-  // Music progress effect
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>
-    if (musicActive && isPlaying) {
-      interval = setInterval(() => {
-        setCurrentTrackTime((prev) => (prev < trackDuration ? prev + 1 : 0))
-      }, 1000)
-    }
-    return () => clearInterval(interval)
-  }, [musicActive, isPlaying, trackDuration])
+  // Start timer helper
+  const startPresetTimer = (minutes: number) => {
+    setTimerSeconds(minutes * 60)
+    setTimerActive(true)
+    setTimerRunning(true)
+    setExpandedActivity(null)
+  }
 
-  // Format time helpers
+  // Format time helper (mm:ss)
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60)
     const s = secs % 60
     return `${m}:${s < 10 ? '0' : ''}${s}`
   }
 
-  // Determine layout mode:
-  const isSplit = musicActive && timerActive && !expandedActivity
-
   return (
-    <div
-      className="w-full h-full flex flex-col items-center pt-2 select-none relative"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+    <div className="w-full h-full flex flex-col items-center justify-start pt-3 select-none relative">
       {/* Dynamic Island Container */}
-      <div ref={islandRef} className="relative z-50 flex items-center justify-center">
-        <AnimatePresence mode="wait">
-          {/* 1. EXPANDED MUSIC VIEW */}
-          {expandedActivity === 'music' && (
+      <div className="relative z-50 flex items-center justify-center">
+        <AnimatePresence mode="popLayout">
+          {/* 1. EXPANDED HOME VIEW (Clock & Quick Actions) */}
+          {expandedActivity === 'home' && (
             <motion.div
-              key="expanded-music"
-              layoutId="island-music"
+              key="expanded-home"
+              layoutId="island-core"
               transition={springTransition}
-              className="bg-black text-white rounded-[38px] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.85)] border border-white/10 w-[380px] flex flex-col gap-3.5 backdrop-blur-xl"
+              className="bg-black text-white rounded-[36px] p-5 shadow-[0_8px_24px_rgba(0,0,0,0.8)] border border-white/20 w-[350px] flex flex-col gap-3"
             >
-              {/* Top Header */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {/* Album Cover Art */}
-                  <div className="w-13 h-13 rounded-2xl overflow-hidden shadow-md relative bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-600 flex items-center justify-center">
-                    <Music className="w-6 h-6 text-white/90 drop-shadow" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm tracking-tight text-white/95">
-                      Paper Sky
-                    </h3>
-                    <p className="text-xs text-white/50 font-medium">Lumen Coast</p>
+                <div>
+                  <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">
+                    {dateStr}
+                  </span>
+                  <div className="text-3xl font-bold tracking-tight text-white/95 mt-0.5">
+                    {timeStr}
                   </div>
                 </div>
-
-                {/* Animated Waveform */}
-                <div className="flex items-center gap-1 h-4 px-2">
-                  {[40, 90, 60, 100, 30].map((h, i) => (
-                    <motion.span
-                      key={i}
-                      animate={{
-                        height: isPlaying ? [`${h * 0.3}%`, `${h}%`, `${h * 0.4}%`] : '30%',
-                      }}
-                      transition={{
-                        repeat: Infinity,
-                        duration: 0.8 + i * 0.15,
-                        ease: 'easeInOut',
-                      }}
-                      className="w-[3px] bg-[#34c759] rounded-full inline-block"
-                      style={{ height: `${h}%` }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Progress Slider */}
-              <div className="flex flex-col gap-1.5 mt-1">
-                <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden relative">
-                  <motion.div
-                    className="bg-white h-full rounded-full"
-                    style={{ width: `${(currentTrackTime / trackDuration) * 100}%` }}
-                    transition={{ ease: 'linear' }}
-                  />
-                </div>
-                <div className="flex justify-between text-[11px] text-white/40 font-mono">
-                  <span>{formatTime(currentTrackTime)}</span>
-                  <span>-{formatTime(trackDuration - currentTrackTime)}</span>
-                </div>
-              </div>
-
-              {/* Controls */}
-              <div className="flex items-center justify-between pt-1 px-4">
-                <button
-                  onClick={() => setCurrentTrackTime(Math.max(0, currentTrackTime - 10))}
-                  className="text-white/70 hover:text-white transition-transform active:scale-90"
-                >
-                  <SkipBack className="w-5 h-5 fill-current" />
-                </button>
-                <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center transition-transform active:scale-90 shadow-lg"
-                >
-                  {isPlaying ? (
-                    <Pause className="w-5 h-5 fill-current" />
-                  ) : (
-                    <Play className="w-5 h-5 fill-current ml-0.5" />
-                  )}
-                </button>
-                <button
-                  onClick={() =>
-                    setCurrentTrackTime(Math.min(trackDuration, currentTrackTime + 10))
-                  }
-                  className="text-white/70 hover:text-white transition-transform active:scale-90"
-                >
-                  <SkipForward className="w-5 h-5 fill-current" />
-                </button>
                 <button
                   onClick={() => setExpandedActivity(null)}
                   className="text-white/40 hover:text-white transition-colors p-1"
                 >
                   <ChevronDown className="w-5 h-5" />
                 </button>
+              </div>
+
+              {/* Quick Timer Presets */}
+              <div className="flex flex-col gap-1.5 pt-1">
+                <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
+                  Mulai Timer Cepat
+                </span>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: '5m', mins: 5 },
+                    { label: '15m', mins: 15 },
+                    { label: '25m', mins: 25 },
+                    { label: 'Pomodoro', mins: 25 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={() => startPresetTimer(preset.mins)}
+                      className="py-1.5 px-1 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-medium transition-all text-center"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </motion.div>
           )}
@@ -189,18 +204,16 @@ export default function App() {
           {expandedActivity === 'timer' && (
             <motion.div
               key="expanded-timer"
-              layoutId="island-timer"
+              layoutId="island-core"
               transition={springTransition}
-              className="bg-black text-white rounded-[38px] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.85)] border border-white/10 w-[330px] flex flex-col gap-4 backdrop-blur-xl"
+              className="bg-black text-white rounded-[36px] p-5 shadow-[0_8px_24px_rgba(0,0,0,0.8)] border border-white/20 w-[330px] flex flex-col gap-3.5"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-[#ff9500]/20 flex items-center justify-center">
-                    <TimerIcon className="w-4 h-4 text-[#ff9500]" />
+                  <div className="w-6 h-6 rounded-full bg-[#ff9500]/20 flex items-center justify-center">
+                    <TimerIcon className="w-3.5 h-3.5 text-[#ff9500]" />
                   </div>
-                  <span className="text-xs font-semibold tracking-wide text-white/70 uppercase">
-                    Focus Timer
-                  </span>
+                  <span className="text-xs font-semibold text-white/70">Timer</span>
                 </div>
                 <button
                   onClick={() => setExpandedActivity(null)}
@@ -210,31 +223,35 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Countdown Digits */}
-              <div className="flex items-center justify-center py-2">
+              <div className="flex items-center justify-center py-1">
                 <div className="text-4xl font-semibold tracking-tight font-mono text-white">
                   {formatTime(timerSeconds)}
                 </div>
               </div>
 
-              {/* Quick Actions */}
               <div className="flex items-center justify-center gap-3">
                 <button
-                  onClick={() => setTimerSeconds(15 * 60)}
-                  className="w-10 h-10 rounded-full bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-transform active:scale-90"
+                  onClick={() => {
+                    setTimerActive(false)
+                    setTimerRunning(false)
+                    setTimerSeconds(0)
+                    setExpandedActivity(null)
+                  }}
+                  className="px-3 h-9 rounded-full bg-white/10 text-white/70 hover:text-white flex items-center gap-1.5 transition-transform active:scale-90 text-xs font-medium"
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset</span>
                 </button>
                 <button
                   onClick={() => setTimerRunning(!timerRunning)}
-                  className="px-6 h-10 rounded-full bg-[#ff9500] text-black font-semibold text-sm flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-md shadow-[#ff9500]/30"
+                  className="px-5 h-9 rounded-full bg-[#ff9500] text-black font-semibold text-xs flex items-center gap-1.5 transition-transform active:scale-95 shadow-md shadow-[#ff9500]/20"
                 >
-                  {timerRunning ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-                  <span>{timerRunning ? 'Pause' : 'Start'}</span>
+                  {timerRunning ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                  <span>{timerRunning ? 'Jeda' : 'Lanjut'}</span>
                 </button>
                 <button
                   onClick={() => setTimerSeconds((prev) => prev + 60)}
-                  className="w-10 h-10 rounded-full bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-transform active:scale-90 font-mono text-xs font-bold"
+                  className="px-3 h-9 rounded-full bg-white/10 text-white/70 hover:text-white flex items-center transition-transform active:scale-90 font-mono text-xs font-medium"
                 >
                   +1m
                 </button>
@@ -242,195 +259,71 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 3. SPLIT ISLAND MODE (DUAL CONCURRENT TASKS!) */}
-          {isSplit && (
-            <div key="split-island" className="flex items-center gap-3">
-              {/* Primary Island Capsule (Music) */}
-              <motion.div
-                layoutId="island-music"
-                onClick={() => setExpandedActivity('music')}
-                transition={springTransition}
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.96 }}
-                className="bg-black text-white h-9 px-3 rounded-full flex items-center gap-2.5 cursor-pointer shadow-[0_6px_20px_rgba(0,0,0,0.6)] border border-white/10"
-              >
-                {/* Mini Art */}
-                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  <Music className="w-3 h-3 text-white" />
-                </div>
-
-                {/* Animated Waveform */}
-                <div className="flex items-center gap-0.5 h-3">
-                  {[40, 90, 60, 100].map((h, i) => (
-                    <motion.span
-                      key={i}
-                      animate={{
-                        height: isPlaying ? [`${h * 0.3}%`, `${h}%`, `${h * 0.4}%`] : '30%',
-                      }}
-                      transition={{
-                        repeat: Infinity,
-                        duration: 0.7 + i * 0.15,
-                        ease: 'easeInOut',
-                      }}
-                      className="w-[2.5px] bg-[#34c759] rounded-full inline-block"
-                      style={{ height: `${h}%` }}
-                    />
-                  ))}
-                </div>
-              </motion.div>
-
-              {/* Secondary Island Bubble (Timer) */}
-              <motion.div
-                layoutId="island-timer"
-                onClick={() => setExpandedActivity('timer')}
-                transition={springTransition}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-black text-[#ff9500] h-9 px-3 rounded-full flex items-center gap-1.5 cursor-pointer shadow-[0_6px_20px_rgba(0,0,0,0.6)] border border-white/10"
-              >
-                <TimerIcon className="w-3.5 h-3.5 text-[#ff9500]" />
-                <span className="text-xs font-mono font-medium text-white/90 tracking-tight">
-                  {formatTime(timerSeconds)}
-                </span>
-              </motion.div>
-            </div>
-          )}
-
-          {/* 4. SINGLE TASK - MUSIC ONLY */}
-          {!isSplit && musicActive && !timerActive && !expandedActivity && (
+          {/* 3. ACTIVE TIMER COMPACT CAPSULE */}
+          {!expandedActivity && timerActive && (
             <motion.div
-              key="single-music"
-              layoutId="island-music"
-              onClick={() => setExpandedActivity('music')}
-              transition={springTransition}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className="bg-black text-white h-9 px-3.5 rounded-full flex items-center gap-3 cursor-pointer shadow-[0_6px_20px_rgba(0,0,0,0.6)] border border-white/10"
-            >
-              <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center overflow-hidden flex-shrink-0">
-                <Music className="w-3 h-3 text-white" />
-              </div>
-              <span className="text-xs font-medium text-white/90 max-w-[130px] truncate">
-                Paper Sky • Lumen Coast
-              </span>
-              <div className="flex items-center gap-0.5 h-3">
-                {[40, 90, 60, 100].map((h, i) => (
-                  <motion.span
-                    key={i}
-                    animate={{
-                      height: isPlaying ? [`${h * 0.3}%`, `${h}%`, `${h * 0.4}%`] : '30%',
-                    }}
-                    transition={{
-                      repeat: Infinity,
-                      duration: 0.7 + i * 0.15,
-                      ease: 'easeInOut',
-                    }}
-                    className="w-[2.5px] bg-[#34c759] rounded-full inline-block"
-                    style={{ height: `${h}%` }}
-                  />
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* 5. SINGLE TASK - TIMER ONLY */}
-          {!isSplit && !musicActive && timerActive && !expandedActivity && (
-            <motion.div
-              key="single-timer"
-              layoutId="island-timer"
+              key="compact-timer"
+              layoutId="island-core"
               onClick={() => setExpandedActivity('timer')}
               transition={springTransition}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className="bg-black text-white h-9 px-4 rounded-full flex items-center gap-2.5 cursor-pointer shadow-[0_6px_20px_rgba(0,0,0,0.6)] border border-white/10"
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              className="bg-black text-white h-8 px-3.5 rounded-full flex items-center gap-2 cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.7)] border border-white/20"
             >
-              <TimerIcon className="w-4 h-4 text-[#ff9500]" />
-              <span className="text-xs font-mono font-medium text-white tracking-tight">
+              <TimerIcon className="w-3.5 h-3.5 text-[#ff9500]" />
+              <span className="text-xs font-mono font-semibold text-white tracking-tight">
                 {formatTime(timerSeconds)}
               </span>
             </motion.div>
           )}
 
-          {/* 6. IDLE STATE (Tiny Discreet Capsule with Kuma companion eyes) */}
-          {!musicActive && !timerActive && !expandedActivity && (
+          {/* 4. DEFAULT IDLE CLOCK CAPSULE (Spec Section 1 & 4 & 5) */}
+          {!expandedActivity && !timerActive && !musicActive && (
             <motion.div
-              key="idle-capsule"
-              layoutId="island-idle"
+              key="idle-clock"
+              layoutId="island-core"
+              onClick={() => setExpandedActivity('home')}
               transition={springTransition}
-              whileHover={{ scale: 1.06 }}
-              className="bg-black text-white h-8 w-28 rounded-full flex items-center justify-center gap-3 cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.5)] border border-white/10"
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              className="bg-black text-white h-8 px-3 rounded-full flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.7)] border border-white/20"
             >
-              {/* Cute Kuma Blinking Eyes */}
-              <motion.span
-                animate={{ scaleY: [1, 1, 0.1, 1] }}
-                transition={{ repeat: Infinity, duration: 4, times: [0, 0.85, 0.9, 1] }}
-                className="w-1.5 h-2 bg-white/90 rounded-full inline-block"
-              />
-              <motion.span
-                animate={{ scaleY: [1, 1, 0.1, 1] }}
-                transition={{ repeat: Infinity, duration: 4, times: [0, 0.85, 0.9, 1] }}
-                className="w-1.5 h-2 bg-white/90 rounded-full inline-block"
-              />
+              <Clock className="w-3.5 h-3.5 text-white/70" />
+              <span className="text-xs font-semibold text-white/95 font-mono tracking-tight">
+                {timeStr}
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Interactive Testing Controller Bar (floating discreetly at bottom) */}
-      <div className="mt-auto mb-2 flex flex-col items-center gap-1 z-40">
-        <button
-          onClick={() => setShowDevControls(!showDevControls)}
-          className="text-[10px] text-white/40 hover:text-white/80 bg-black/60 px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1 backdrop-blur-md transition-all"
-        >
-          <SlidersHorizontal className="w-2.5 h-2.5" />
-          <span>{showDevControls ? 'Hide Controls' : 'Show Controls'}</span>
-        </button>
-
-        {showDevControls && (
-          <motion.div
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 bg-black/80 backdrop-blur-md border border-white/15 px-3 py-1.5 rounded-full text-xs text-white/80 shadow-lg"
+      {/* Dev Controls - Visible ONLY in Dev Mode */}
+      {isDev && showDevControls && (
+        <div className="mt-3 flex items-center gap-1.5 bg-black/90 border border-white/15 px-3 py-1 rounded-full text-[11px] text-white/80 shadow-lg">
+          <Sparkles className="w-3 h-3 text-amber-400" />
+          <button
+            onClick={() => startPresetTimer(5)}
+            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20"
           >
-            <button
-              onClick={() => {
-                setMusicActive(!musicActive)
-                setExpandedActivity(null)
-              }}
-              className={`px-2 py-1 rounded-full transition-all ${
-                musicActive ? 'bg-[#34c759]/20 text-[#34c759] font-medium' : 'text-white/40'
-              }`}
-            >
-              🎵 Music {musicActive ? 'ON' : 'OFF'}
-            </button>
-            <span className="text-white/20">|</span>
-            <button
-              onClick={() => {
-                setTimerActive(!timerActive)
-                setExpandedActivity(null)
-              }}
-              className={`px-2 py-1 rounded-full transition-all ${
-                timerActive ? 'bg-[#ff9500]/20 text-[#ff9500] font-medium' : 'text-white/40'
-              }`}
-            >
-              ⏱ Timer {timerActive ? 'ON' : 'OFF'}
-            </button>
-            <span className="text-white/20">|</span>
-            <button
-              onClick={() => {
-                setMusicActive(true)
-                setTimerActive(true)
-                setExpandedActivity(null)
-              }}
-              className={`px-2 py-1 rounded-full transition-all ${
-                isSplit ? 'bg-white text-black font-semibold' : 'text-white/50 hover:text-white'
-              }`}
-            >
-              Split Island ✨
-            </button>
-          </motion.div>
-        )}
-      </div>
+            Start 5m
+          </button>
+          <button
+            onClick={() => {
+              setTimerActive(false)
+              setTimerSeconds(0)
+            }}
+            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20"
+          >
+            Stop
+          </button>
+          <button
+            onClick={() => setShowDevControls(false)}
+            className="text-white/40 hover:text-white ml-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   )
 }
