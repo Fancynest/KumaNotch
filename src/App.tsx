@@ -131,7 +131,6 @@ export default function App() {
   const targetView = getIslandView(displayState, expandedActivity, timerData)
   const [currentView, setCurrentView] = useState<IslandView>(targetView)
   const [shellConfig, setShellConfig] = useState<ShellConfig>(SHELL_CONFIGS[targetView])
-  const pendingWindowResizeRef = useRef<WindowSize | null>(null)
   const currentWindowSizeRef = useRef<WindowSize>(WINDOW_SIZES[targetView])
 
   // Synchronize OS window bounds and shell spring animation
@@ -147,27 +146,25 @@ export default function App() {
     if (isExpanding) {
       // EXPAND FLOW:
       // 1. Resize OS window first so expansion is never clipped
+      // 2. Trigger shell animation on the next frame after layout settles
       resizeWindow(nextSize.width, nextSize.height).then(() => {
         if (!isMounted) return
         currentWindowSizeRef.current = nextSize
-        // 2. Wait 1-2 animation frames for OS/WebView viewport layout to settle
         requestAnimationFrame(() => {
           if (!isMounted) return
-          requestAnimationFrame(() => {
-            if (!isMounted) return
-            // 3. Trigger shell spring animation to expand
-            setCurrentView(targetView)
-            setShellConfig(SHELL_CONFIGS[targetView])
-          })
+          setCurrentView(targetView)
+          setShellConfig(SHELL_CONFIGS[targetView])
         })
       })
     } else {
       // COLLAPSE FLOW:
-      // 1. Animate shell first to the smaller target dimensions
-      pendingWindowResizeRef.current = nextSize
+      // Resize OS window IMMEDIATELY (same frame) to eliminate ghost artifacts
+      // in the transparent region. The shell clips for the first few spring frames
+      // but content is centered + overflow-hidden so it's invisible.
+      currentWindowSizeRef.current = nextSize
+      resizeWindow(nextSize.width, nextSize.height)
       setCurrentView(targetView)
       setShellConfig(SHELL_CONFIGS[targetView])
-      // 2. Window will be resized in handleAnimationComplete once the spring settles
     }
 
     return () => {
@@ -176,12 +173,7 @@ export default function App() {
   }, [targetView, currentView])
 
   const handleAnimationComplete = () => {
-    if (pendingWindowResizeRef.current) {
-      const nextSize = pendingWindowResizeRef.current
-      pendingWindowResizeRef.current = null
-      currentWindowSizeRef.current = nextSize
-      resizeWindow(nextSize.width, nextSize.height)
-    }
+    // No-op: window resize is now handled synchronously for both expand and collapse
   }
 
   // Alert Auto-Dismiss after 30s of inactivity (Spec Section 5 item 5)
