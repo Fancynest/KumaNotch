@@ -186,10 +186,11 @@ export default function App() {
   const [isDragOver, setIsDragOver] = useState(false)
   const [homePage, setHomePage] = useState<number>(1)
 
-  // Always reset to Clock (Page 1) when card is collapsed/closed so next open is always on Clock
+  // Always reset to Clock (Page 1) and close custom input when card is collapsed/closed
   useEffect(() => {
     if (expandedActivity === null) {
       setHomePage(1)
+      setShowCustomInput(false)
     }
   }, [expandedActivity])
 
@@ -324,22 +325,43 @@ export default function App() {
     pointerStartX.current = null
   }
 
+  // Dynamically resolve shell and window dimensions (expands smoothly when showCustomInput is active)
+  const getDynamicDimensions = (view: IslandView, isCustom: boolean) => {
+    const baseShell = { ...SHELL_CONFIGS[view] }
+    const baseWin = { ...WINDOW_SIZES[view] }
+
+    if (view === 'home') {
+      const height = isCustom ? 268 : 230
+      const winHeight = isCustom ? 310 : 270
+      baseShell.height = height
+      baseWin.height = winHeight
+    }
+
+    return { shell: baseShell, win: baseWin }
+  }
+
   // Synchronized persistent shell state
   const targetView = getIslandView(displayState, expandedActivity, timerData, mediaData, isDragOver)
   const [currentView, setCurrentView] = useState<IslandView>(targetView)
-  const [shellConfig, setShellConfig] = useState<ShellConfig>(SHELL_CONFIGS[targetView])
-  const currentWindowSizeRef = useRef<WindowSize>(WINDOW_SIZES[targetView])
+  const initialDims = getDynamicDimensions(targetView, showCustomInput)
+  const [shellConfig, setShellConfig] = useState<ShellConfig>(initialDims.shell)
+  const currentWindowSizeRef = useRef<WindowSize>(initialDims.win)
 
   // Synchronize OS window bounds and shell spring animation
   useEffect(() => {
-    if (targetView === currentView) return
+    const { shell: nextShell, win: nextWin } = getDynamicDimensions(targetView, showCustomInput)
 
-    const nextSize = WINDOW_SIZES[targetView]
-    currentWindowSizeRef.current = nextSize
-    resizeWindow(nextSize.width, nextSize.height)
+    if (
+      currentWindowSizeRef.current.width !== nextWin.width ||
+      currentWindowSizeRef.current.height !== nextWin.height
+    ) {
+      currentWindowSizeRef.current = nextWin
+      resizeWindow(nextWin.width, nextWin.height)
+    }
+
     setCurrentView(targetView)
-    setShellConfig(SHELL_CONFIGS[targetView])
-  }, [targetView, currentView])
+    setShellConfig(nextShell)
+  }, [targetView, showCustomInput])
 
   const handleAnimationComplete = () => {
     // No-op: window resize is now handled synchronously for both expand and collapse
@@ -777,7 +799,7 @@ export default function App() {
                         }}
                         className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 cursor-pointer my-0.5 transition-colors"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
                           {mediaData.thumbnailBase64 ? (
                             <img
                               src={mediaData.thumbnailBase64}
@@ -787,31 +809,24 @@ export default function App() {
                           ) : (
                             <Music2 className="w-3.5 h-3.5 text-[#1ed760] shrink-0" />
                           )}
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-xs font-semibold text-white truncate max-w-[130px]">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className="text-xs font-semibold text-white truncate max-w-[140px]">
                               {mediaData.title}
                             </span>
-                            <span className="text-[10px] text-white/50 truncate max-w-[90px]">
+                            <span className="text-[10px] text-white/50 truncate flex-1">
                               {mediaData.artist}
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <AudioWaveform
-                            isPlaying={mediaData.playbackStatus === 'playing'}
-                            barCount={3}
-                            size="sm"
-                          />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setHomePage(0)
-                            }}
-                            className="px-2.5 py-0.5 rounded-lg bg-[#1ed760] hover:bg-[#1ed760]/90 text-black text-[10px] font-bold transition-transform active:scale-95"
-                          >
-                            {t.openFile}
-                          </button>
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setHomePage(0)
+                          }}
+                          className="px-2.5 py-0.5 rounded-lg bg-[#1ed760] hover:bg-[#1ed760]/90 text-black text-[10px] font-bold transition-transform active:scale-95 shrink-0"
+                        >
+                          {t.openFile}
+                        </button>
                       </div>
                     )}
 
