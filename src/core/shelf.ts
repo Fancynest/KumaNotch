@@ -23,16 +23,35 @@ export function formatFileSize(bytes: number, isDir: boolean): string {
   return `${formatted} ${units[i]}`
 }
 
-export function getFileCategory(name: string, isDir: boolean): 'folder' | 'image' | 'archive' | 'code' | 'audio' | 'video' | 'pdf' | 'doc' | 'file' {
+export type FileCategory =
+  | 'folder'
+  | 'word'
+  | 'excel'
+  | 'powerpoint'
+  | 'pdf'
+  | 'image'
+  | 'archive'
+  | 'code'
+  | 'data'
+  | 'audio'
+  | 'video'
+  | 'text'
+  | 'file'
+
+export function getFileCategory(name: string, isDir: boolean): FileCategory {
   if (isDir) return 'folder'
   const ext = name.split('.').pop()?.toLowerCase() || ''
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)) return 'image'
-  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext)) return 'archive'
+  if (['doc', 'docx', 'docm', 'dot', 'dotx', 'odt', 'rtf'].includes(ext)) return 'word'
+  if (['xls', 'xlsx', 'xlsm', 'xlsb', 'csv', 'tsv', 'ods'].includes(ext)) return 'excel'
+  if (['ppt', 'pptx', 'pptm', 'pot', 'potx', 'pps', 'ppsx', 'odp', 'key'].includes(ext)) return 'powerpoint'
   if (['pdf'].includes(ext)) return 'pdf'
-  if (['doc', 'docx', 'txt', 'md', 'rtf', 'odt', 'csv', 'xlsx', 'pptx'].includes(ext)) return 'doc'
-  if (['ts', 'tsx', 'js', 'jsx', 'rs', 'py', 'json', 'html', 'css', 'c', 'cpp', 'java', 'go'].includes(ext)) return 'code'
-  if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg'].includes(ext)) return 'audio'
-  if (['mp4', 'mkv', 'mov', 'webm', 'avi'].includes(ext)) return 'video'
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff', 'psd', 'ai', 'raw', 'heic'].includes(ext)) return 'image'
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'iso', 'xz', 'tgz'].includes(ext)) return 'archive'
+  if (['ts', 'tsx', 'js', 'jsx', 'rs', 'py', 'c', 'cpp', 'h', 'hpp', 'cs', 'java', 'go', 'php', 'rb', 'html', 'htm', 'css', 'scss', 'sass', 'less', 'sql', 'sh', 'bat', 'cmd', 'ps1', 'vue', 'svelte', 'lua', 'swift', 'kt'].includes(ext)) return 'code'
+  if (['json', 'yaml', 'yml', 'toml', 'xml', 'env', 'ini', 'conf', 'config'].includes(ext)) return 'data'
+  if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'wma', 'opus', 'mid', 'midi'].includes(ext)) return 'audio'
+  if (['mp4', 'mkv', 'mov', 'webm', 'avi', 'wmv', 'flv', 'm4v', '3gp'].includes(ext)) return 'video'
+  if (['txt', 'md', 'markdown', 'log'].includes(ext)) return 'text'
   return 'file'
 }
 

@@ -4,11 +4,14 @@ import {
   FolderOpen,
   File,
   FileText,
+  FileSpreadsheet,
+  Presentation,
   FileCode,
   FileArchive,
-  Image as ImageIcon,
-  Music,
-  Video,
+  FileImage,
+  FileAudio,
+  FileVideo,
+  FileJson,
   Trash2,
   Copy,
   Check,
@@ -33,25 +36,87 @@ interface FileShelfProps {
 
 function renderFileIcon(item: ShelfItem) {
   const cat = getFileCategory(item.name, item.isDir)
-  const iconClass = 'w-4 h-4 shrink-0'
+  const iconClass = 'w-3.5 h-3.5 shrink-0'
+
   switch (cat) {
     case 'folder':
-      return <Folder className={`${iconClass} text-amber-400`} />
-    case 'image':
-      return <ImageIcon className={`${iconClass} text-sky-400`} />
-    case 'archive':
-      return <FileArchive className={`${iconClass} text-purple-400`} />
-    case 'code':
-      return <FileCode className={`${iconClass} text-emerald-400`} />
-    case 'audio':
-      return <Music className={`${iconClass} text-pink-400`} />
-    case 'video':
-      return <Video className={`${iconClass} text-indigo-400`} />
+      return (
+        <div className="w-6 h-6 rounded-md bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+          <Folder className={`${iconClass} text-amber-400`} />
+        </div>
+      )
+    case 'word':
+      return (
+        <div className="w-6 h-6 rounded-md bg-blue-500/15 border border-blue-500/25 flex items-center justify-center shrink-0">
+          <FileText className={`${iconClass} text-blue-400`} />
+        </div>
+      )
+    case 'excel':
+      return (
+        <div className="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
+          <FileSpreadsheet className={`${iconClass} text-emerald-400`} />
+        </div>
+      )
+    case 'powerpoint':
+      return (
+        <div className="w-6 h-6 rounded-md bg-orange-500/15 border border-orange-500/25 flex items-center justify-center shrink-0">
+          <Presentation className={`${iconClass} text-orange-400`} />
+        </div>
+      )
     case 'pdf':
-    case 'doc':
-      return <FileText className={`${iconClass} text-amber-300`} />
+      return (
+        <div className="w-6 h-6 rounded-md bg-rose-500/15 border border-rose-500/25 flex items-center justify-center shrink-0">
+          <FileText className={`${iconClass} text-rose-400`} />
+        </div>
+      )
+    case 'image':
+      return (
+        <div className="w-6 h-6 rounded-md bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0">
+          <FileImage className={`${iconClass} text-sky-400`} />
+        </div>
+      )
+    case 'archive':
+      return (
+        <div className="w-6 h-6 rounded-md bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0">
+          <FileArchive className={`${iconClass} text-purple-400`} />
+        </div>
+      )
+    case 'code':
+      return (
+        <div className="w-6 h-6 rounded-md bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center shrink-0">
+          <FileCode className={`${iconClass} text-cyan-400`} />
+        </div>
+      )
+    case 'data':
+      return (
+        <div className="w-6 h-6 rounded-md bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+          <FileJson className={`${iconClass} text-amber-300`} />
+        </div>
+      )
+    case 'audio':
+      return (
+        <div className="w-6 h-6 rounded-md bg-pink-500/15 border border-pink-500/25 flex items-center justify-center shrink-0">
+          <FileAudio className={`${iconClass} text-pink-400`} />
+        </div>
+      )
+    case 'video':
+      return (
+        <div className="w-6 h-6 rounded-md bg-violet-500/15 border border-violet-500/25 flex items-center justify-center shrink-0">
+          <FileVideo className={`${iconClass} text-violet-400`} />
+        </div>
+      )
+    case 'text':
+      return (
+        <div className="w-6 h-6 rounded-md bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
+          <FileText className={`${iconClass} text-slate-300`} />
+        </div>
+      )
     default:
-      return <File className={`${iconClass} text-white/60`} />
+      return (
+        <div className="w-6 h-6 rounded-md bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
+          <File className={`${iconClass} text-white/70`} />
+        </div>
+      )
   }
 }
 
