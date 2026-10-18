@@ -21,10 +21,7 @@ pub fn create_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build()?;
 
-    let icon = match app.default_window_icon() {
-        Some(icon) => icon.clone(),
-        None => return Ok(()),
-    };
+    let icon = tauri::include_image!("icons/tray.png");
 
     let _tray = TrayIconBuilder::new()
         .icon(icon)

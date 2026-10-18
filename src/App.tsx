@@ -413,7 +413,7 @@ export default function App() {
               }}
               whileHover={{ scale: 1.15 }}
               whileTap={{ scale: 0.9 }}
-              className="relative flex items-center justify-center cursor-pointer select-none"
+              className="relative h-8 flex items-center justify-center cursor-pointer select-none"
             >
               {/* Ripple progress cue during 2s dwell hover */}
               {isDwelling && (

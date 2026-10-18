@@ -48,4 +48,15 @@ This document records architectural choices, deviations from the initial spec, a
   4. **Dwell Hover & Ripple Feedback**: 2-second hover over droplet triggers visual ripple progress ring (`border-white/60` expanding outward). Mouse-out before 2s cancels. Direct click re-opens instantly.
   5. **Auto-Transition Logic**: 10 seconds of no interaction in app mode collapses to droplet; returning to desktop instantly restores normal clock capsule.
 
+## Decision 005: Fase 1b Refinements & Icon Assets
+- **Date**: 2026-10-18
+- **Context**: Review of Fase 1b revealed edge cases in OS foreground tracking (in-place maximize/restore, D3D fullscreen delay, shell flyouts, multi-monitor setups), droplet vertical center discrepancy, and missing high-resolution icon assets.
+- **Decision**:
+  1. **In-Place Geometry Hook**: Registered `EVENT_OBJECT_LOCATIONCHANGE` (0x800B) hook filtered to `id_object == OBJID_WINDOW` (`0`) and `hwnd == GetForegroundWindow()`, debounced via an `mpsc` worker thread by ~200ms. Accurately detects in-place maximize/restore and browser fullscreen (F11/YouTube fullscreen) without polling or CPU overhead.
+  2. **Delayed D3D Fullscreen Recheck**: Added a 1.5-second delayed check after every `EVENT_SYSTEM_FOREGROUND` event to catch exclusive Direct3D/DirectX games that initialize in windowed mode before engaging exclusive fullscreen (`QUNS_RUNNING_D3D_FULL_SCREEN` = 3 -> `hidden`).
+  3. **Transient Shell Overlays**: Explicitly ignored shell classes (`Windows.UI.Core.CoreWindow`, `XamlExplorerHostIslandWindow`, `MultitaskingViewFrame`, `Shell_CharmWindow`, `NotifyIconOverflowWindow`, `TopLevelWindowForOverflowXamlIsland`, `ForegroundStaging`) so opening the Start Menu, Search, Task View, or Alt+Tab does not cause mode flickering or bouncing.
+  4. **Multi-Monitor Geometry**: Foreground monitor is compared to KumaNotch's host monitor (`fg_mon == notch_mon`). Maximized or fullscreen apps on secondary monitors do not force KumaNotch on the primary monitor into droplet mode.
+  5. **Vertical Center Alignment**: Aligned droplet container height to capsule height (`h-8`, 32px) at `pt-2` (8px), ensuring both droplet circle ($14\times 14$) and capsule share the exact same vertical center line ($y = 24\text{px}$) from the top of the window, eliminating vertical jumping during Framer Motion layout animations.
+  6. **Icon Generation & Asset Compression**: Cropped 1024×1024 master PNG (`assets/icon.png`) with smooth squircle alpha mask from `assets/kumanotch_icon.jpg`, regenerated all application icons with `tauri icon`, added simplified high-contrast tray silhouette (`src-tauri/icons/tray.png`), and compressed raw 1.6MB JPG down to 42KB (>97% reduction).
+
 

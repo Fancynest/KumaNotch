@@ -10,6 +10,7 @@ pub struct AppModePayload {
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static LAST_MODE: AtomicU8 = AtomicU8::new(0); // 0: unset, 1: desktop, 2: app, 3: hidden
+static DEBOUNCE_TX: OnceLock<std::sync::mpsc::Sender<()>> = OnceLock::new();
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -59,6 +60,8 @@ pub type WINEVENTPROC = Option<
 
 const EVENT_SYSTEM_FOREGROUND: u32 = 0x0003;
 const EVENT_SYSTEM_MOVESIZEEND: u32 = 0x000B;
+const EVENT_OBJECT_LOCATIONCHANGE: u32 = 0x800B;
+const OBJID_WINDOW: i32 = 0;
 const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
 const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;
 const MONITOR_DEFAULTTONEAREST: u32 = 2;
@@ -96,15 +99,45 @@ unsafe extern "system" {
     fn SHQueryUserNotificationState(pquns: *mut i32) -> i32;
 }
 
+fn trigger_debounced_check() {
+    if let Some(tx) = DEBOUNCE_TX.get() {
+        let _ = tx.send(());
+    }
+}
+
 pub fn query_foreground_mode() -> &'static str {
     #[cfg(windows)]
     unsafe {
+        // Query monitor where KumaNotch sits
+        let notch_hwnd = APP_HANDLE
+            .get()
+            .and_then(|app| app.get_webview_window("main"))
+            .and_then(|win| win.hwnd().ok())
+            .map(|h| h.0 as isize)
+            .unwrap_or(0);
+
+        let notch_mon = if notch_hwnd != 0 {
+            MonitorFromWindow(notch_hwnd, MONITOR_DEFAULTTONEAREST)
+        } else {
+            0
+        };
+
         // 1. Check SHQueryUserNotificationState for exclusive fullscreen or presentation mode
         let mut quns = 0i32;
         if SHQueryUserNotificationState(&mut quns) == 0 {
             // 3: QUNS_RUNNING_D3D_FULL_SCREEN, 4: QUNS_PRESENTATION_MODE
             if quns == 3 || quns == 4 {
-                return "hidden";
+                let fg = GetForegroundWindow();
+                if fg != 0 && notch_mon != 0 {
+                    let fg_mon = MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST);
+                    if fg_mon != 0 && fg_mon != notch_mon {
+                        // Fullscreen game is on secondary monitor, notch stays visible
+                    } else {
+                        return "hidden";
+                    }
+                } else {
+                    return "hidden";
+                }
             }
         }
 
@@ -121,7 +154,7 @@ pub fn query_foreground_mode() -> &'static str {
             return ""; // No change
         }
 
-        // 4. Check if desktop or taskbar
+        // 4. Check window class: Desktop/Taskbar or transient shell windows
         let mut class_name = [0u16; 256];
         let len = GetClassNameW(hwnd, class_name.as_mut_ptr(), 256) as usize;
         if len > 0 {
@@ -133,23 +166,42 @@ pub fn query_foreground_mode() -> &'static str {
             {
                 return "desktop";
             }
+
+            // Ignore transient shell windows (Start menu, Task View, Alt+Tab, Search flyout)
+            // so notch mode does not flicker when opening or closing system overlays
+            if class_str == "Windows.UI.Core.CoreWindow"
+                || class_str == "XamlExplorerHostIslandWindow"
+                || class_str == "MultitaskingViewFrame"
+                || class_str == "Shell_CharmWindow"
+                || class_str == "NotifyIconOverflowWindow"
+                || class_str == "TopLevelWindowForOverflowXamlIsland"
+                || class_str == "ForegroundStaging"
+            {
+                return ""; // Ignore transient shell, do not change mode
+            }
         }
 
-        // 5. Check if window is maximized (IsZoomed)
+        // 5. Compare foreground window monitor with notch monitor
+        let fg_mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        if notch_mon != 0 && fg_mon != 0 && fg_mon != notch_mon {
+            // Foreground window is on another monitor; notch monitor is unobstructed
+            return "desktop";
+        }
+
+        // 6. Check if window is maximized (IsZoomed)
         if IsZoomed(hwnd) != 0 {
             return "app";
         }
 
-        // 6. Check if window covers entire monitor (borderless fullscreen / video fullscreen)
-        let h_mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-        if h_mon != 0 {
+        // 7. Check if window covers entire monitor (borderless fullscreen / video fullscreen)
+        if fg_mon != 0 {
             let mut mi = MONITORINFO {
                 cb_size: std::mem::size_of::<MONITORINFO>() as u32,
                 rc_monitor: RECT::default(),
                 rc_work: RECT::default(),
                 dw_flags: 0,
             };
-            if GetMonitorInfoW(h_mon, &mut mi) != 0 {
+            if GetMonitorInfoW(fg_mon, &mut mi) != 0 {
                 let mut rect = RECT::default();
                 if GetWindowRect(hwnd, &mut rect) != 0 {
                     if rect.left <= mi.rc_monitor.left
@@ -208,18 +260,48 @@ pub fn check_and_emit_foreground_state() {
 #[cfg(windows)]
 unsafe extern "system" fn win_event_proc(
     _h_win_event_hook: isize,
-    _event: u32,
-    _hwnd: isize,
-    _id_object: i32,
+    event: u32,
+    hwnd: isize,
+    id_object: i32,
     _id_child: i32,
     _id_event_thread: u32,
     _dwms_event_time: u32,
 ) {
-    check_and_emit_foreground_state();
+    unsafe {
+        if event == EVENT_OBJECT_LOCATIONCHANGE {
+            // Filter strictly to OBJID_WINDOW and current foreground window
+            if id_object == OBJID_WINDOW && hwnd != 0 && hwnd == GetForegroundWindow() {
+                trigger_debounced_check();
+            }
+        } else if event == EVENT_SYSTEM_FOREGROUND {
+            // Immediate check on focus switch
+            check_and_emit_foreground_state();
+            // Delayed recheck (~1.5s) to catch games transitioning to D3D exclusive fullscreen
+            thread::spawn(|| {
+                thread::sleep(std::time::Duration::from_millis(1500));
+                check_and_emit_foreground_state();
+            });
+        } else {
+            // EVENT_SYSTEM_MOVESIZEEND
+            check_and_emit_foreground_state();
+        }
+    }
 }
 
 pub fn start_detector(app: AppHandle) {
     let _ = APP_HANDLE.set(app);
+
+    // Set up debounced worker thread for location/size events (~200ms)
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
+    let _ = DEBOUNCE_TX.set(tx);
+    thread::spawn(move || {
+        while rx.recv().is_ok() {
+            while rx.try_recv().is_ok() {}
+            thread::sleep(std::time::Duration::from_millis(200));
+            while rx.try_recv().is_ok() {}
+            check_and_emit_foreground_state();
+        }
+    });
 
     // Initial check on launch
     check_and_emit_foreground_state();
@@ -246,6 +328,16 @@ pub fn start_detector(app: AppHandle) {
             WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
         );
 
+        let hook_loc = SetWinEventHook(
+            EVENT_OBJECT_LOCATIONCHANGE,
+            EVENT_OBJECT_LOCATIONCHANGE,
+            0,
+            Some(win_event_proc),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+        );
+
         let mut msg = MSG {
             hwnd: 0,
             message: 0,
@@ -265,6 +357,9 @@ pub fn start_detector(app: AppHandle) {
         }
         if hook_move != 0 {
             UnhookWinEvent(hook_move);
+        }
+        if hook_loc != 0 {
+            UnhookWinEvent(hook_loc);
         }
     });
 }
