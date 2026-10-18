@@ -9,12 +9,38 @@
 
 ## ✨ Features
 
-- **True Dynamic Island Aesthetic**: Jet black capsule with continuous squircle corners, subtle ring glow, and authentic iOS spring physics.
-- **State-Based Dynamic Window Sizing**: Window dimensions shrink and expand per state to ensure minimal transparent area and zero unwanted click obstruction.
-- **Split Island Multitasking**: When multiple activities run simultaneously (e.g. Music + Timer), the island cleanly splits into detached bubbles.
-- **Interactive Expanded Cards**: Click on any activity bubble to smoothly expand into full media controls, clock home, or timer settings.
+- **True Dynamic Island Aesthetic**: Jet black capsule with continuous squircle corners, subtle glow, and authentic iOS spring physics (stiffness: 420, damping: 32).
+- **Split Island Multitasking**: When multiple activities run simultaneously (e.g., Music + Timer), the island cleanly splits into detached compact bubbles.
+- **Horizontal 3-Page Home Pager**:
+  - **Page 0 (Music Player)**: Windows SMTC integration for Spotify, browsers, and media players with live playback controls, seek bar, and live track art.
+  - **Page 1 (Clock & Quick Timer)**: Real-time clock respecting system 12h/24h format, quick timer presets (5m, 15m, 25m, Focus Session Pomodoro), and custom timer duration picker.
+  - **Page 2 (File Shelf)**: Temporary file tray to drop files or folders. Seamlessly drag items back out into Explorer, Slack, Discord, or web browsers.
+- **Mata Kuma ("Personality")**:
+  - Displays cute blinking Kuma bear eyes when idle.
+  - Scheduled with randomized intervals (3–6s) to ensure ~0% CPU usage without infinite render loops; automatically pauses when window is hidden.
+- **Bilingual Settings & Customization**:
+  - Full Indonesian and English localization.
+  - Customizable time format (Auto, 12h, 24h), language, Auto-droplet timeout, dwell hover timeout, and personality toggle.
+  - Windows autostart toggle synced with system tray.
+  - Web Audio synthesized alarm chimes with volume control.
+- **Auto-Droplet Mode**:
+  - Automatically morphs into a tiny droplet when other applications are active.
+  - Dwell hover (2s) or click smoothly springs back to the capsule.
 - **Ultra-Lightweight**: Minimal CPU (~0% idle) and RAM footprint, smooth 60/120fps animations powered by Framer Motion.
 - **Native Windows Integration**: Built on Tauri 2 with Rust backend, system tray controls, and auto-start integration.
+
+---
+
+## 🎮 Gestures & Shortcuts
+
+| Action | Gesture / Shortcut |
+|---|---|
+| **Expand Home Card** | Click idle capsule |
+| **Switch Pages (Music / Clock / Shelf)** | Mouse scroll wheel or horizontal swipe gesture |
+| **Quick Settings** | Click gear icon in Clock header, or Tray menu |
+| **Collapse Card** | Press <kbd>Escape</kbd>, click header arrow, or click outside |
+| **Re-emerge from Droplet** | Hover cursor for 2 seconds (dwell), or click droplet |
+| **Drop Files to Shelf** | Drag files or folders directly over the island |
 
 ---
 
@@ -56,7 +82,7 @@ The output installers will be generated in `src-tauri/target/release/bundle/`.
 - **Frontend**: React 19 + TypeScript + Vite
 - **Styling**: Tailwind CSS v4
 - **Animations**: Framer Motion (Spring Physics)
-- **State**: Zustand
+- **Audio**: Web Audio API (Synthesized resonant chimes)
 - **Icons**: Lucide React
 
 ---

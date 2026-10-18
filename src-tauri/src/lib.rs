@@ -37,6 +37,8 @@ pub fn run() {
             media::media_next,
             media::media_prev,
             media::media_seek,
+            tray::autostart_is_enabled,
+            tray::autostart_set,
         ])
         .setup(|app| {
             let handle = app.handle();

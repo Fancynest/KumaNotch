@@ -66,6 +66,33 @@ export const translations = {
     reorderHint: 'Tahan & geser untuk mengubah urutan',
     remove: 'Hapus',
     clickToOpen: 'Klik untuk membuka',
+    settings: 'Pengaturan',
+    general: 'Umum',
+    timeFormat: 'Format Waktu',
+    language: 'Bahasa',
+    autostart: 'Mulai otomatis saat Windows aktif',
+    islandAndDroplet: 'Pulau & Droplet',
+    autoDroplet: 'Mode Droplet Otomatis',
+    autoDropletDesc: 'Mengecil jadi tetesan air saat aplikasi lain aktif',
+    inactivityTimeout: 'Waktu inaktif ke droplet',
+    dwellTimeout: 'Waktu tahan kursor untuk membuka',
+    personality: 'Personality (Mata Kuma)',
+    personalityDesc: 'Mata Kuma berkedip santai saat mode diam/idle',
+    sound: 'Suara',
+    timerChime: 'Alarm Bunyi Timer',
+    timerVolume: 'Volume Alarm',
+    secondsUnit: 'detik',
+    auto: 'Otomatis',
+    hours12: '12 Jam',
+    hours24: '24 Jam',
+    langId: 'Bahasa Indonesia',
+    langEn: 'English',
+    delayBeforeEyes: 'Jeda sebelum mata muncul',
+    testSound: 'Tes Suara',
+    tabGeneral: 'Umum',
+    tabNotch: 'Droplet',
+    tabPersonality: 'Kuma & Audio',
+    closeSettings: 'Tutup Pengaturan',
   },
   en: {
     quickTimer: 'Quick Timer',
@@ -123,9 +150,42 @@ export const translations = {
     reorderHint: 'Drag to reorder',
     remove: 'Remove',
     clickToOpen: 'Click to open',
+    settings: 'Settings',
+    general: 'General',
+    timeFormat: 'Time Format',
+    language: 'Language',
+    autostart: 'Start with Windows',
+    islandAndDroplet: 'Island & Droplet',
+    autoDroplet: 'Auto-Droplet Mode',
+    autoDropletDesc: 'Shrink to droplet when another app is maximized',
+    inactivityTimeout: 'Inactivity before droplet',
+    dwellTimeout: 'Hover dwell to expand',
+    personality: 'Personality (Kuma Eyes)',
+    personalityDesc: 'Cute Kuma blinking eyes during idle',
+    sound: 'Sound',
+    timerChime: 'Timer Alarm Sound',
+    timerVolume: 'Alarm Volume',
+    secondsUnit: 'sec',
+    auto: 'Auto',
+    hours12: '12 Hours',
+    hours24: '24 Hours',
+    langId: 'Indonesian',
+    langEn: 'English',
+    delayBeforeEyes: 'Delay before eyes appear',
+    testSound: 'Test Sound',
+    tabGeneral: 'General',
+    tabNotch: 'Droplet',
+    tabPersonality: 'Kuma & Audio',
+    closeSettings: 'Close Settings',
   },
 }
 
-export function getT(lang: SupportedLang = detectDeviceLanguage()) {
-  return translations[lang] || translations.en
+export function getT(lang?: SupportedLang | 'auto') {
+  let chosen: SupportedLang = 'en'
+  if (!lang || lang === 'auto') {
+    chosen = detectDeviceLanguage()
+  } else {
+    chosen = lang
+  }
+  return translations[chosen] || translations.en
 }

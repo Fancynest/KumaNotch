@@ -1,6 +1,7 @@
 import { globalActivityRegistry, ACTIVITY_PRIORITIES } from './activities'
 import { startAlarmLoop, stopAlarmLoop } from './audio'
 import { getT } from './i18n'
+import { globalSettingsEngine } from './settings'
 
 export type TimerStatus = 'idle' | 'running' | 'paused' | 'completed'
 export type PomodoroPhase = 'focus' | 'shortBreak' | 'longBreak'
@@ -276,10 +277,13 @@ export class TimerEngine {
   }
 
   private triggerCompletionAlert(): void {
-    // Start repeating alarm chime until user clicks Stop / dismissAlert()
-    startAlarmLoop(2400, 0.85)
+    // Start repeating alarm chime if enabled in settings
+    const settings = globalSettingsEngine.getSettings()
+    if (settings.timerChimeEnabled) {
+      startAlarmLoop(2400, (settings.timerChimeVolume || 80) / 100)
+    }
 
-    const t = getT()
+    const t = getT(settings.language)
     // Register high-priority Alert activity (100)
     // Persists with 10-minute safety limit if user walks away
     globalActivityRegistry.register({

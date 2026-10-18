@@ -14,6 +14,7 @@ import {
   UploadCloud,
   Hourglass,
   Music2,
+  Settings,
 } from 'lucide-react'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { listen } from '@tauri-apps/api/event'
@@ -36,6 +37,8 @@ import { globalMediaEngine, type MediaData } from './core/media'
 import { ExpandedMusic } from './features/media/ExpandedMusic'
 import { AudioWaveform } from './features/media/AudioWaveform'
 import { getT } from './core/i18n'
+import { globalSettingsEngine, type AppSettings } from './core/settings'
+import { SettingsView } from './features/settings/SettingsView'
 
 // Authentic Apple Dynamic Island spring transition curve
 const springTransition: Transition = {
@@ -68,15 +71,17 @@ type IslandView =
   | 'expandedTimer'
   | 'alert'
   | 'dropTarget'
+  | 'settings'
 
 function getIslandView(
   displayState: 'capsule' | 'droplet',
-  expandedActivity: 'home' | 'timer' | 'music' | null,
+  expandedActivity: 'home' | 'timer' | 'music' | 'settings' | null,
   timerData: TimerData | null,
   mediaData: MediaData | null,
   isDragOver: boolean,
 ): IslandView {
   if (timerData?.status === 'completed') return 'alert'
+  if (expandedActivity === 'settings') return 'settings'
   if (expandedActivity === 'home' || expandedActivity === 'music') return 'home'
   if (expandedActivity === 'timer') return 'expandedTimer'
   if (isDragOver) return 'dropTarget'
@@ -98,7 +103,16 @@ function getIslandView(
 }
 
 export default function App() {
-  const t = getT()
+  // App Settings Engine subscription (Spec Fase 5)
+  const [settings, setSettings] = useState<AppSettings>(() => globalSettingsEngine.getSettings())
+
+  useEffect(() => {
+    return globalSettingsEngine.subscribe((newSettings) => {
+      setSettings({ ...newSettings })
+    })
+  }, [])
+
+  const t = getT(settings.language)
 
   // Global Timestamp-based Timer Engine subscription (Spec Fase 2)
   const [timerData, setTimerData] = useState<TimerData | null>(() => globalTimerEngine.getData())
@@ -125,8 +139,8 @@ export default function App() {
   const [displayState, setDisplayState] = useState<'capsule' | 'droplet'>('capsule')
   const [isDwelling, setIsDwelling] = useState(false)
 
-  // Expanded focus state: null (compact), 'home', 'timer', or 'music'
-  const [expandedActivity, setExpandedActivity] = useState<'home' | 'timer' | 'music' | null>(null)
+  // Expanded focus state: null (compact), 'home', 'timer', 'music', or 'settings'
+  const [expandedActivity, setExpandedActivity] = useState<'home' | 'timer' | 'music' | 'settings' | null>(null)
 
   // Auto-clear expanded activity when timer completes so alert pops into view
   useEffect(() => {
@@ -407,19 +421,26 @@ export default function App() {
     }
   }, [systemMode])
 
-  // In app mode, enter droplet after 10s of no interaction (Spec 5.1 point 2)
+  // In app mode, enter droplet after inactivitySeconds of no interaction (Spec 5.1 point 2)
   useEffect(() => {
-    if (systemMode !== 'app' || displayState !== 'capsule' || expandedActivity !== null || currentView === 'alert') return
+    if (
+      !settings.autoDroplet ||
+      systemMode !== 'app' ||
+      displayState !== 'capsule' ||
+      expandedActivity !== null ||
+      currentView === 'alert'
+    ) return
 
+    const timeoutMs = (settings.inactivitySeconds || 10) * 1000
     let timer = setTimeout(() => {
       setDisplayState('droplet')
-    }, 10000)
+    }, timeoutMs)
 
     const resetDropletTimer = () => {
       clearTimeout(timer)
       timer = setTimeout(() => {
         setDisplayState('droplet')
-      }, 10000)
+      }, timeoutMs)
     }
 
     window.addEventListener('mousemove', resetDropletTimer)
@@ -432,27 +453,37 @@ export default function App() {
       window.removeEventListener('mousedown', resetDropletTimer)
       window.removeEventListener('keydown', resetDropletTimer)
     }
-  }, [systemMode, displayState, expandedActivity, currentView])
+  }, [systemMode, displayState, expandedActivity, currentView, settings.autoDroplet, settings.inactivitySeconds])
 
-  // Dwell hover: 2 seconds on droplet re-emerges capsule with spring (Spec 5.1 point 4)
+  // Dwell hover: dwellSeconds on droplet re-emerges capsule with spring (Spec 5.1 point 4)
   useEffect(() => {
     if (!isDwelling || displayState !== 'droplet') return
 
+    const dwellMs = (settings.dwellSeconds || 2) * 1000
     const dwellTimer = setTimeout(() => {
       setIsDwelling(false)
       setDisplayState('capsule')
-    }, 2000)
+    }, dwellMs)
 
     return () => clearTimeout(dwellTimer)
-  }, [isDwelling, displayState])
+  }, [isDwelling, displayState, settings.dwellSeconds])
 
-  // Align clock updates to minute boundaries and follow system 12h/24h setting
+  // Align clock updates to minute boundaries and follow system 12h/24h setting and language
   useEffect(() => {
+    const effectiveFormat = settings.timeFormat === 'auto' ? clockFormat : settings.timeFormat
     const updateTime = () => {
       const now = new Date()
-      setTimeStr(formatClockTime(now, clockFormat))
+      setTimeStr(formatClockTime(now, effectiveFormat))
+      const locale =
+        settings.language === 'id'
+          ? 'id-ID'
+          : settings.language === 'en'
+          ? 'en-US'
+          : typeof navigator !== 'undefined'
+          ? navigator.language
+          : undefined
       setDateStr(
-        now.toLocaleDateString(typeof navigator !== 'undefined' ? navigator.language : undefined, {
+        now.toLocaleDateString(locale, {
           weekday: 'long',
           day: 'numeric',
           month: 'long',
@@ -474,7 +505,108 @@ export default function App() {
       clearTimeout(timeoutId)
       clearInterval(intervalId)
     }
-  }, [clockFormat])
+  }, [clockFormat, settings.timeFormat, settings.language])
+
+  // Listen to tray events from Tauri backend (Settings, Personality, Autostart)
+  useEffect(() => {
+    const unlisteners: Array<() => void> = []
+
+    listen('open_settings', () => {
+      setExpandedActivity('settings')
+    }).then((fn) => unlisteners.push(fn)).catch(() => {})
+
+    listen('toggle_personality', () => {
+      const curr = globalSettingsEngine.getSettings().personalityEnabled
+      globalSettingsEngine.update({ personalityEnabled: !curr })
+    }).then((fn) => unlisteners.push(fn)).catch(() => {})
+
+    listen<boolean>('autostart_changed', (e) => {
+      globalSettingsEngine.update({ autostart: e.payload })
+    }).then((fn) => unlisteners.push(fn)).catch(() => {})
+
+    return () => {
+      unlisteners.forEach((fn) => fn())
+    }
+  }, [])
+
+  // Personality - Mata Kuma Blinking Eyes State (Spec 178)
+  const [isPersonalityIdle, setIsPersonalityIdle] = useState(false)
+  const [isBlinking, setIsBlinking] = useState(false)
+
+  // Trigger Mata Kuma eyes after inactivity delay when in idle mode
+  useEffect(() => {
+    if (
+      currentView !== 'idle' ||
+      !settings.personalityEnabled ||
+      systemMode === 'hidden'
+    ) {
+      setIsPersonalityIdle(false)
+      return
+    }
+
+    const idleDelayMs = (settings.idleBeforeEyesSeconds || 6) * 1000
+    let timerId = setTimeout(() => {
+      setIsPersonalityIdle(true)
+    }, idleDelayMs)
+
+    const handleActivity = () => {
+      setIsPersonalityIdle(false)
+      clearTimeout(timerId)
+      timerId = setTimeout(() => {
+        setIsPersonalityIdle(true)
+      }, idleDelayMs)
+    }
+
+    window.addEventListener('mousemove', handleActivity)
+    window.addEventListener('mousedown', handleActivity)
+    window.addEventListener('keydown', handleActivity)
+
+    return () => {
+      clearTimeout(timerId)
+      window.removeEventListener('mousemove', handleActivity)
+      window.removeEventListener('mousedown', handleActivity)
+      window.removeEventListener('keydown', handleActivity)
+    }
+  }, [currentView, settings.personalityEnabled, settings.idleBeforeEyesSeconds, systemMode])
+
+  // Randomized blink scheduler (3s - 6s) - completely stops when hidden or inactive (Spec 178)
+  useEffect(() => {
+    if (
+      currentView !== 'idle' ||
+      !isPersonalityIdle ||
+      !settings.personalityEnabled ||
+      systemMode === 'hidden'
+    ) {
+      setIsBlinking(false)
+      return
+    }
+
+    let blinkTimeout: ReturnType<typeof setTimeout> | null = null
+    let resetTimeout: ReturnType<typeof setTimeout> | null = null
+    let active = true
+
+    const scheduleNextBlink = () => {
+      const delay = Math.floor(Math.random() * 3000) + 3000
+      blinkTimeout = setTimeout(() => {
+        if (!active) return
+        setIsBlinking(true)
+        resetTimeout = setTimeout(() => {
+          if (!active) return
+          setIsBlinking(false)
+          scheduleNextBlink()
+        }, 140)
+      }, delay)
+    }
+
+    scheduleNextBlink()
+
+    return () => {
+      active = false
+      if (blinkTimeout) clearTimeout(blinkTimeout)
+      if (resetTimeout) clearTimeout(resetTimeout)
+      setIsBlinking(false)
+    }
+  }, [currentView, isPersonalityIdle, settings.personalityEnabled, systemMode])
 
   // Collapse on Escape
   useEffect(() => {
@@ -730,13 +862,24 @@ export default function App() {
                           {dateStr}
                         </span>
 
-                        <button
-                          onClick={() => setExpandedActivity(null)}
-                          className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
-                          title={t.collapse}
-                        >
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setExpandedActivity('settings')}
+                            className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
+                            title={t.settings}
+                            aria-label={t.settings}
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setExpandedActivity(null)}
+                            className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
+                            title={t.collapse}
+                            aria-label={t.collapse}
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       <div
@@ -1307,16 +1450,36 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 7. IDLE CLOCK VIEW */}
+          {/* 7. IDLE CLOCK / MATA KUMA VIEW (Spec 178) */}
           {currentView === 'idle' && (
             <motion.div
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
+              onMouseEnter={() => setIsPersonalityIdle(false)}
               className="absolute inset-0 px-3 flex items-center justify-center text-white overflow-hidden whitespace-nowrap"
             >
-              <span className="text-xs font-semibold text-white/95 font-mono tracking-tight">
-                {timeStr}
-              </span>
+              {isPersonalityIdle && settings.personalityEnabled ? (
+                <div className="flex items-center justify-center gap-2.5">
+                  {/* Left eye */}
+                  <motion.div
+                    animate={{ scaleY: isBlinking ? 0.1 : 1 }}
+                    transition={{ duration: 0.1 }}
+                    className="w-1.5 h-1.5 rounded-full bg-white/95"
+                  />
+                  {/* Cute subtle bear nose */}
+                  <div className="w-1 h-0.5 rounded-full bg-white/30" />
+                  {/* Right eye */}
+                  <motion.div
+                    animate={{ scaleY: isBlinking ? 0.1 : 1 }}
+                    transition={{ duration: 0.1 }}
+                    className="w-1.5 h-1.5 rounded-full bg-white/95"
+                  />
+                </div>
+              ) : (
+                <span className="text-xs font-semibold text-white/95 font-mono tracking-tight">
+                  {timeStr}
+                </span>
+              )}
             </motion.div>
           )}
 
@@ -1331,6 +1494,11 @@ export default function App() {
                 {t.dropFilesHere}
               </span>
             </motion.div>
+          )}
+
+          {/* 9. SETTINGS VIEW (Spec 179) */}
+          {currentView === 'settings' && (
+            <SettingsView onClose={() => setExpandedActivity(null)} />
           )}
       </motion.div>
 
