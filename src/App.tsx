@@ -6,6 +6,7 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Folder,
   Timer as TimerIcon,
   Sparkles,
@@ -67,7 +68,6 @@ type IslandView =
   | 'singleMusic'
   | 'home'
   | 'expandedTimer'
-  | 'expandedMusic'
   | 'alert'
   | 'dropTarget'
 
@@ -79,9 +79,8 @@ function getIslandView(
   isDragOver: boolean,
 ): IslandView {
   if (timerData?.status === 'completed') return 'alert'
-  if (expandedActivity === 'home') return 'home'
+  if (expandedActivity === 'home' || expandedActivity === 'music') return 'home'
   if (expandedActivity === 'timer') return 'expandedTimer'
-  if (expandedActivity === 'music') return 'expandedMusic'
   if (isDragOver) return 'dropTarget'
 
   const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
@@ -187,7 +186,7 @@ export default function App() {
 
   // Drag and drop listener for File Shelf (Spec Fase 3)
   const [isDragOver, setIsDragOver] = useState(false)
-  const [homePage, setHomePage] = useState<number>(0)
+  const [homePage, setHomePage] = useState<number>(1)
   const [shelfCount, setShelfCount] = useState(() => globalShelfEngine.getItems().length)
 
   useEffect(() => {
@@ -226,12 +225,12 @@ export default function App() {
         .onDragDropEvent((event) => {
           if (event.payload.type === 'enter' || event.payload.type === 'over') {
             setIsDragOver(true)
-            setHomePage(1)
+            setHomePage(2)
           } else if (event.payload.type === 'leave') {
             setIsDragOver(false)
           } else if (event.payload.type === 'drop') {
             setIsDragOver(false)
-            setHomePage(1)
+            setHomePage(2)
             if (event.payload.paths && event.payload.paths.length > 0) {
               globalShelfEngine.addPaths(event.payload.paths)
               setExpandedActivity('home')
@@ -252,7 +251,7 @@ export default function App() {
     }
   }, [])
 
-  // Wheel and swipe gesture handling for Home 2-page pager
+  // Wheel and swipe gesture handling for Home 3-page pager (0 = Musik, 1 = Jam/Timer, 2 = Shelf)
   const lastWheelTime = useRef<number>(0)
   const pointerStartX = useRef<number | null>(null)
   const isSwiping = useRef<boolean>(false)
@@ -264,11 +263,11 @@ export default function App() {
     const dx = e.deltaX
     const dy = e.deltaY
 
-    // If on Page 1 (File Shelf) and cursor is over the file list, preserve vertical list scrolling
+    // If on Page 2 (File Shelf) and cursor is over the file list, preserve vertical list scrolling
     const target = e.target as HTMLElement | null
     const fileList = target?.closest('.shelf-file-list') as HTMLElement | null
 
-    if (homePage === 1 && fileList) {
+    if (homePage === 2 && fileList) {
       const canScrollDown = fileList.scrollHeight > fileList.clientHeight &&
         fileList.scrollTop + fileList.clientHeight < fileList.scrollHeight - 2
       const canScrollUp = fileList.scrollTop > 2
@@ -279,15 +278,21 @@ export default function App() {
     }
 
     // Direction detection:
-    // Next page (Page 1): mouse wheel down (dy > 15) OR swipe left (dx > 15)
-    // Prev page (Page 0): mouse wheel up (dy < -15) OR swipe right (dx < -15)
+    // Next page (advance right: 0 -> 1 -> 2): mouse wheel down (dy > 15) OR swipe left (dx > 15)
+    // Prev page (advance left: 2 -> 1 -> 0): mouse wheel up (dy < -15) OR swipe right (dx < -15)
     if (dx > 15 || dy > 15) {
       if (homePage === 0) {
         lastWheelTime.current = now
         setHomePage(1)
+      } else if (homePage === 1) {
+        lastWheelTime.current = now
+        setHomePage(2)
       }
     } else if (dx < -15 || dy < -15) {
-      if (homePage === 1) {
+      if (homePage === 2) {
+        lastWheelTime.current = now
+        setHomePage(1)
+      } else if (homePage === 1) {
         lastWheelTime.current = now
         setHomePage(0)
       }
@@ -308,9 +313,13 @@ export default function App() {
     const threshold = 30
 
     if (diffX < -threshold) {
-      setHomePage(1)
+      // Swipe left -> slide rightward
+      if (homePage === 0) setHomePage(1)
+      else if (homePage === 1) setHomePage(2)
     } else if (diffX > threshold) {
-      setHomePage(0)
+      // Swipe right -> slide leftward
+      if (homePage === 2) setHomePage(1)
+      else if (homePage === 1) setHomePage(0)
     }
 
     isSwiping.current = false
@@ -520,22 +529,27 @@ export default function App() {
   const handleShellClick = () => {
     if (currentView === 'idle') {
       setExpandedActivity('home')
+      setHomePage(1)
     } else if (currentView === 'singleTimer' || currentView === 'split') {
       setExpandedActivity('timer')
     } else if (currentView === 'singleMusic') {
-      setExpandedActivity('music')
+      setExpandedActivity('home')
+      setHomePage(0)
     } else if (currentView === 'droplet') {
       setIsDwelling(false)
       setDisplayState('capsule')
       if (isTimerActive) {
         setExpandedActivity('timer')
       } else if (isMediaActive) {
-        setExpandedActivity('music')
+        setExpandedActivity('home')
+        setHomePage(0)
       } else {
         setExpandedActivity('home')
+        setHomePage(1)
       }
     } else if (currentView === 'dropTarget') {
       setExpandedActivity('home')
+      setHomePage(2)
     }
   }
   // Digits-only duration input handler: blocks non-digits, strips leading 0 seamlessly, clamps to max
@@ -668,18 +682,44 @@ export default function App() {
                 }}
               >
                 <motion.div
-                  animate={{ x: homePage === 0 ? '0%' : '-50%' }}
+                  animate={{
+                    x: homePage === 0 ? '0%' : homePage === 1 ? '-33.333333%' : '-66.666666%',
+                  }}
                   transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                  className="flex w-[200%] h-full"
+                  className="flex w-[300%] h-full"
                 >
-                  {/* Page 0: Clock & Quick Timer */}
-                  <div className="w-1/2 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between shrink-0">
+                  {/* Page 0: Dedicated Music Player (Kiri) */}
+                  <div className="w-1/3 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between shrink-0">
+                    <ExpandedMusic
+                      onClose={() => setExpandedActivity(null)}
+                      onBackToHome={() => setHomePage(1)}
+                      onOpenShelf={() => setHomePage(2)}
+                      onOpenTimer={() => setExpandedActivity('timer')}
+                      isTimerActive={isTimerActive}
+                    />
+                  </div>
+
+                  {/* Page 1: Clock & Quick Timer (Tengah / Default) */}
+                  <div className="w-1/3 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between shrink-0">
                     <div>
-                      {/* Top Bar: Date & Shelf Navigation Pill & Collapse Button */}
+                      {/* Top Bar: Musik Button (Kiri), Date (Tengah), Shelf & Collapse Button (Kanan) */}
                       <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => setHomePage(0)}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[10px] font-medium transition-all active:scale-95"
+                          title="Buka Musik"
+                        >
+                          <ChevronLeft className="w-3 h-3 text-white/40" />
+                          <Music2 className="w-3 h-3 text-[#1ed760]" />
+                          <span>Musik</span>
+                          {isMediaActive && mediaData?.playbackStatus === 'playing' && (
+                            <AudioWaveform isPlaying={true} barCount={3} size="sm" />
+                          )}
+                        </button>
+
                         <span
                           onClick={() => setExpandedActivity(null)}
-                          className="text-[11px] font-semibold text-white/50 hover:text-white/80 cursor-pointer uppercase tracking-wider transition-colors"
+                          className="text-[10px] font-semibold text-white/50 hover:text-white/80 cursor-pointer uppercase tracking-wider transition-colors truncate max-w-[110px] text-center"
                           title="Klik untuk mengecilkan"
                         >
                           {dateStr}
@@ -687,7 +727,7 @@ export default function App() {
 
                         <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => setHomePage(1)}
+                            onClick={() => setHomePage(2)}
                             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[10px] font-medium transition-all active:scale-95"
                             title={t.fileShelf}
                           >
@@ -767,7 +807,7 @@ export default function App() {
                       <div
                         onClick={(e) => {
                           e.stopPropagation()
-                          setExpandedActivity('music')
+                          setHomePage(0)
                         }}
                         className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 cursor-pointer my-0.5 transition-colors"
                       >
@@ -799,7 +839,7 @@ export default function App() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              setExpandedActivity('music')
+                              setHomePage(0)
                             }}
                             className="px-2.5 py-0.5 rounded-lg bg-[#1ed760] hover:bg-[#1ed760]/90 text-black text-[10px] font-bold transition-transform active:scale-95"
                           >
@@ -932,32 +972,42 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Page 1: Dedicated File Shelf */}
-                  <div className="w-1/2 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between shrink-0">
+                  {/* Page 2: Dedicated File Shelf (Kanan) */}
+                  <div className="w-1/3 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between shrink-0">
                     <FileShelf
                       isDragOver={isDragOver}
-                      onBack={() => setHomePage(0)}
+                      onBack={() => setHomePage(1)}
                       onClose={() => setExpandedActivity(null)}
                     />
                   </div>
                 </motion.div>
               </div>
 
-              {/* Bottom Pagination Dots */}
+              {/* Bottom Pagination Dots (3 Pages: 0 = Musik, 1 = Jam/Timer, 2 = Shelf) */}
               <div className="flex items-center justify-center gap-1.5 pb-2 pt-0.5 shrink-0">
                 <button
                   onClick={() => setHomePage(0)}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
-                    homePage === 0 ? 'w-4 bg-white' : 'w-1.5 bg-white/25 hover:bg-white/50'
+                    homePage === 0 ? 'w-4 bg-[#1ed760]' : 'w-1.5 bg-white/25 hover:bg-white/50'
                   }`}
-                  aria-label="Clock & Timer"
+                  aria-label="Musik"
+                  title="Musik"
                 />
                 <button
                   onClick={() => setHomePage(1)}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
-                    homePage === 1 ? 'w-4 bg-amber-400' : 'w-1.5 bg-white/25 hover:bg-white/50'
+                    homePage === 1 ? 'w-4 bg-white' : 'w-1.5 bg-white/25 hover:bg-white/50'
+                  }`}
+                  aria-label="Jam & Timer"
+                  title="Jam & Timer"
+                />
+                <button
+                  onClick={() => setHomePage(2)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    homePage === 2 ? 'w-4 bg-amber-400' : 'w-1.5 bg-white/25 hover:bg-white/50'
                   }`}
                   aria-label="File Shelf"
+                  title="File Shelf"
                 />
               </div>
             </div>
@@ -992,7 +1042,10 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   {isMediaActive && (
                     <button
-                      onClick={() => setExpandedActivity('music')}
+                      onClick={() => {
+                        setExpandedActivity('home')
+                        setHomePage(0)
+                      }}
                       className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1ed760]/20 hover:bg-[#1ed760]/30 text-[#1ed760] text-[10px] font-medium transition-all active:scale-95 border border-[#1ed760]/30"
                       title="Buka Musik"
                     >
@@ -1004,7 +1057,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setExpandedActivity('home')
-                      setHomePage(1)
+                      setHomePage(2)
                     }}
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[10px] font-medium transition-all active:scale-95"
                     title={t.fileShelf}
@@ -1074,19 +1127,6 @@ export default function App() {
                 </button>
               </div>
             </div>
-          )}
-
-          {/* 3. EXPANDED MUSIC VIEW (Spec Fase 4) */}
-          {currentView === 'expandedMusic' && (
-            <ExpandedMusic
-              onClose={() => setExpandedActivity(null)}
-              onOpenShelf={() => {
-                setExpandedActivity('home')
-                setHomePage(1)
-              }}
-              onOpenTimer={() => setExpandedActivity('timer')}
-              isTimerActive={isTimerActive}
-            />
           )}
 
           {/* 3. ALERT VIEW - Automatically Expands when Timer Completes (Spec 5.1 point 6 & line 156) */}
@@ -1325,7 +1365,8 @@ export default function App() {
               whileTap={{ scale: 0.92 }}
               onClick={(e) => {
                 e.stopPropagation()
-                setExpandedActivity('music')
+                setExpandedActivity('home')
+                setHomePage(0)
               }}
               style={{
                 height: 32,
