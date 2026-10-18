@@ -2,6 +2,8 @@
   "name": "kumanotch",
   "private": true,
   "version": "0.1.0",
+  "description": "Apple-style Dynamic Island for Windows",
+  "author": "Fancynest",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
