@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence, type Transition } from 'framer-motion'
+import { motion, type Transition } from 'framer-motion'
 import {
   Play,
   Pause,
@@ -463,15 +463,10 @@ export default function App() {
           currentView === 'alert' ? 'border-amber-500/50' : 'border-white/20'
         }`}
       >
-        <AnimatePresence initial={false}>
+
           {/* 1. EXPANDED HOME VIEW */}
           {currentView === 'home' && (
-            <motion.div
-              key="view-home"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, pointerEvents: 'none' }}
-              transition={{ duration: 0.12, ease: 'easeOut' }}
+            <div
               className="absolute inset-0 px-5 py-4 flex flex-col gap-2.5 text-white cursor-default overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
@@ -605,17 +600,12 @@ export default function App() {
                   </form>
                 )}
               </div>
-            </motion.div>
+            </div>
           )}
 
           {/* 2. EXPANDED TIMER VIEW */}
           {currentView === 'expandedTimer' && timerData && (
-            <motion.div
-              key="view-timer"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, pointerEvents: 'none' }}
-              transition={{ duration: 0.12, ease: 'easeOut' }}
+            <div
               className="absolute inset-0 p-5 flex flex-col gap-3 text-white cursor-default overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
@@ -699,17 +689,12 @@ export default function App() {
                   +1m
                 </button>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {/* 3. ALERT VIEW - Automatically Expands when Timer Completes (Spec 5.1 point 6 & line 156) */}
           {currentView === 'alert' && timerData && (
-            <motion.div
-              key="view-alert"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, pointerEvents: 'none' }}
-              transition={{ duration: 0.12, ease: 'easeOut' }}
+            <div
               className="absolute inset-0 p-4 flex flex-col justify-between text-white cursor-default overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
@@ -788,20 +773,15 @@ export default function App() {
                   </button>
                 )}
               </div>
-            </motion.div>
+            </div>
           )}
 
           {/* 4. DROPLET VIEW */}
           {currentView === 'droplet' && (
             <motion.div
-              key="view-droplet"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8, pointerEvents: 'none' }}
-              transition={{ duration: 0.12 }}
               whileHover={{ scale: 1.15 }}
               whileTap={{ scale: 0.9 }}
-              className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-auto"
+              className="absolute inset-0 flex items-center justify-center overflow-hidden"
             >
               <div className="absolute top-0.5 left-0.5 w-1 h-1 rounded-full bg-white/40 blur-[0.2px]" />
               {isTimerActive && (
@@ -819,14 +799,9 @@ export default function App() {
           {/* 5. COMPACT TIMER VIEW (Progress Ring + mm:ss - Spec line 156) */}
           {currentView === 'singleTimer' && timerData && (
             <motion.div
-              key="view-singleTimer"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, pointerEvents: 'none' }}
-              transition={{ duration: 0.12 }}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
-              className="absolute inset-0 px-3 flex items-center justify-center gap-2 text-white overflow-hidden whitespace-nowrap pointer-events-auto"
+              className="absolute inset-0 px-3 flex items-center justify-center gap-2 text-white overflow-hidden whitespace-nowrap"
             >
               {/* Circular Progress Ring */}
               <div className="relative w-4 h-4 flex items-center justify-center shrink-0">
@@ -872,21 +847,15 @@ export default function App() {
           {/* 6. IDLE CLOCK VIEW */}
           {currentView === 'idle' && (
             <motion.div
-              key="view-idle"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, pointerEvents: 'none' }}
-              transition={{ duration: 0.12 }}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
-              className="absolute inset-0 px-3 flex items-center justify-center text-white overflow-hidden whitespace-nowrap pointer-events-auto"
+              className="absolute inset-0 px-3 flex items-center justify-center text-white overflow-hidden whitespace-nowrap"
             >
               <span className="text-xs font-semibold text-white/95 font-mono tracking-tight">
                 {timeStr}
               </span>
             </motion.div>
           )}
-        </AnimatePresence>
       </motion.div>
 
       {/* Dev Controls - Visible ONLY when developing in standard browser, never inside Tauri window */}
