@@ -61,14 +61,21 @@ function formatClockTime(now: Date, mode: 'auto' | '12h' | '24h' = 'auto'): stri
   return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
+function formatCompactRemaining(secs: number): string {
+  if (secs <= 0) return '0s'
+  if (secs < 60) return `${secs}s`
+  const m = Math.ceil(secs / 60)
+  if (m < 60) return `${m}m`
+  const h = Math.floor(secs / 3600)
+  return `${h}h`
+}
+
 type IslandView =
   | 'droplet'
   | 'idle'
-  | 'split'
-  | 'singleTimer'
-  | 'singleMusic'
   | 'home'
   | 'expandedTimer'
+  | 'expandedMusic'
   | 'alert'
   | 'dropTarget'
   | 'settings'
@@ -77,27 +84,14 @@ function getIslandView(
   displayState: 'capsule' | 'droplet',
   expandedActivity: 'home' | 'timer' | 'music' | 'settings' | null,
   timerData: TimerData | null,
-  mediaData: MediaData | null,
   isDragOver: boolean,
 ): IslandView {
   if (timerData?.status === 'completed') return 'alert'
   if (expandedActivity === 'settings') return 'settings'
-  if (expandedActivity === 'home' || expandedActivity === 'music') return 'home'
+  if (expandedActivity === 'music') return 'expandedMusic'
+  if (expandedActivity === 'home') return 'home'
   if (expandedActivity === 'timer') return 'expandedTimer'
   if (isDragOver) return 'dropTarget'
-
-  const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
-  const isMediaActive = mediaData !== null && mediaData.isActive
-
-  if (isTimerActive && isMediaActive) {
-    return 'split'
-  }
-  if (isTimerActive) {
-    return 'singleTimer'
-  }
-  if (isMediaActive) {
-    return 'singleMusic'
-  }
   if (displayState === 'droplet') return 'droplet'
   return 'idle'
 }
@@ -339,10 +333,74 @@ export default function App() {
     pointerStartX.current = null
   }
 
-  // Dynamically resolve shell and window dimensions (expands smoothly when showCustomInput is active)
-  const getDynamicDimensions = (view: IslandView, isCustom: boolean) => {
+  // Multi-activity flags for layout
+  const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
+  const isMediaActive = mediaData !== null && mediaData.isActive
+  const isExpanded = expandedActivity !== null || timerData?.status === 'completed'
+  const hasMusic = isMediaActive && !isExpanded
+  const hasTimer = isTimerActive && !isExpanded
+
+  // Hover Dwell (2s) and Auto-Collapse handlers (Spec: hover 2s expands, cursor moves away collapses)
+  const [hoveredTarget, setHoveredTarget] = useState<'timer' | 'music' | null>(null)
+  const hoverDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const leaveCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleBubblePointerEnter = (type: 'timer' | 'music') => {
+    if (leaveCollapseTimerRef.current) {
+      clearTimeout(leaveCollapseTimerRef.current)
+      leaveCollapseTimerRef.current = null
+    }
+
+    setHoveredTarget(type)
+
+    hoverDwellTimerRef.current = setTimeout(() => {
+      setExpandedActivity(type)
+      setHoveredTarget(null)
+    }, 2000)
+  }
+
+  const handleBubblePointerLeave = () => {
+    if (hoverDwellTimerRef.current) {
+      clearTimeout(hoverDwellTimerRef.current)
+      hoverDwellTimerRef.current = null
+    }
+    setHoveredTarget(null)
+  }
+
+  const handleExpandedPointerEnter = () => {
+    if (leaveCollapseTimerRef.current) {
+      clearTimeout(leaveCollapseTimerRef.current)
+      leaveCollapseTimerRef.current = null
+    }
+  }
+
+  const handleExpandedPointerLeave = () => {
+    if (expandedActivity === 'timer' || expandedActivity === 'music') {
+      leaveCollapseTimerRef.current = setTimeout(() => {
+        setExpandedActivity(null)
+      }, 250)
+    }
+  }
+
+  // Dynamically resolve shell and window dimensions
+  const getDynamicDimensions = (
+    view: IslandView,
+    isCustom: boolean,
+    musicActive: boolean,
+    timerActive: boolean,
+  ) => {
     const baseShell = { ...SHELL_CONFIGS[view] }
     const baseWin = { ...WINDOW_SIZES[view] }
+
+    if (view === 'idle') {
+      if (musicActive && timerActive) {
+        baseWin.width = 260
+      } else if (musicActive || timerActive) {
+        baseWin.width = 220
+      } else {
+        baseWin.width = 170
+      }
+    }
 
     if (view === 'home') {
       const height = isCustom ? 268 : 230
@@ -355,15 +413,20 @@ export default function App() {
   }
 
   // Synchronized persistent shell state
-  const targetView = getIslandView(displayState, expandedActivity, timerData, mediaData, isDragOver)
+  const targetView = getIslandView(displayState, expandedActivity, timerData, isDragOver)
   const [currentView, setCurrentView] = useState<IslandView>(targetView)
-  const initialDims = getDynamicDimensions(targetView, showCustomInput)
+  const initialDims = getDynamicDimensions(targetView, showCustomInput, hasMusic, hasTimer)
   const [shellConfig, setShellConfig] = useState<ShellConfig>(initialDims.shell)
   const currentWindowSizeRef = useRef<WindowSize>(initialDims.win)
 
   // Synchronize OS window bounds and shell spring animation
   useEffect(() => {
-    const { shell: nextShell, win: nextWin } = getDynamicDimensions(targetView, showCustomInput)
+    const { shell: nextShell, win: nextWin } = getDynamicDimensions(
+      targetView,
+      showCustomInput,
+      hasMusic,
+      hasTimer,
+    )
 
     if (
       currentWindowSizeRef.current.width !== nextWin.width ||
@@ -375,7 +438,7 @@ export default function App() {
 
     setCurrentView(targetView)
     setShellConfig(nextShell)
-  }, [targetView, showCustomInput])
+  }, [targetView, showCustomInput, hasMusic, hasTimer])
 
   const handleAnimationComplete = () => {
     // No-op: window resize is now handled synchronously for both expand and collapse
@@ -682,23 +745,11 @@ export default function App() {
     if (currentView === 'idle') {
       setExpandedActivity('home')
       setHomePage(1)
-    } else if (currentView === 'singleTimer' || currentView === 'split') {
-      setExpandedActivity('timer')
-    } else if (currentView === 'singleMusic') {
-      setExpandedActivity('home')
-      setHomePage(0)
     } else if (currentView === 'droplet') {
       setIsDwelling(false)
       setDisplayState('capsule')
-      if (isTimerActive) {
-        setExpandedActivity('timer')
-      } else if (isMediaActive) {
-        setExpandedActivity('home')
-        setHomePage(0)
-      } else {
-        setExpandedActivity('home')
-        setHomePage(1)
-      }
+      setExpandedActivity('home')
+      setHomePage(1)
     } else if (currentView === 'dropTarget') {
       setExpandedActivity('home')
       setHomePage(2)
@@ -741,9 +792,7 @@ export default function App() {
     : 0
 
   const isTimerRunning = timerData?.status === 'running'
-  const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
   const isPomodoroBreak = timerData?.isPomodoro && timerData.pomodoroPhase !== 'focus'
-  const isMediaActive = mediaData !== null && mediaData.isActive
 
   const handleBackdropPointerDown = (e: React.PointerEvent) => {
     if (e.target === e.currentTarget && expandedActivity !== null) {
@@ -778,11 +827,88 @@ export default function App() {
         />
       )}
 
-      {/* CENTERED SHELL & SPLIT ROW CONTAINER */}
+      {/* CENTERED SHELL & MULTI-TASK BUBBLES CONTAINER */}
       <div
-        className={`pt-2 flex items-center justify-center z-40 ${currentView === 'split' ? 'gap-2.5' : ''}`}
+        className="pt-2 flex items-center justify-center z-40 gap-2.5"
         onPointerDown={handleBackdropPointerDown}
       >
+        {/* LEFT BUBBLE: MUSIC (Spec: bubble on left of main capsule) */}
+        <AnimatePresence>
+          {isMediaActive && !isExpanded && (
+            <motion.div
+              key="bubble-music"
+              initial={{
+                x: 38,
+                scaleX: 1.55,
+                scaleY: 0.6,
+                scale: 0.35,
+                opacity: 0,
+              }}
+              animate={{
+                x: 0,
+                scaleX: 1,
+                scaleY: 1,
+                scale: 1,
+                opacity: 1,
+              }}
+              exit={{
+                x: 38,
+                scaleX: 1.4,
+                scaleY: 0.6,
+                scale: 0.2,
+                opacity: 0,
+                transition: { duration: 0.22, ease: 'easeIn' },
+              }}
+              transition={{
+                type: 'spring',
+                stiffness: 450,
+                damping: 24,
+                mass: 0.7,
+              }}
+              whileHover={{ scale: 1.14 }}
+              whileTap={{ scale: 0.94 }}
+              onPointerEnter={() => handleBubblePointerEnter('music')}
+              onPointerLeave={handleBubblePointerLeave}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleBubblePointerLeave()
+                setExpandedActivity('music')
+              }}
+              style={{
+                width: 32,
+                height: 32,
+                transformOrigin: 'right center',
+              }}
+              className="relative rounded-full bg-black border border-[#1ed760]/40 shadow-[0_2px_12px_rgba(30,215,96,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+              title={`${mediaData?.title || t.music} • ${t.clickToOpen}`}
+            >
+              {mediaData?.thumbnailBase64 ? (
+                <img
+                  src={mediaData.thumbnailBase64}
+                  alt={mediaData.title}
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                <AudioWaveform
+                  isPlaying={mediaData?.playbackStatus === 'playing'}
+                  barCount={3}
+                  size="sm"
+                />
+              )}
+
+              {/* Hover Dwell Progress Aura */}
+              {hoveredTarget === 'music' && (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
+                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute inset-0 rounded-full border-2 border-[#1ed760] pointer-events-none"
+                />
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* SINGLE PERSISTENT SHELL */}
         <motion.div
           animate={{
@@ -795,8 +921,14 @@ export default function App() {
           transition={springTransition}
           onAnimationComplete={handleAnimationComplete}
           onClick={handleShellClick}
-          onMouseEnter={() => currentView === 'droplet' && setIsDwelling(true)}
-          onMouseLeave={() => setIsDwelling(false)}
+          onMouseEnter={() => {
+            if (currentView === 'droplet') setIsDwelling(true)
+            handleExpandedPointerEnter()
+          }}
+          onMouseLeave={() => {
+            setIsDwelling(false)
+            handleExpandedPointerLeave()
+          }}
           onScroll={(e) => {
             e.currentTarget.scrollLeft = 0
             e.currentTarget.scrollTop = 0
@@ -1363,94 +1495,21 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 5. COMPACT TIMER VIEW (used in singleTimer and split) */}
-          {(currentView === 'singleTimer' || currentView === 'split') && timerData && (
-            <motion.div
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.96 }}
-              className="absolute inset-0 px-3 flex items-center justify-center gap-2 text-white overflow-hidden whitespace-nowrap"
+          {/* 3. EXPANDED MUSIC VIEW */}
+          {currentView === 'expandedMusic' && (
+            <div
+              className="absolute inset-0 px-5 pt-3.5 pb-2.5 flex flex-col justify-between text-white cursor-default overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
             >
-              {/* Circular Progress Ring */}
-              <div className="relative w-4 h-4 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 -rotate-90 absolute inset-0" viewBox="0 0 16 16">
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="6"
-                    fill="none"
-                    stroke="rgba(255, 255, 255, 0.2)"
-                    strokeWidth="2.2"
-                  />
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="6"
-                    fill="none"
-                    stroke={isPomodoroBreak ? '#10b981' : '#ff9500'}
-                    strokeWidth="2.2"
-                    strokeDasharray={37.7}
-                    strokeDashoffset={37.7 * (1 - timerProgress)}
-                    strokeLinecap="round"
-                    className="transition-all duration-300"
-                  />
-                </svg>
-                {/* Center dot/indicator */}
-                <span
-                  className={`w-1.5 h-1.5 rounded-full absolute z-10 ${
-                    isPomodoroBreak
-                      ? 'bg-emerald-400 shadow-[0_0_4px_#10b981]'
-                      : 'bg-[#ff9500] shadow-[0_0_4px_#ff9500]'
-                  } ${isTimerRunning ? 'animate-pulse' : 'opacity-70'}`}
-                />
-              </div>
-
-              {/* Time string */}
-              <span className="text-xs font-mono font-semibold text-white tracking-tight">
-                {formatTimeDisplay(remainingSeconds)}
-              </span>
-            </motion.div>
+              <ExpandedMusic
+                onClose={() => setExpandedActivity(null)}
+                onOpenTimer={() => setExpandedActivity('timer')}
+                isTimerActive={isTimerActive}
+              />
+            </div>
           )}
 
-          {/* 6. COMPACT SINGLE MUSIC VIEW (Spec Fase 4) */}
-          {currentView === 'singleMusic' && mediaData && (
-            <motion.div
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className="absolute inset-0 px-2.5 flex items-center justify-between gap-2 text-white overflow-hidden whitespace-nowrap"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                {mediaData.thumbnailBase64 ? (
-                  <img
-                    src={mediaData.thumbnailBase64}
-                    alt={mediaData.title}
-                    className="w-5 h-5 rounded-md object-cover border border-white/10 shrink-0"
-                  />
-                ) : (
-                  <div className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center shrink-0">
-                    <Music2 className="w-3 h-3 text-[#1ed760]" />
-                  </div>
-                )}
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-semibold text-white tracking-tight truncate max-w-[110px] leading-tight">
-                    {mediaData.title}
-                  </span>
-                  <span className="text-[9px] text-white/50 truncate max-w-[110px] leading-tight">
-                    {mediaData.artist || 'Unknown'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="shrink-0 pr-0.5">
-                <AudioWaveform
-                  isPlaying={mediaData.playbackStatus === 'playing'}
-                  barCount={4}
-                  size="sm"
-                />
-              </div>
-            </motion.div>
-          )}
-
-          {/* 7. IDLE CLOCK / MATA KUMA VIEW (Spec 178) */}
+          {/* 4. IDLE CLOCK / MATA KUMA VIEW (Spec 178) */}
           {currentView === 'idle' && (
             <motion.div
               whileHover={{ scale: 1.04 }}
@@ -1483,7 +1542,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 8. DROP TARGET COMPACT CAPSULE VIEW */}
+          {/* 5. DROP TARGET COMPACT CAPSULE VIEW */}
           {currentView === 'dropTarget' && (
             <motion.div
               whileHover={{ scale: 1.04 }}
@@ -1496,45 +1555,102 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 9. SETTINGS VIEW (Spec 179) */}
+          {/* 6. SETTINGS VIEW (Spec 179) */}
           {currentView === 'settings' && (
             <SettingsView onClose={() => setExpandedActivity(null)} />
           )}
-      </motion.div>
+        </motion.div>
 
-        {/* DETACHED SECONDARY BUBBLE (Dynamic Island Split Mode - Media) */}
+        {/* RIGHT BUBBLE: TIMER (Spec: water droplet separation animation from main capsule) */}
         <AnimatePresence>
-          {currentView === 'split' && (
+          {isTimerActive && !isExpanded && (
             <motion.div
-              initial={{ scale: 0, opacity: 0, width: 0 }}
-              animate={{ scale: 1, opacity: 1, width: 32 }}
-              exit={{ scale: 0, opacity: 0, width: 0, transition: { duration: 0.12, ease: 'easeIn' } }}
-              transition={springTransition}
-              whileHover={{ scale: 1.12 }}
-              whileTap={{ scale: 0.92 }}
+              key="bubble-timer"
+              initial={{
+                x: -38,
+                scaleX: 1.55,
+                scaleY: 0.6,
+                scale: 0.35,
+                opacity: 0,
+              }}
+              animate={{
+                x: 0,
+                scaleX: 1,
+                scaleY: 1,
+                scale: 1,
+                opacity: 1,
+              }}
+              exit={{
+                x: -38,
+                scaleX: 1.4,
+                scaleY: 0.6,
+                scale: 0.2,
+                opacity: 0,
+                transition: { duration: 0.22, ease: 'easeIn' },
+              }}
+              transition={{
+                type: 'spring',
+                stiffness: 450,
+                damping: 24,
+                mass: 0.7,
+              }}
+              whileHover={{ scale: 1.14 }}
+              whileTap={{ scale: 0.94 }}
+              onPointerEnter={() => handleBubblePointerEnter('timer')}
+              onPointerLeave={handleBubblePointerLeave}
               onClick={(e) => {
                 e.stopPropagation()
-                setExpandedActivity('home')
-                setHomePage(0)
+                handleBubblePointerLeave()
+                setExpandedActivity('timer')
               }}
               style={{
+                width: 32,
                 height: 32,
-                transformOrigin: 'center center',
+                transformOrigin: 'left center',
               }}
-              className="relative rounded-full bg-black border border-[#1ed760]/40 shadow-[0_2px_12px_rgba(30,215,96,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
-              title={`${mediaData?.title || t.music} • ${t.clickToOpen}`}
+              className="relative rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+              title={`${timerData?.label || 'Timer'}: ${formatTimeDisplay(remainingSeconds)} • ${t.clickToOpen}`}
             >
-              {mediaData?.thumbnailBase64 ? (
-                <img
-                  src={mediaData.thumbnailBase64}
-                  alt={mediaData.title}
-                  className="w-full h-full object-cover rounded-full"
+              {/* SVG Circular Progress Ring */}
+              <svg className="w-6 h-6 -rotate-90 absolute" viewBox="0 0 24 24">
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="8.5"
+                  fill="none"
+                  stroke="rgba(255, 255, 255, 0.15)"
+                  strokeWidth="2"
                 />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="8.5"
+                  fill="none"
+                  stroke={isPomodoroBreak ? '#10b981' : '#ff9500'}
+                  strokeWidth="2"
+                  strokeDasharray={53.4}
+                  strokeDashoffset={53.4 * (1 - timerProgress)}
+                  strokeLinecap="round"
+                  className="transition-all duration-300"
+                />
+              </svg>
+
+              {/* Center Countdown / Status */}
+              {timerData?.status === 'paused' ? (
+                <Pause className="w-2.5 h-2.5 text-amber-400 fill-amber-400 relative z-10" />
               ) : (
-                <AudioWaveform
-                  isPlaying={mediaData?.playbackStatus === 'playing'}
-                  barCount={3}
-                  size="sm"
+                <span className="text-[9px] font-mono font-bold text-amber-300 tracking-tighter relative z-10 leading-none">
+                  {formatCompactRemaining(remainingSeconds)}
+                </span>
+              )}
+
+              {/* Hover Dwell Progress Aura */}
+              {hoveredTarget === 'timer' && (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
+                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute inset-0 rounded-full border-2 border-amber-400 pointer-events-none"
                 />
               )}
             </motion.div>
