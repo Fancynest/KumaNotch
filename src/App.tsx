@@ -68,10 +68,10 @@ function getIslandView(
   if (expandedActivity === 'home') return 'home'
   if (expandedActivity === 'timer') return 'expandedTimer'
   if (isDragOver) return 'dropTarget'
-  if (displayState === 'droplet') return 'droplet'
   if (timerData && (timerData.status === 'running' || timerData.status === 'paused')) {
     return 'split'
   }
+  if (displayState === 'droplet') return 'droplet'
   return 'idle'
 }
 
@@ -96,6 +96,13 @@ export default function App() {
 
   // Expanded focus state: null (compact), 'home', 'timer', or 'music'
   const [expandedActivity, setExpandedActivity] = useState<'home' | 'timer' | 'music' | null>(null)
+
+  // Auto-clear expanded activity when timer completes so alert pops into view
+  useEffect(() => {
+    if (timerData?.status === 'completed') {
+      setExpandedActivity(null)
+    }
+  }, [timerData?.status])
 
   // Custom timer duration inputs on Home card (Jam, Menit, Detik - all default to 0)
   const [customHours, setCustomHours] = useState<string>('0')
@@ -293,12 +300,12 @@ export default function App() {
 
   // Alert Auto-Dismiss after 30s of inactivity (Spec Section 5 item 5)
   useEffect(() => {
-    if (currentView !== 'alert') return
+    if (currentView !== 'alert' && timerData?.status !== 'completed') return
     const timer = setTimeout(() => {
       globalTimerEngine.dismissAlert()
     }, 30000)
     return () => clearTimeout(timer)
-  }, [currentView])
+  }, [currentView, timerData?.status])
 
   // Listen to OS foreground state changes from Rust detector (event-driven)
   useEffect(() => {
@@ -404,7 +411,7 @@ export default function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (currentView === 'alert') {
+        if (currentView === 'alert' || timerData?.status === 'completed') {
           globalTimerEngine.dismissAlert()
         } else {
           setExpandedActivity(null)
@@ -413,7 +420,7 @@ export default function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentView])
+  }, [currentView, timerData?.status])
 
   // Collapse on window blur / loss of focus
   useEffect(() => {
@@ -555,7 +562,7 @@ export default function App() {
           borderRadius: shellConfig.borderRadius,
           boxShadow: shellConfig.boxShadow,
           y: shellConfig.y,
-          x: currentView === 'split' ? 'calc(-50% - 20px)' : '-50%',
+          x: '-50%',
         }}
         transition={springTransition}
         onAnimationComplete={handleAnimationComplete}
@@ -565,8 +572,9 @@ export default function App() {
         style={{
           position: 'absolute',
           top: 8,
-          left: '50%',
+          left: currentView === 'split' ? 'calc(50% - 21px)' : '50%',
           transformOrigin: 'top center',
+          transition: 'left 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
         }}
         className={`bg-black border overflow-hidden cursor-pointer z-40 ${
           currentView === 'alert'
@@ -630,8 +638,8 @@ export default function App() {
                       <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 my-0.5">
                         <div className="flex items-center gap-2">
                           <motion.div
-                            animate={isTimerRunning ? { rotate: [0, 180, 180, 360] } : { rotate: 0 }}
-                            transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+                            animate={isTimerRunning ? { rotate: [0, 0, 180, 180, 360] } : { rotate: 0 }}
+                            transition={{ duration: 5.0, times: [0, 0.38, 0.50, 0.88, 1.0], repeat: Infinity, ease: 'easeInOut' }}
                             className="text-amber-400"
                           >
                             <Hourglass className="w-3.5 h-3.5 fill-amber-400/20" />
@@ -923,7 +931,7 @@ export default function App() {
           )}
 
           {/* 3. ALERT VIEW - Automatically Expands when Timer Completes (Spec 5.1 point 6 & line 156) */}
-          {currentView === 'alert' && timerData && (
+          {currentView === 'alert' && (
             <div
               className="absolute inset-0 p-4 flex flex-col justify-between text-white cursor-default overflow-hidden"
               onClick={(e) => e.stopPropagation()}
@@ -935,10 +943,10 @@ export default function App() {
                   </div>
                   <div>
                     <span className="text-xs font-bold text-amber-400 block leading-tight">
-                      {timerData.isPomodoro ? `${timerData.label} ${t.completedSuffix}` : t.timeUp}
+                      {timerData?.isPomodoro ? `${timerData.label} ${t.completedSuffix}` : t.timeUp}
                     </span>
                     <span className="text-[10px] text-white/50 block leading-tight">
-                      {timerData.isPomodoro
+                      {timerData?.isPomodoro
                         ? isPomodoroBreak
                           ? t.timeToRefocus
                           : t.timeForBreak
@@ -968,11 +976,11 @@ export default function App() {
                   <span>{t.stop}</span>
                 </button>
 
-                {timerData.isPomodoro ? (
+                {timerData?.isPomodoro ? (
                   isPomodoroBreak ? (
                     <button
                       onClick={() => {
-                        const nextCycle = ((timerData.pomodoroCycle || 1) % 4) + 1
+                        const nextCycle = ((timerData?.pomodoroCycle || 1) % 4) + 1
                         globalTimerEngine.startPomodoro('focus', nextCycle)
                       }}
                       className="px-4 py-1.5 rounded-full bg-emerald-400 hover:bg-emerald-300 text-black text-xs font-bold transition-transform active:scale-95"
@@ -982,20 +990,20 @@ export default function App() {
                   ) : (
                     <button
                       onClick={() => {
-                        const cycle = timerData.pomodoroCycle || 1
+                        const cycle = timerData?.pomodoroCycle || 1
                         const nextPhase = cycle === 4 ? 'longBreak' : 'shortBreak'
                         globalTimerEngine.startPomodoro(nextPhase, cycle)
                       }}
                       className="px-4 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold transition-transform active:scale-95"
                     >
-                      {t.startBreak(timerData.pomodoroCycle === 4 ? '15m' : '5m')}
+                      {t.startBreak(timerData?.pomodoroCycle === 4 ? '15m' : '5m')}
                     </button>
                   )
                 ) : (
                   <button
                     onClick={() => {
-                      const mins = Math.max(1, Math.round(timerData.totalDurationSeconds / 60))
-                      globalTimerEngine.startTimer(mins)
+                      const secs = timerData?.totalDurationSeconds || 60
+                      globalTimerEngine.startTimerSeconds(secs)
                     }}
                     className="px-4 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold transition-transform active:scale-95"
                   >
@@ -1107,7 +1115,7 @@ export default function App() {
         animate={{
           scale: currentView === 'split' ? 1 : 0,
           opacity: currentView === 'split' ? 1 : 0,
-          x: currentView === 'split' ? 'calc(-50% + 54px)' : '-50%',
+          x: '-50%',
           y: shellConfig.y,
         }}
         transition={springTransition}
@@ -1120,11 +1128,12 @@ export default function App() {
         style={{
           position: 'absolute',
           top: 8,
-          left: '50%',
+          left: currentView === 'split' ? 'calc(50% + 53px)' : '50%',
           width: 32,
           height: 32,
           pointerEvents: currentView === 'split' ? 'auto' : 'none',
           transformOrigin: 'center center',
+          transition: 'left 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
         }}
         className="rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer z-40 overflow-hidden"
         title="Timer"
@@ -1158,13 +1167,13 @@ export default function App() {
         {/* Animated Flipping Hourglass Icon */}
         <motion.div
           animate={isTimerRunning ? {
-            rotate: [0, 180, 180, 360],
+            rotate: [0, 0, 180, 180, 360],
           } : { rotate: 0 }}
           transition={{
-            duration: 2.6,
+            duration: 5.0,
             repeat: Infinity,
             ease: "easeInOut",
-            times: [0, 0.42, 0.58, 1],
+            times: [0, 0.38, 0.50, 0.88, 1.0],
           }}
           className="flex items-center justify-center text-amber-400 z-10"
         >

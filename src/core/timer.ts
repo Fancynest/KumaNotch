@@ -262,9 +262,10 @@ export class TimerEngine {
         }
         savePersistedTimer(this.data)
         this.triggerCompletionAlert()
+      } else {
+        this.notify()
       }
-      this.notify()
-    }, 1000)
+    }, 250)
   }
 
   private stopTick(): void {

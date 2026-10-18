@@ -15,6 +15,7 @@ unsafe extern "system" {
 
 const SWP_NOZORDER: u32 = 0x0004;
 const SWP_NOACTIVATE: u32 = 0x0010;
+const SWP_SHOWWINDOW: u32 = 0x0040;
 const SWP_NOCOPYBITS: u32 = 0x0100;
 const SWP_NOOWNERZORDER: u32 = 0x0200;
 const SWP_NOSENDCHANGING: u32 = 0x0400;
@@ -31,7 +32,7 @@ pub fn set_window_bounds(window: &tauri::WebviewWindow, x: i32, y: i32, width: u
                     y,
                     width as i32,
                     height as i32,
-                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING,
+                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOCOPYBITS | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING,
                 );
             }
             return;
