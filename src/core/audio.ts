@@ -5,6 +5,8 @@
  */
 
 let audioCtx: AudioContext | null = null
+let alarmIntervalId: ReturnType<typeof setInterval> | null = null
+let currentMasterGain: GainNode | null = null
 
 function getAudioContext(): AudioContext {
   if (!audioCtx) {
@@ -17,7 +19,7 @@ function getAudioContext(): AudioContext {
   return audioCtx
 }
 
-export function playTimerChime(volume = 0.8): void {
+export function playTimerChime(volume = 0.85): void {
   try {
     const ctx = getAudioContext()
     const now = ctx.currentTime
@@ -26,6 +28,7 @@ export function playTimerChime(volume = 0.8): void {
     const masterGain = ctx.createGain()
     masterGain.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), now)
     masterGain.connect(ctx.destination)
+    currentMasterGain = masterGain
 
     // Note 1: C6 (1046.5 Hz) - bright pleasant strike
     const osc1 = ctx.createOscillator()
@@ -68,4 +71,39 @@ export function playTimerChime(volume = 0.8): void {
   } catch (err) {
     console.debug('Audio chime playback fallback:', err)
   }
+}
+
+/**
+ * Starts repeating alarm sound until stopAlarmLoop() is called.
+ * Default interval: 2.4s between strikes for continuous rhythmic alert.
+ */
+export function startAlarmLoop(intervalMs = 2400, volume = 0.85): void {
+  stopAlarmLoop()
+  playTimerChime(volume)
+  alarmIntervalId = setInterval(() => {
+    playTimerChime(volume)
+  }, intervalMs)
+}
+
+/**
+ * Stops repeating alarm sound immediately and fades active gain.
+ */
+export function stopAlarmLoop(): void {
+  if (alarmIntervalId) {
+    clearInterval(alarmIntervalId)
+    alarmIntervalId = null
+  }
+  if (currentMasterGain && audioCtx) {
+    try {
+      const now = audioCtx.currentTime
+      currentMasterGain.gain.cancelScheduledValues(now)
+      currentMasterGain.gain.setValueAtTime(currentMasterGain.gain.value, now)
+      currentMasterGain.gain.linearRampToValueAtTime(0, now + 0.05)
+    } catch {}
+    currentMasterGain = null
+  }
+}
+
+export function isAlarmPlaying(): boolean {
+  return alarmIntervalId !== null
 }

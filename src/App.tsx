@@ -685,9 +685,10 @@ export default function App() {
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button
                   onClick={() => globalTimerEngine.dismissAlert()}
-                  className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 text-xs font-medium transition-colors"
+                  className="px-3.5 py-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-xs font-semibold transition-all active:scale-95 flex items-center gap-1.5"
                 >
-                  Selesai
+                  <span className="w-2 h-2 rounded-sm bg-red-400" />
+                  <span>Stop</span>
                 </button>
 
                 {timerData.isPomodoro ? (

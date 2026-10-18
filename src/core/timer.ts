@@ -1,5 +1,5 @@
 import { globalActivityRegistry, ACTIVITY_PRIORITIES } from './activities'
-import { playTimerChime } from './audio'
+import { startAlarmLoop, stopAlarmLoop } from './audio'
 
 export type TimerStatus = 'idle' | 'running' | 'paused' | 'completed'
 export type PomodoroPhase = 'focus' | 'shortBreak' | 'longBreak'
@@ -109,6 +109,7 @@ export class TimerEngine {
   }
 
   public startTimerSeconds(durationSeconds: number, label = 'Timer'): void {
+    stopAlarmLoop()
     const validSeconds = Math.max(1, Math.round(durationSeconds))
     const now = Date.now()
     const endsAt = now + validSeconds * 1000
@@ -134,6 +135,7 @@ export class TimerEngine {
   }
 
   public startPomodoro(phase: PomodoroPhase = 'focus', cycle = 1): void {
+    stopAlarmLoop()
     const minutes = phase === 'focus' ? 25 : phase === 'shortBreak' ? 5 : 15
     const durationSeconds = minutes * 60
     const now = Date.now()
@@ -224,6 +226,7 @@ export class TimerEngine {
   }
 
   public reset(): void {
+    stopAlarmLoop()
     this.stopTick()
     this.data = null
     savePersistedTimer(null)
@@ -233,6 +236,7 @@ export class TimerEngine {
   }
 
   public dismissAlert(): void {
+    stopAlarmLoop()
     globalActivityRegistry.remove('timer-alert')
     if (this.data && this.data.status === 'completed') {
       this.reset()
@@ -269,16 +273,18 @@ export class TimerEngine {
   }
 
   private triggerCompletionAlert(): void {
-    playTimerChime(0.85)
+    // Start repeating alarm chime until user clicks Stop / dismissAlert()
+    startAlarmLoop(2400, 0.85)
 
-    // Register high-priority Alert activity (100) with 30s auto-dismiss
+    // Register high-priority Alert activity (100)
+    // Persists with 10-minute safety limit if user walks away
     globalActivityRegistry.register({
       id: 'timer-alert',
       kind: 'alert',
       priority: ACTIVITY_PRIORITIES.alert,
       title: this.data?.isPomodoro ? `${this.data.label} Selesai!` : 'Waktu Habis!',
       updatedAt: Date.now(),
-      expiresAt: Date.now() + 30000,
+      expiresAt: Date.now() + 600000,
     })
 
     this.notify()
