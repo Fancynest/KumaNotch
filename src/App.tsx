@@ -26,6 +26,7 @@ import {
   formatTimeDisplay,
   type TimerData,
 } from './core/timer'
+import { getT } from './core/i18n'
 
 // Authentic Apple Dynamic Island spring transition curve
 const springTransition: Transition = {
@@ -64,6 +65,8 @@ function getIslandView(
 }
 
 export default function App() {
+  const t = getT()
+
   // Global Timestamp-based Timer Engine subscription (Spec Fase 2)
   const [timerData, setTimerData] = useState<TimerData | null>(() => globalTimerEngine.getData())
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() => globalTimerEngine.getRemainingSeconds())
@@ -115,7 +118,7 @@ export default function App() {
     return formatClockTime(new Date(), 'auto')
   })
   const [dateStr, setDateStr] = useState(() => {
-    return new Date().toLocaleDateString('id-ID', {
+    return new Date().toLocaleDateString(typeof navigator !== 'undefined' ? navigator.language : undefined, {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
@@ -263,7 +266,13 @@ export default function App() {
     const updateTime = () => {
       const now = new Date()
       setTimeStr(formatClockTime(now, clockFormat))
-      setDateStr(now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' }))
+      setDateStr(
+        now.toLocaleDateString(typeof navigator !== 'undefined' ? navigator.language : undefined, {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        }),
+      )
     }
 
     updateTime()
@@ -460,7 +469,7 @@ export default function App() {
               {/* Quick Timer Presets */}
               <div className="flex flex-col gap-1.5 pt-0.5">
                 <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
-                  Mulai Timer Cepat
+                  {t.quickTimer}
                 </span>
 
                 <div className="grid grid-cols-5 gap-1.5">
@@ -487,7 +496,7 @@ export default function App() {
                       },
                     },
                     {
-                      label: 'Fokus',
+                      label: t.focus,
                       action: () => {
                         globalTimerEngine.startPomodoro('focus', 1)
                         setExpandedActivity(null)
@@ -495,7 +504,7 @@ export default function App() {
                       highlight: true,
                     },
                     {
-                      label: 'Custom',
+                      label: t.custom,
                       action: () => setShowCustomInput(!showCustomInput),
                       active: showCustomInput,
                     },
@@ -528,7 +537,7 @@ export default function App() {
                         className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         placeholder="0"
                       />
-                      <span className="text-[11px] text-white/50 font-mono">j</span>
+                      <span className="text-[11px] text-white/50 font-mono">{t.hourUnit}</span>
                     </div>
                     <span className="text-white/30 text-xs font-mono">:</span>
                     <div className="flex items-center gap-1">
@@ -542,7 +551,7 @@ export default function App() {
                         placeholder="10"
                         autoFocus
                       />
-                      <span className="text-[11px] text-white/50 font-mono">m</span>
+                      <span className="text-[11px] text-white/50 font-mono">{t.minUnit}</span>
                     </div>
                     <span className="text-white/30 text-xs font-mono">:</span>
                     <div className="flex items-center gap-1">
@@ -555,13 +564,13 @@ export default function App() {
                         className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         placeholder="0"
                       />
-                      <span className="text-[11px] text-white/50 font-mono">d</span>
+                      <span className="text-[11px] text-white/50 font-mono">{t.secUnit}</span>
                     </div>
                     <button
                       type="submit"
                       className="px-3.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-colors ml-auto active:scale-95 shadow-sm"
                     >
-                      Mulai
+                      {t.start}
                     </button>
                   </form>
                 )}
@@ -595,7 +604,7 @@ export default function App() {
                     </span>
                     {timerData.isPomodoro && (
                       <span className="text-[10px] text-white/40 block leading-tight">
-                        Putaran {timerData.pomodoroCycle || 1} dari 4
+                        {t.round(timerData.pomodoroCycle || 1, 4)}
                       </span>
                     )}
                   </div>
@@ -634,7 +643,7 @@ export default function App() {
                   className="px-3 h-9 rounded-full bg-white/10 text-white/70 hover:text-white flex items-center gap-1.5 transition-transform active:scale-90 text-xs font-medium"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset</span>
+                  <span>{t.reset}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -651,7 +660,7 @@ export default function App() {
                   }`}
                 >
                   {isTimerRunning ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                  <span>{isTimerRunning ? 'Jeda' : 'Lanjut'}</span>
+                  <span>{isTimerRunning ? t.pause : t.resume}</span>
                 </button>
                 <button
                   onClick={() => globalTimerEngine.addOneMinute()}
@@ -681,14 +690,14 @@ export default function App() {
                   </div>
                   <div>
                     <span className="text-xs font-bold text-amber-400 block leading-tight">
-                      {timerData.isPomodoro ? `${timerData.label} Selesai!` : 'Waktu Habis!'}
+                      {timerData.isPomodoro ? `${timerData.label} ${t.completedSuffix}` : t.timeUp}
                     </span>
                     <span className="text-[10px] text-white/50 block leading-tight">
                       {timerData.isPomodoro
                         ? isPomodoroBreak
-                          ? 'Waktunya kembali fokus'
-                          : 'Saatnya istirahat sejenak'
-                        : 'Timer telah selesai'}
+                          ? t.timeToRefocus
+                          : t.timeForBreak
+                        : t.timerCompleted}
                     </span>
                   </div>
                 </div>
@@ -711,7 +720,7 @@ export default function App() {
                   className="px-3.5 py-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-xs font-semibold transition-all active:scale-95 flex items-center gap-1.5"
                 >
                   <span className="w-2 h-2 rounded-sm bg-red-400" />
-                  <span>Stop</span>
+                  <span>{t.stop}</span>
                 </button>
 
                 {timerData.isPomodoro ? (
@@ -723,7 +732,7 @@ export default function App() {
                       }}
                       className="px-4 py-1.5 rounded-full bg-emerald-400 hover:bg-emerald-300 text-black text-xs font-bold transition-transform active:scale-95"
                     >
-                      Mulai Sesi Fokus
+                      {t.startFocusSession}
                     </button>
                   ) : (
                     <button
@@ -734,7 +743,7 @@ export default function App() {
                       }}
                       className="px-4 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold transition-transform active:scale-95"
                     >
-                      Mulai Istirahat ({timerData.pomodoroCycle === 4 ? '15m' : '5m'})
+                      {t.startBreak(timerData.pomodoroCycle === 4 ? '15m' : '5m')}
                     </button>
                   )
                 ) : (
@@ -745,7 +754,7 @@ export default function App() {
                     }}
                     className="px-4 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold transition-transform active:scale-95"
                   >
-                    Ulangi Timer
+                    {t.repeatTimer}
                   </button>
                 )}
               </div>

@@ -5,13 +5,34 @@ use tauri::{
 };
 use tauri_plugin_autostart::ManagerExt;
 
+#[cfg(windows)]
+unsafe extern "system" {
+    fn GetUserDefaultUILanguage() -> u16;
+}
+
+fn is_indonesian_locale() -> bool {
+    #[cfg(windows)]
+    {
+        let lang_id = unsafe { GetUserDefaultUILanguage() };
+        (lang_id & 0x03FF) == 0x0021
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 pub fn create_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let is_id = is_indonesian_locale();
+    let autostart_label = if is_id { "Mulai otomatis saat Windows aktif" } else { "Start with Windows" };
+    let quit_label = if is_id { "Keluar dari KumaNotch" } else { "Quit KumaNotch" };
+
     let autolaunch_enabled = app.autolaunch().is_enabled().unwrap_or(false);
-    let autostart_item = CheckMenuItemBuilder::with_id("autostart", "Start with Windows")
+    let autostart_item = CheckMenuItemBuilder::with_id("autostart", autostart_label)
         .checked(autolaunch_enabled)
         .build(app)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let quit_item = MenuItemBuilder::with_id("quit", "Quit KumaNotch").build(app)?;
+    let quit_item = MenuItemBuilder::with_id("quit", quit_label).build(app)?;
 
     let menu = MenuBuilder::new(app)
         .items(&[

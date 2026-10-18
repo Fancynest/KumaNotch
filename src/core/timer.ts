@@ -1,5 +1,6 @@
 import { globalActivityRegistry, ACTIVITY_PRIORITIES } from './activities'
 import { startAlarmLoop, stopAlarmLoop } from './audio'
+import { getT } from './i18n'
 
 export type TimerStatus = 'idle' | 'running' | 'paused' | 'completed'
 export type PomodoroPhase = 'focus' | 'shortBreak' | 'longBreak'
@@ -141,12 +142,13 @@ export class TimerEngine {
     const now = Date.now()
     const endsAt = now + durationSeconds * 1000
 
+    const t = getT()
     const label =
       phase === 'focus'
-        ? `Pomodoro Fokus (#${cycle})`
+        ? `${t.focusSession} (#${cycle})`
         : phase === 'shortBreak'
-          ? 'Istirahat Pendek'
-          : 'Istirahat Panjang'
+          ? t.shortBreak
+          : t.longBreak
 
     this.data = {
       id: 'timer-main',
@@ -276,13 +278,14 @@ export class TimerEngine {
     // Start repeating alarm chime until user clicks Stop / dismissAlert()
     startAlarmLoop(2400, 0.85)
 
+    const t = getT()
     // Register high-priority Alert activity (100)
     // Persists with 10-minute safety limit if user walks away
     globalActivityRegistry.register({
       id: 'timer-alert',
       kind: 'alert',
       priority: ACTIVITY_PRIORITIES.alert,
-      title: this.data?.isPomodoro ? `${this.data.label} Selesai!` : 'Waktu Habis!',
+      title: this.data?.isPomodoro ? `${this.data.label} ${t.completedSuffix}` : t.timeUp,
       updatedAt: Date.now(),
       expiresAt: Date.now() + 600000,
     })
