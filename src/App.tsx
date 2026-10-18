@@ -1079,9 +1079,9 @@ export default function App() {
         <AnimatePresence>
           {currentView === 'split' && (
             <motion.div
-              initial={{ scale: 0, opacity: 0, width: 0 }}
-              animate={{ scale: 1, opacity: 1, width: 32 }}
-              exit={{ scale: 0, opacity: 0, width: 0 }}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
               transition={springTransition}
               whileHover={{ scale: 1.12 }}
               whileTap={{ scale: 0.92 }}
@@ -1090,15 +1090,16 @@ export default function App() {
                 setExpandedActivity('timer')
               }}
               style={{
+                width: 32,
                 height: 32,
                 transformOrigin: 'center center',
               }}
-              className="rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+              className="relative w-8 h-8 rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
               title="Timer"
             >
               {/* Progress Ring */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <svg className="w-full h-full -rotate-90 p-0.5" viewBox="0 0 32 32">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 32 32">
                   <circle
                     cx="16"
                     cy="16"
