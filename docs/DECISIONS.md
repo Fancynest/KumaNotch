@@ -34,3 +34,18 @@ This document records architectural choices, deviations from the initial spec, a
   6. **Timer Effect Reactivity**: Removed setState updater side-effects from timer countdown; state transition to stopped now runs cleanly outside updater callback.
   7. **Cleanups**: Removed unused `@tauri-apps/plugin-shell`, removed Electron `electronAPI` typing from `vite-env.d.ts`, removed hardcoded file logging from `lib.rs` in favor of `tauri-plugin-log`, configured strict Content-Security-Policy (CSP), and updated `README.md`.
 
+## Decision 004: Mode Droplet & Event-Driven Foreground Detection (Fase 1b)
+- **Date**: 2026-10-18
+- **Context**: Implementation of Section 5.1 and Fase 1b of `KUMANOTCH_SPEC.md`. When working in maximized or fullscreen applications (e.g. Chrome, editors, borderless video), KumaNotch shrinks into a discrete, non-obtrusive 14px droplet so it does not block tabs or window controls.
+- **Decision**:
+  1. **Event-Driven Detection (Zero-Polling)**: Implemented `src-tauri/src/detector.rs` using Win32 `SetWinEventHook` (`EVENT_SYSTEM_FOREGROUND` and `EVENT_SYSTEM_MOVESIZEEND`) with a background thread message loop. Emits `app_mode_changed` (`desktop` | `app` | `hidden`) only when foreground state changes.
+  2. **Accurate Window Classification**:
+     - `SHQueryUserNotificationState`: detects exclusive DirectX full-screen (`QUNS_RUNNING_D3D_FULL_SCREEN` = 3) and presentation mode (`QUNS_PRESENTATION_MODE` = 4), setting `hidden` state (`window.hide()`).
+     - `GetClassNameW`: recognizes Desktop (`Progman`, `WorkerW`) and Taskbar (`Shell_TrayWnd`), immediately restoring `desktop` mode (`capsule`).
+     - `IsZoomed` & `GetWindowRect` vs `GetMonitorInfoW`: accurately detects maximized windows and borderless/fullscreen video (e.g., YouTube full-screen in Chrome).
+     - `GetCurrentProcessId`: filters out KumaNotch's own HWND to avoid mode flickering on interaction.
+  3. **Shrink-To-Fit Droplet Window**: Window bounds shrink to 48×48 (`WINDOW_SIZES.droplet`) when in droplet mode, virtually eliminating click obstruction at the top bezel.
+  4. **Dwell Hover & Ripple Feedback**: 2-second hover over droplet triggers visual ripple progress ring (`border-white/60` expanding outward). Mouse-out before 2s cancels. Direct click re-opens instantly.
+  5. **Auto-Transition Logic**: 10 seconds of no interaction in app mode collapses to droplet; returning to desktop instantly restores normal clock capsule.
+
+

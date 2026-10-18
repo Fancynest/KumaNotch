@@ -68,13 +68,13 @@ Komunikasi Rust → React lewat event Tauri (mis. `media://changed`); React → 
 ## 4. Window & posisi (spec)
 
 - Window tanpa frame, transparan, selalu di atas, tidak muncul di taskbar, tanpa shadow bawaan OS (shadow digambar CSS).
-- **Window ukurannya mengikuti state** (bukan window besar tetap). Ukuran = konstanta per state + padding sekitar 16px untuk bayangan. Ini menggantikan pendekatan click-through lama (window 760×280 yang menangkap klik di area transparan).
+- **Window ukurannya mengikuti state** (bukan window besar tetap). Ukuran = konstanta per state + padding untuk bayangan. **Padding tiap sisi harus ≥ blur + offset + spread bayangan CSS** (praktisnya ≥ 40px, lebih besar di sisi bawah). Kalau bayangan lebih besar dari padding, ia terpotong di tepi window dan tampak sebagai "bayangan kotak" (bug yang sudah terjadi di build awal). Pastikan juga background webview benar-benar transparan (`html`, `body`, `#root`) dan bayangan bawaan OS dimatikan (`shadow: false`). Jangan pakai `backdrop-filter`. Ini menggantikan pendekatan click-through lama (window 760×280 yang menangkap klik di area transparan).
 - Ukuran window berasal dari **tabel konstanta per state**, BUKAN dari ResizeObserver (supaya window tidak mengejar animasi tiap frame).
 - Koreografi resize:
   - Expand: besarkan window dulu → animasikan konten (spring).
   - Collapse: animasikan konten dulu → kecilkan window setelah animasi selesai.
 - Posisi: tengah atas monitor aktif (default monitor utama), offset atas ±8px. Hitung dalam ukuran fisik dengan scale factor; hitung ulang saat resolusi/DPI/monitor berubah.
-- Sembunyikan (atau turunkan z-order) saat ada aplikasi fullscreen/game/presentasi. Gunakan `SHQueryUserNotificationState` (atau pendekatan setara yang terverifikasi).
+- Perilaku saat ada aplikasi lain di depan: lihat bagian 5.1 (Droplet untuk app mode biasa; sembunyikan total hanya untuk fullscreen eksklusif/game/presentasi). Gunakan `SHQueryUserNotificationState` (atau pendekatan setara yang terverifikasi).
 - Single instance: instance kedua hanya memfokuskan yang sudah ada.
 - Tray icon wajib: Settings, "Start with Windows" (toggle), "Personality" (toggle mata Kuma), Quit. Tanpa tray, aplikasi tidak bisa ditutup normal.
 - Expand dengan **klik**. Collapse: klik di luar (window blur), tombol Esc, atau inaktif ±10 detik pada halaman Home. Hover-to-open boleh jadi opsi di Settings, bukan default.
@@ -112,6 +112,22 @@ Aturan tampilan:
 - Zona **File Shelf** (drop area + daftar item)
 - (Opsional, fase lanjut) to-do ringkas, status baterai/Wi-Fi
 
+### 5.1 Mode Droplet (auto-minimize saat di aplikasi lain)
+
+Tujuan: saat pengguna bekerja di aplikasi lain, kapsul tidak mengganggu dan tidak memblokir area di bawahnya.
+
+State tampilan: `capsule` (normal) → `droplet` → `hidden`.
+
+1. **Konteks "app mode"**: jendela foreground milik aplikasi lain (bukan desktop/shell Explorer/taskbar) yang maximized atau fullscreen (termasuk borderless dan video fullscreen di browser). Deteksi berbasis event: `SetWinEventHook` (`EVENT_SYSTEM_FOREGROUND` dan perubahan lokasi jendela foreground), lalu `IsZoomed` atau bandingkan rect jendela dengan rect monitor. Hindari polling cepat. Verifikasi API ke dokumentasi.
+2. **Masuk droplet**: di app mode, bila tidak ada interaksi dengan notch selama 10 detik (bisa diatur di Settings, default 10), kapsul menyusut dengan spring menjadi droplet. Interaksi = hover, klik, atau aktivitas baru.
+3. **Bentuk droplet**: lingkaran kecil hitam sekitar 14px, border tipis, highlight halus seperti tetesan air, di posisi atas-tengah yang sama. Window ikut mengecil ke ukuran droplet + padding bayangan (sekitar 48×48) sehingga hampir tidak memblokir klik.
+4. **Keluar droplet (dwell hover)**: kursor di atas droplet selama 2 detik (default, bisa diatur 1–3 detik) → kapsul muncul kembali dengan spring. Selama dwell tampilkan isyarat progres (riak/cincin yang membesar pelan) supaya pengguna tahu akan terbuka. Kursor keluar sebelum waktunya → batal tanpa efek. Klik langsung pada droplet = buka seketika.
+5. Setelah muncul lewat hover: bila 10 detik tanpa interaksi → kembali jadi droplet. Keluar dari app mode (kembali ke desktop) → kapsul normal otomatis.
+6. **Aktivitas saat droplet**: timer/musik aktif ditandai titik kecil pada droplet (oranye untuk timer, hijau untuk media), tanpa teks. **Alert** (timer selesai) tetap melebar otomatis dari droplet beserta chime, kecuali mode "Jangan ganggu" atau fullscreen eksklusif: di situ droplet hanya berdenyut halus sampai pengguna hover.
+7. **Hidden**: fullscreen eksklusif (game D3D), mode presentasi, atau layar terkunci → sembunyikan total, bukan droplet. Gunakan `SHQueryUserNotificationState` atau setara.
+8. Settings: aktif/nonaktif auto-droplet, durasi inaktif, durasi dwell, dan apakah berlaku untuk aplikasi yang tidak maximized.
+9. Performa: tanpa polling cepat; tanpa animasi loop saat droplet diam (riak hanya berjalan saat dwell).
+
 ## 6. Fase pengerjaan
 
 ### Fase 0 — Migrasi fondasi
@@ -124,7 +140,14 @@ Aturan tampilan:
 - Kapsul jam (format 12/24 jam di Settings; update per menit kecuali "tampilkan detik" aktif, selaras batas menit).
 - Klik → Home dengan koreografi resize bagian 4. Collapse via blur/Esc/inaktif.
 - Hapus dev control bar dari build produksi (boleh dipertahankan di mode dev lewat flag).
-- **Acceptance**: expand/collapse mulus; tidak ada animasi infinite saat collapsed; CPU idle ≈ 0.
+- **Aturan first-run (wajib)**: instalasi baru HANYA menampilkan kapsul jam. Tidak boleh ada timer jalan atau musik/waveform palsu. Data demo prototipe (`musicActive`/`timerActive` = true, "Paper Sky", 14:52) hanya boleh ada di mode dev lewat flag (`import.meta.env.DEV` atau `?demo=1`), tidak pernah di build produksi. Timer baru ada kalau pengguna memulainya; musik baru ada kalau SMTC (Fase 4) benar-benar mendeteksi sesi media. Sebelum Fase 4 selesai, aktivitas musik tidak ditampilkan sama sekali.
+- **Acceptance**: expand/collapse mulus; tidak ada animasi infinite saat collapsed; CPU idle ≈ 0; instalasi baru menampilkan jam saja; tidak ada kotak/bayangan terpotong di sekeliling kapsul (cek di wallpaper terang dan gelap).
+
+### Fase 1b — Mode Droplet
+- Kerjakan setelah sisa Fase 1 beres (kartu menutup saat fokus hilang, tanpa scrollbar), karena memakai logika fokus/inaktivitas yang sama.
+- Implementasi bagian 5.1: deteksi app mode di Rust (event-driven), state `capsule`/`droplet`/`hidden`, dwell hover 2 detik dengan isyarat progres, window mengecil ke ukuran droplet.
+- Titik indikator timer/media dan aturan alert disiapkan sebagai hook; diisi penuh saat Fase 2 dan 4.
+- **Acceptance**: buka Chrome maximized → setelah 10 detik jadi droplet dan window ≤ sekitar 48×48; hover 2 detik → kapsul kembali; pindah ke desktop → kapsul normal; kursor keluar sebelum 2 detik → batal; video/game borderless fullscreen tidak terganggu; CPU idle tetap ≈ 0.
 
 ### Fase 2 — Timer + registry aktivitas
 - Implementasi `core/activities.ts` + store.

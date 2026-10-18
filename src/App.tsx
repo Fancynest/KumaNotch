@@ -10,6 +10,8 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
 import { WINDOW_SIZES, resizeWindow, type WindowSize } from './core/windowSizing'
 
 // Authentic Apple Dynamic Island spring transition curve
@@ -26,6 +28,11 @@ export default function App() {
   const [timerActive, setTimerActive] = useState(false)
   const [timerRunning, setTimerRunning] = useState(false)
   const [timerSeconds, setTimerSeconds] = useState(0)
+
+  // OS Foreground Application State & Droplet Mode (Spec 5.1 & Fase 1b)
+  const [systemMode, setSystemMode] = useState<'desktop' | 'app' | 'hidden'>('desktop')
+  const [displayState, setDisplayState] = useState<'capsule' | 'droplet'>('capsule')
+  const [isDwelling, setIsDwelling] = useState(false)
 
   // Expanded focus state: null (compact), 'home', 'timer', or 'music'
   const [expandedActivity, setExpandedActivity] = useState<'home' | 'timer' | 'music' | null>(null)
@@ -49,6 +56,76 @@ export default function App() {
       month: 'long',
     })
   })
+
+  // Listen to OS foreground state changes from Rust detector (event-driven)
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+
+    invoke<string>('get_app_mode')
+      .then((mode) => {
+        if (mode === 'app' || mode === 'desktop' || mode === 'hidden') {
+          setSystemMode(mode)
+        }
+      })
+      .catch(() => {})
+
+    listen<{ mode: 'desktop' | 'app' | 'hidden' }>('app_mode_changed', (event) => {
+      setSystemMode(event.payload.mode)
+    }).then((fn) => {
+      unlisten = fn
+    }).catch(() => {})
+
+    return () => {
+      if (unlisten) unlisten()
+    }
+  }, [])
+
+  // Auto-restore capsule when user returns to desktop (Spec 5.1 point 5)
+  useEffect(() => {
+    if (systemMode === 'desktop') {
+      setDisplayState('capsule')
+      setIsDwelling(false)
+    }
+  }, [systemMode])
+
+  // In app mode, enter droplet after 10s of no interaction (Spec 5.1 point 2)
+  useEffect(() => {
+    if (systemMode !== 'app' || displayState !== 'capsule' || expandedActivity !== null) return
+
+    let timer = setTimeout(() => {
+      setDisplayState('droplet')
+    }, 10000)
+
+    const resetDropletTimer = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        setDisplayState('droplet')
+      }, 10000)
+    }
+
+    window.addEventListener('mousemove', resetDropletTimer)
+    window.addEventListener('mousedown', resetDropletTimer)
+    window.addEventListener('keydown', resetDropletTimer)
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('mousemove', resetDropletTimer)
+      window.removeEventListener('mousedown', resetDropletTimer)
+      window.removeEventListener('keydown', resetDropletTimer)
+    }
+  }, [systemMode, displayState, expandedActivity])
+
+  // Dwell hover: 2 seconds on droplet re-emerges capsule with spring (Spec 5.1 point 4)
+  useEffect(() => {
+    if (!isDwelling || displayState !== 'droplet') return
+
+    const dwellTimer = setTimeout(() => {
+      setIsDwelling(false)
+      setDisplayState('capsule')
+    }, 2000)
+
+    return () => clearTimeout(dwellTimer)
+  }, [isDwelling, displayState])
 
   // Align clock updates to minute boundaries
   useEffect(() => {
@@ -143,7 +220,9 @@ export default function App() {
   // Choreographed window sizing
   useEffect(() => {
     let target: WindowSize = WINDOW_SIZES.idle
-    if (expandedActivity === 'home') {
+    if (displayState === 'droplet' && !expandedActivity) {
+      target = WINDOW_SIZES.droplet
+    } else if (expandedActivity === 'home') {
       target = WINDOW_SIZES.home
     } else if (expandedActivity === 'timer') {
       target = WINDOW_SIZES.expandedTimer
@@ -157,17 +236,19 @@ export default function App() {
       target = WINDOW_SIZES.singleMusic
     }
 
-    if (expandedActivity) {
-      // Expand: resize window first so shadow and card are never clipped
+    // Expanding from droplet/compact: resize window first so no clipping occurs
+    const isExpanding = (displayState === 'capsule' && target !== WINDOW_SIZES.droplet) || expandedActivity !== null
+
+    if (isExpanding) {
       resizeWindow(target.width, target.height)
     } else {
-      // Collapse: wait for spring animation before shrinking window
+      // Collapsing into droplet/compact: wait for spring animation before shrinking window
       const timer = setTimeout(() => {
         resizeWindow(target.width, target.height)
       }, 350)
       return () => clearTimeout(timer)
     }
-  }, [expandedActivity, isSplit, musicActive, timerActive])
+  }, [displayState, expandedActivity, isSplit, musicActive, timerActive])
 
   // Timer countdown effect - pure updater without side-effects
   useEffect(() => {
@@ -175,6 +256,9 @@ export default function App() {
 
     if (timerSeconds <= 0) {
       setTimerRunning(false)
+      // Alert auto-expands from droplet (Spec 5.1 point 6)
+      setDisplayState('capsule')
+      setExpandedActivity('timer')
       return
     }
 
@@ -314,8 +398,50 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 3. ACTIVE TIMER COMPACT CAPSULE */}
-          {!expandedActivity && timerActive && (
+          {/* 3. MODE DROPLET (Spec Section 5.1 & Fase 1b) */}
+          {!expandedActivity && displayState === 'droplet' && (
+            <motion.div
+              key="droplet"
+              layoutId="island-core"
+              transition={springTransition}
+              onMouseEnter={() => setIsDwelling(true)}
+              onMouseLeave={() => setIsDwelling(false)}
+              onClick={() => {
+                setIsDwelling(false)
+                setDisplayState('capsule')
+                setExpandedActivity('home')
+              }}
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.9 }}
+              className="relative flex items-center justify-center cursor-pointer select-none"
+            >
+              {/* Ripple progress cue during 2s dwell hover */}
+              {isDwelling && (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0.9 }}
+                  animate={{ scale: 2.4, opacity: 0 }}
+                  transition={{ duration: 1.8, ease: 'easeOut', repeat: Infinity }}
+                  className="absolute w-4 h-4 rounded-full border-2 border-white/60 pointer-events-none"
+                />
+              )}
+
+              {/* ~14px black circle with water droplet highlight */}
+              <div className="relative w-3.5 h-3.5 rounded-full bg-black border border-white/30 shadow-[0_2px_8px_rgba(0,0,0,0.8)] flex items-center justify-center overflow-hidden">
+                <div className="absolute top-0.5 left-0.5 w-1 h-1 rounded-full bg-white/40 blur-[0.2px]" />
+
+                {/* Activity Dots: Orange for timer, Emerald for media */}
+                {timerActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#ff9500] shadow-[0_0_4px_#ff9500]" />
+                )}
+                {!timerActive && musicActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_#10b981]" />
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* 4. ACTIVE TIMER COMPACT CAPSULE */}
+          {!expandedActivity && displayState === 'capsule' && timerActive && (
             <motion.div
               key="compact-timer"
               layoutId="island-core"
@@ -332,8 +458,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 4. DEFAULT IDLE CLOCK CAPSULE (Spec Section 1 & 4 & 5) */}
-          {!expandedActivity && !timerActive && !musicActive && (
+          {/* 5. DEFAULT IDLE CLOCK CAPSULE (Spec Section 1 & 4 & 5) */}
+          {!expandedActivity && displayState === 'capsule' && !timerActive && !musicActive && (
             <motion.div
               key="idle-clock"
               layoutId="island-core"

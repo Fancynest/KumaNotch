@@ -8,6 +8,7 @@ export interface WindowSize {
 // Window sizes include tight padding for lighter shadow without clipping
 export const WINDOW_SIZES: Record<string, WindowSize> = {
   idle: { width: 170, height: 58 },
+  droplet: { width: 48, height: 48 },
   singleTimer: { width: 180, height: 58 },
   singleMusic: { width: 280, height: 58 },
   split: { width: 320, height: 58 },

@@ -1,3 +1,4 @@
+mod detector;
 mod tray;
 mod window;
 
@@ -17,11 +18,15 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
-        .invoke_handler(tauri::generate_handler![window::resize_island])
+        .invoke_handler(tauri::generate_handler![
+            window::resize_island,
+            detector::get_app_mode
+        ])
         .setup(|app| {
             let handle = app.handle();
             let _ = window::setup_window(handle);
             let _ = tray::create_tray(handle);
+            detector::start_detector(handle.clone());
             Ok(())
         })
         .run(tauri::generate_context!())
