@@ -239,6 +239,14 @@ class ShelfEngine {
     }
   }
 
+  public async startDrag(paths: string[]): Promise<void> {
+    try {
+      await invoke('shelf_start_drag', { paths })
+    } catch (err) {
+      console.error('Failed to start native drag:', err)
+    }
+  }
+
   public async verifyExistence(): Promise<void> {
     if (this.items.length === 0) return
     try {

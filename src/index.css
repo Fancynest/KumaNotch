@@ -25,3 +25,8 @@ html, body, #root {
 ::-webkit-scrollbar {
   display: none;
 }
+
+.shelf-file-draggable {
+  -webkit-user-drag: element !important;
+  user-drag: element !important;
+}

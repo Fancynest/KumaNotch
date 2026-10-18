@@ -150,18 +150,25 @@ const TRANSPARENT_PNG: &[u8] = &[
 
 #[tauri::command]
 pub fn shelf_start_drag(window: tauri::WebviewWindow, paths: Vec<String>) -> Result<(), String> {
-    let path_bufs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    let path_bufs: Vec<PathBuf> = paths
+        .into_iter()
+        .map(|p| PathBuf::from(p.trim().trim_matches('"').replace('/', "\\")))
+        .collect();
     if path_bufs.is_empty() {
         return Ok(());
     }
 
     let preview_image = drag::Image::Raw(TRANSPARENT_PNG.to_vec());
-    let _ = drag::start_drag(
+    let res = drag::start_drag(
         &window,
         drag::DragItem::Files(path_bufs),
         preview_image,
         |_result, _pos| {},
         drag::Options::default(),
     );
+    if let Err(e) = res {
+        eprintln!("drag::start_drag error: {:?}", e);
+        return Err(format!("{:?}", e));
+    }
     Ok(())
 }

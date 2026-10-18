@@ -139,6 +139,29 @@ function ShelfItemRow({
 }: ShelfItemRowProps) {
   const t = getT()
   const controls = useDragControls()
+  const isDraggingOut = React.useRef(false)
+  const pointerStart = React.useRef<{ x: number; y: number } | null>(null)
+
+  const handleFilePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    pointerStart.current = { x: e.clientX, y: e.clientY }
+    isDraggingOut.current = false
+  }
+
+  const handleFilePointerMove = (e: React.PointerEvent) => {
+    if (!pointerStart.current || isDraggingOut.current) return
+    const dx = e.clientX - pointerStart.current.x
+    const dy = e.clientY - pointerStart.current.y
+    if (Math.hypot(dx, dy) > 5) {
+      isDraggingOut.current = true
+      pointerStart.current = null
+      globalShelfEngine.startDrag([item.path])
+    }
+  }
+
+  const handleFilePointerUp = () => {
+    pointerStart.current = null
+  }
 
   return (
     <Reorder.Item
@@ -146,26 +169,46 @@ function ShelfItemRow({
       id={item.id}
       dragListener={false}
       dragControls={controls}
-      className={`shelf-item group flex items-center justify-between px-2 py-1 rounded-lg text-xs transition-colors cursor-pointer select-none ${
+      className={`shelf-item group flex items-center justify-between px-2 py-1 rounded-lg text-xs transition-colors select-none ${
         item.exists
           ? 'hover:bg-white/10 bg-white/[0.04] text-white/90'
           : 'bg-red-500/10 hover:bg-red-500/20 text-white/60'
       }`}
-      onClick={() => onOpen(item.path)}
     >
-      {/* Drag Grip Handle + Category Icon + File Info */}
-      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <div
-          onPointerDown={(e) => {
-            e.stopPropagation()
-            controls.start(e)
-          }}
-          className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-white/25 hover:text-white/80 transition-colors touch-none"
-          title="Tahan & geser untuk mengubah urutan"
-        >
-          <GripVertical className="w-3.5 h-3.5 shrink-0" />
-        </div>
+      {/* Drag Grip Handle for List Reordering */}
+      <div
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          controls.start(e)
+        }}
+        className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-white/25 hover:text-white/80 transition-colors touch-none shrink-0"
+        title="Tahan & geser untuk mengubah urutan"
+      >
+        <GripVertical className="w-3.5 h-3.5 shrink-0" />
+      </div>
 
+      {/* File Info & Icon (Click to open, Drag out to other apps) */}
+      <div
+        onPointerDown={handleFilePointerDown}
+        onPointerMove={handleFilePointerMove}
+        onPointerUp={handleFilePointerUp}
+        onPointerCancel={handleFilePointerUp}
+        draggable="true"
+        onDragStart={(e) => {
+          e.preventDefault()
+          isDraggingOut.current = true
+          globalShelfEngine.startDrag([item.path])
+        }}
+        onClick={(e) => {
+          if (isDraggingOut.current) {
+            e.stopPropagation()
+            return
+          }
+          onOpen(item.path)
+        }}
+        className="shelf-file-draggable flex items-center gap-1.5 min-w-0 flex-1 cursor-grab active:cursor-grabbing select-none"
+        title="Klik untuk buka, atau tahan & geser keluar ke aplikasi lain"
+      >
         {renderFileIcon(item)}
 
         <div className="flex flex-col min-w-0 flex-1">
