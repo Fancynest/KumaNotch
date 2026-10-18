@@ -10,8 +10,10 @@ import {
   Bell,
   Coffee,
   Brain,
+  UploadCloud,
 } from 'lucide-react'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import {
@@ -26,6 +28,8 @@ import {
   formatTimeDisplay,
   type TimerData,
 } from './core/timer'
+import { globalShelfEngine } from './core/shelf'
+import { FileShelf } from './features/shelf/FileShelf'
 import { getT } from './core/i18n'
 
 // Authentic Apple Dynamic Island spring transition curve
@@ -49,16 +53,18 @@ function formatClockTime(now: Date, mode: 'auto' | '12h' | '24h' = 'auto'): stri
   return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
-type IslandView = 'droplet' | 'idle' | 'singleTimer' | 'home' | 'expandedTimer' | 'alert'
+type IslandView = 'droplet' | 'idle' | 'singleTimer' | 'home' | 'expandedTimer' | 'alert' | 'dropTarget'
 
 function getIslandView(
   displayState: 'capsule' | 'droplet',
   expandedActivity: 'home' | 'timer' | 'music' | null,
   timerData: TimerData | null,
+  isDragOver: boolean,
 ): IslandView {
   if (timerData?.status === 'completed') return 'alert'
   if (expandedActivity === 'home') return 'home'
   if (expandedActivity === 'timer') return 'expandedTimer'
+  if (isDragOver) return 'dropTarget'
   if (displayState === 'droplet') return 'droplet'
   if (timerData && (timerData.status === 'running' || timerData.status === 'paused')) {
     return 'singleTimer'
@@ -127,8 +133,39 @@ export default function App() {
     })
   })
 
+  // Drag and drop listener for File Shelf (Spec Fase 3)
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    try {
+      getCurrentWebview()
+        .onDragDropEvent((event) => {
+          if (event.payload.type === 'enter' || event.payload.type === 'over') {
+            setIsDragOver(true)
+          } else if (event.payload.type === 'leave') {
+            setIsDragOver(false)
+          } else if (event.payload.type === 'drop') {
+            setIsDragOver(false)
+            if (event.payload.paths && event.payload.paths.length > 0) {
+              globalShelfEngine.addPaths(event.payload.paths)
+              setExpandedActivity('home')
+            }
+          }
+        })
+        .then((fn) => {
+          unlisten = fn
+        })
+        .catch(() => {})
+    } catch {}
+
+    return () => {
+      if (unlisten) unlisten()
+    }
+  }, [])
+
   // Synchronized persistent shell state
-  const targetView = getIslandView(displayState, expandedActivity, timerData)
+  const targetView = getIslandView(displayState, expandedActivity, timerData, isDragOver)
   const [currentView, setCurrentView] = useState<IslandView>(targetView)
   const [shellConfig, setShellConfig] = useState<ShellConfig>(SHELL_CONFIGS[targetView])
   const currentWindowSizeRef = useRef<WindowSize>(WINDOW_SIZES[targetView])
@@ -364,6 +401,8 @@ export default function App() {
       setIsDwelling(false)
       setDisplayState('capsule')
       setExpandedActivity('home')
+    } else if (currentView === 'dropTarget') {
+      setExpandedActivity('home')
     }
   }
   // Digits-only duration input handler: blocks non-digits, strips leading 0 seamlessly, clamps to max
@@ -452,7 +491,11 @@ export default function App() {
           transformOrigin: 'top center',
         }}
         className={`bg-black border overflow-hidden cursor-pointer z-40 ${
-          currentView === 'alert' ? 'border-amber-500/50' : 'border-white/20'
+          currentView === 'alert'
+            ? 'border-amber-500/50'
+            : currentView === 'dropTarget'
+            ? 'border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+            : 'border-white/20'
         }`}
       >
 
@@ -592,6 +635,9 @@ export default function App() {
                   </form>
                 )}
               </div>
+
+              {/* 3. File Shelf (Spec Fase 3) */}
+              <FileShelf isDragOver={isDragOver} />
             </div>
           )}
 
@@ -845,6 +891,19 @@ export default function App() {
             >
               <span className="text-xs font-semibold text-white/95 font-mono tracking-tight">
                 {timeStr}
+              </span>
+            </motion.div>
+          )}
+
+          {/* 7. DROP TARGET COMPACT CAPSULE VIEW */}
+          {currentView === 'dropTarget' && (
+            <motion.div
+              whileHover={{ scale: 1.04 }}
+              className="absolute inset-0 px-3 flex items-center justify-center gap-2 text-amber-300 overflow-hidden whitespace-nowrap"
+            >
+              <UploadCloud className="w-4 h-4 text-amber-400 animate-bounce shrink-0" />
+              <span className="text-xs font-semibold tracking-tight font-medium">
+                {t.dropFilesHere}
               </span>
             </motion.div>
           )}

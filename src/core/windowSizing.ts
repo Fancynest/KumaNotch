@@ -20,7 +20,8 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   singleTimer: { width: 180, height: 58 },
   singleMusic: { width: 280, height: 58 },
   split: { width: 320, height: 58 },
-  home: { width: 390, height: 230 },
+  dropTarget: { width: 260, height: 72 },
+  home: { width: 390, height: 320 },
   expandedMusic: { width: 400, height: 230 },
   expandedTimer: { width: 370, height: 220 },
   alert: { width: 370, height: 210 },
@@ -34,6 +35,13 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     borderRadius: 8,
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.8)',
     y: 8, // vertical center anchored at y = 24px (8 + 8 + 8)
+  },
+  dropTarget: {
+    width: 220,
+    height: 44,
+    borderRadius: 22,
+    boxShadow: '0 4px 20px rgba(245, 158, 11, 0.5)',
+    y: 0,
   },
   idle: {
     width: 96,
@@ -51,7 +59,7 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
   },
   home: {
     width: 350,
-    height: 190,
+    height: 280,
     borderRadius: 36,
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)',
     y: 0,

@@ -1,4 +1,5 @@
 mod detector;
+mod shelf;
 mod tray;
 mod window;
 
@@ -21,7 +22,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             window::resize_island,
             window::get_system_time_format,
-            detector::get_app_mode
+            detector::get_app_mode,
+            shelf::shelf_get_metadata,
+            shelf::shelf_check_exists,
+            shelf::shelf_open_path,
+            shelf::shelf_show_in_folder,
+            shelf::shelf_copy_path,
+            shelf::shelf_start_drag,
         ])
         .setup(|app| {
             let handle = app.handle();
