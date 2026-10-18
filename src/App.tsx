@@ -16,7 +16,6 @@ import {
   Hourglass,
 } from 'lucide-react'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import {
@@ -155,9 +154,32 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    // HTML5 dragover & dragenter preventDefault ensures WebView2 allows dropping folders without OS forbidden cursor
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault()
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy'
+      }
+    }
+
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault()
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy'
+      }
+    }
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault()
+    }
+
+    window.addEventListener('dragover', handleDragOver)
+    window.addEventListener('dragenter', handleDragEnter)
+    window.addEventListener('drop', handleDrop)
+
     let unlisten: (() => void) | undefined
     try {
-      getCurrentWebview()
+      getCurrentWebviewWindow()
         .onDragDropEvent((event) => {
           if (event.payload.type === 'enter' || event.payload.type === 'over') {
             setIsDragOver(true)
@@ -180,6 +202,9 @@ export default function App() {
     } catch {}
 
     return () => {
+      window.removeEventListener('dragover', handleDragOver)
+      window.removeEventListener('dragenter', handleDragEnter)
+      window.removeEventListener('drop', handleDrop)
       if (unlisten) unlisten()
     }
   }, [])

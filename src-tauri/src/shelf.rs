@@ -16,25 +16,38 @@ pub struct ShelfMetadata {
 pub fn shelf_get_metadata(paths: Vec<String>) -> Vec<ShelfMetadata> {
     let mut results = Vec::new();
     for p_str in paths {
-        let p = Path::new(&p_str);
+        let clean_str = p_str.trim().trim_matches('"');
+        let p = Path::new(clean_str);
         let exists = p.exists();
         let is_dir = p.is_dir();
         let name = p
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| p_str.clone());
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| {
+                clean_str
+                    .trim_end_matches(['/', '\\'])
+                    .split(['/', '\\'])
+                    .last()
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or(clean_str)
+                    .to_string()
+            });
         let size = if is_dir {
             0
         } else {
             std::fs::metadata(p).map(|m| m.len()).unwrap_or(0)
         };
-        let extension = p
-            .extension()
-            .map(|e| e.to_string_lossy().to_string().to_lowercase())
-            .unwrap_or_default();
+        let extension = if is_dir {
+            String::new()
+        } else {
+            p.extension()
+                .map(|e| e.to_string_lossy().to_string().to_lowercase())
+                .unwrap_or_default()
+        };
 
         results.push(ShelfMetadata {
-            path: p_str,
+            path: clean_str.to_string(),
             name,
             size,
             is_dir,
@@ -49,7 +62,8 @@ pub fn shelf_get_metadata(paths: Vec<String>) -> Vec<ShelfMetadata> {
 pub fn shelf_check_exists(paths: Vec<String>) -> HashMap<String, bool> {
     let mut map = HashMap::new();
     for p_str in paths {
-        let exists = Path::new(&p_str).exists();
+        let clean_str = p_str.trim().trim_matches('"');
+        let exists = Path::new(clean_str).exists();
         map.insert(p_str, exists);
     }
     map

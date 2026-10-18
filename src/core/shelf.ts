@@ -146,6 +146,10 @@ class ShelfEngine {
     }
 
     try {
+      const cleanPaths = paths
+        .map((p) => p.trim().replace(/^"|"$/g, ''))
+        .filter(Boolean)
+
       // Query metadata from Rust
       const metadataList = await invoke<
         Array<{
@@ -156,19 +160,20 @@ class ShelfEngine {
           exists: boolean
           extension: string
         }>
-      >('shelf_get_metadata', { paths })
+      >('shelf_get_metadata', { paths: cleanPaths })
 
       const newItems: ShelfItem[] = []
 
       for (const meta of metadataList) {
-        // Skip duplicate paths
-        if (this.items.some((it) => it.path.toLowerCase() === meta.path.toLowerCase())) {
+        // Skip duplicate paths (case-insensitive and trailing slash insensitive)
+        const metaNorm = meta.path.toLowerCase().replace(/[\\/]+$/, '')
+        if (this.items.some((it) => it.path.toLowerCase().replace(/[\\/]+$/, '') === metaNorm)) {
           continue
         }
         newItems.push({
           id: `shelf_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           path: meta.path,
-          name: meta.name,
+          name: meta.name || (meta.is_dir ? 'Folder' : 'File'),
           size: meta.size,
           isDir: meta.is_dir,
           exists: meta.exists,
