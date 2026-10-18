@@ -18,7 +18,6 @@ import {
   UploadCloud,
   AlertTriangle,
   GripVertical,
-  ChevronLeft,
   ChevronDown,
 } from 'lucide-react'
 import { Reorder, useDragControls } from 'framer-motion'
@@ -32,7 +31,6 @@ import { getT } from '../../core/i18n'
 
 interface FileShelfProps {
   isDragOver?: boolean
-  onBack?: () => void
   onClose?: () => void
 }
 
@@ -184,7 +182,7 @@ function ShelfItemRow({
           controls.start(e)
         }}
         className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-white/25 hover:text-white/80 transition-colors touch-none shrink-0"
-        title="Tahan & geser untuk mengubah urutan"
+        title={t.reorderHint}
       >
         <GripVertical className="w-3.5 h-3.5 shrink-0" />
       </div>
@@ -209,7 +207,7 @@ function ShelfItemRow({
           onOpen(item.path)
         }}
         className="shelf-file-draggable flex items-center gap-1.5 min-w-0 flex-1 cursor-grab active:cursor-grabbing select-none"
-        title="Klik untuk buka, atau tahan & geser keluar ke aplikasi lain"
+        title={t.clickToOpenOrDrag}
       >
         {renderFileIcon(item)}
 
@@ -268,7 +266,7 @@ function ShelfItemRow({
             e.stopPropagation()
             onRemove(item.id)
           }}
-          title="Hapus"
+          title={t.remove}
           className="p-1 rounded hover:bg-red-500/20 text-white/40 hover:text-red-400 transition-colors"
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -278,7 +276,7 @@ function ShelfItemRow({
   )
 }
 
-export function FileShelf({ isDragOver = false, onBack, onClose }: FileShelfProps) {
+export function FileShelf({ isDragOver = false, onClose }: FileShelfProps) {
   const t = getT()
   const [items, setItems] = useState<ShelfItem[]>(() => globalShelfEngine.getItems())
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -317,16 +315,6 @@ export function FileShelf({ isDragOver = false, onBack, onClose }: FileShelfProp
       {/* Shelf Header */}
       <div className="flex items-center justify-between px-0.5 shrink-0">
         <div className="flex items-center gap-1.5">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white text-[10px] font-medium transition-all active:scale-95 mr-0.5"
-              title={t.backToHome}
-            >
-              <ChevronLeft className="w-3 h-3 text-white/50" />
-              <span>{t.backToHome}</span>
-            </button>
-          )}
           <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">
             {t.fileShelf}
           </span>
@@ -356,7 +344,7 @@ export function FileShelf({ isDragOver = false, onBack, onClose }: FileShelfProp
             <button
               onClick={onClose}
               className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
-              title="Tutup"
+              title={t.collapse}
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </button>

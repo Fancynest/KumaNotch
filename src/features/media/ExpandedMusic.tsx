@@ -5,9 +5,7 @@ import {
   SkipBack,
   SkipForward,
   ChevronDown,
-  ChevronRight,
   Music2,
-  Folder,
 } from 'lucide-react'
 import {
   globalMediaEngine,
@@ -19,16 +17,12 @@ import { getT } from '../../core/i18n'
 
 interface ExpandedMusicProps {
   onClose?: () => void
-  onBackToHome?: () => void
-  onOpenShelf?: () => void
   onOpenTimer?: () => void
   isTimerActive?: boolean
 }
 
 export function ExpandedMusic({
   onClose,
-  onBackToHome,
-  onOpenShelf,
   onOpenTimer,
   isTimerActive = false,
 }: ExpandedMusicProps) {
@@ -148,33 +142,11 @@ export function ExpandedMusic({
         </div>
 
         <div className="flex items-center gap-1">
-          {onBackToHome && (
-            <button
-              onClick={onBackToHome}
-              className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[10px] font-medium transition-all active:scale-95 mr-0.5"
-              title="Ke Halaman Jam"
-            >
-              <span>Jam</span>
-              <ChevronRight className="w-3 h-3 text-white/50" />
-            </button>
-          )}
-
-          {onOpenShelf && (
-            <button
-              onClick={onOpenShelf}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[10px] font-medium transition-all active:scale-95"
-              title={t.fileShelf}
-            >
-              <Folder className="w-3 h-3 text-amber-400" />
-              <span>Shelf</span>
-            </button>
-          )}
-
           {onClose && (
             <button
               onClick={onClose}
               className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
-              title="Tutup (Kecilkan)"
+              title={t.collapse}
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
@@ -189,9 +161,9 @@ export function ExpandedMusic({
             <Music2 className="w-5 h-5 text-white/30" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-white/80">Tidak Ada Musik</p>
+            <p className="text-xs font-semibold text-white/80">{t.noMusic}</p>
             <p className="text-[10px] text-white/40 mt-0.5 max-w-[200px] leading-tight">
-              Buka Spotify, browser, atau media player untuk memutar musik
+              {t.noMusicDesc}
             </p>
           </div>
         </div>
@@ -217,10 +189,10 @@ export function ExpandedMusic({
             <div className="flex-1 min-w-0 pr-1 flex items-center justify-between">
               <div className="min-w-0 mr-2">
                 <h3 className="text-xs font-bold text-white tracking-tight truncate leading-tight">
-                  {media?.title || 'No Track'}
+                  {media?.title || t.noTrack}
                 </h3>
                 <p className="text-[11px] text-white/60 truncate font-medium mt-0.5 leading-tight">
-                  {media?.artist || 'Unknown Artist'}
+                  {media?.artist || t.unknownArtist}
                 </p>
                 {media?.album && (
                   <p className="text-[9px] text-white/35 truncate mt-0.5 leading-tight">
@@ -263,7 +235,7 @@ export function ExpandedMusic({
             <button
               onClick={() => globalMediaEngine.previous()}
               className="p-1.5 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-transform active:scale-90"
-              title="Previous (Ganti Lagu)"
+              title={t.previousTrack}
             >
               <SkipBack className="w-4 h-4 fill-current" />
             </button>
@@ -271,7 +243,7 @@ export function ExpandedMusic({
             <button
               onClick={() => globalMediaEngine.togglePlayPause()}
               className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-lg"
-              title={isPlaying ? 'Jeda' : 'Putar'}
+              title={isPlaying ? t.pause : t.play}
             >
               {isPlaying ? (
                 <Pause className="w-4 h-4 fill-current" />
@@ -283,7 +255,7 @@ export function ExpandedMusic({
             <button
               onClick={() => globalMediaEngine.next()}
               className="p-1.5 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-transform active:scale-90"
-              title="Next (Ganti Lagu)"
+              title={t.nextTrack}
             >
               <SkipForward className="w-4 h-4 fill-current" />
             </button>
