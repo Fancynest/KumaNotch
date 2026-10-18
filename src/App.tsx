@@ -108,6 +108,14 @@ export default function App() {
   const [customMins, setCustomMins] = useState<string>('0')
   const [customSecs, setCustomSecs] = useState<string>('0')
   const [showCustomInput, setShowCustomInput] = useState<boolean>(false)
+  const customMinsInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (showCustomInput && customMinsInputRef.current) {
+      customMinsInputRef.current.focus({ preventScroll: true })
+      customMinsInputRef.current.select()
+    }
+  }, [showCustomInput])
 
   // Dev controls active ONLY in normal browser development mode (NOT inside Tauri window)
   const isBrowserDev =
@@ -552,7 +560,7 @@ export default function App() {
       )}
 
       {/* CENTERED SHELL & SPLIT ROW CONTAINER */}
-      <div className="pt-2 flex items-center justify-center gap-2.5 z-40">
+      <div className={`pt-2 flex items-center justify-center z-40 ${currentView === 'split' ? 'gap-2.5' : ''}`}>
         {/* SINGLE PERSISTENT SHELL */}
         <motion.div
           animate={{
@@ -567,6 +575,10 @@ export default function App() {
           onClick={handleShellClick}
           onMouseEnter={() => currentView === 'droplet' && setIsDwelling(true)}
           onMouseLeave={() => setIsDwelling(false)}
+          onScroll={(e) => {
+            e.currentTarget.scrollLeft = 0
+            e.currentTarget.scrollTop = 0
+          }}
           className={`bg-black border overflow-hidden cursor-pointer relative shrink-0 ${
             currentView === 'alert'
               ? 'border-amber-500/50'
@@ -586,16 +598,26 @@ export default function App() {
               onPointerUp={handleHomePointerUp}
               onPointerLeave={handleHomePointerUp}
               onPointerCancel={handleHomePointerUp}
+              onScroll={(e) => {
+                e.currentTarget.scrollLeft = 0
+                e.currentTarget.scrollTop = 0
+              }}
             >
               {/* Horizontal Slider Content */}
-              <div className="relative flex-1 w-full overflow-hidden">
+              <div
+                className="relative flex-1 w-full overflow-hidden"
+                onScroll={(e) => {
+                  e.currentTarget.scrollLeft = 0
+                  e.currentTarget.scrollTop = 0
+                }}
+              >
                 <motion.div
                   animate={{ x: homePage === 0 ? '0%' : '-50%' }}
                   transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                   className="flex w-[200%] h-full"
                 >
                   {/* Page 0: Clock & Quick Timer */}
-                  <div className="w-1/2 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between">
+                  <div className="w-1/2 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between shrink-0">
                     <div>
                       {/* Top Bar: Date & Shelf Navigation Pill */}
                       <div className="flex items-center justify-between">
@@ -746,6 +768,7 @@ export default function App() {
                           <span className="text-white/30 text-xs font-mono">:</span>
                           <div className="flex items-center gap-1">
                             <input
+                              ref={customMinsInputRef}
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
@@ -757,7 +780,6 @@ export default function App() {
                               }}
                               className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
                               placeholder="0"
-                              autoFocus
                             />
                             <span className="text-[11px] text-white/50 font-mono">{t.minUnit}</span>
                           </div>
@@ -790,7 +812,7 @@ export default function App() {
                   </div>
 
                   {/* Page 1: Dedicated File Shelf */}
-                  <div className="w-1/2 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between">
+                  <div className="w-1/2 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between shrink-0">
                     <FileShelf
                       isDragOver={isDragOver}
                       onBack={() => setHomePage(0)}
@@ -1104,9 +1126,9 @@ export default function App() {
         <AnimatePresence>
           {currentView === 'split' && (
             <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
+              initial={{ scale: 0, opacity: 0, width: 0 }}
+              animate={{ scale: 1, opacity: 1, width: 32 }}
+              exit={{ scale: 0, opacity: 0, width: 0, transition: { duration: 0.12, ease: 'easeIn' } }}
               transition={springTransition}
               whileHover={{ scale: 1.12 }}
               whileTap={{ scale: 0.92 }}
@@ -1115,11 +1137,10 @@ export default function App() {
                 setExpandedActivity('timer')
               }}
               style={{
-                width: 32,
                 height: 32,
                 transformOrigin: 'center center',
               }}
-              className="relative w-8 h-8 rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+              className="relative rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
               title="Timer"
             >
               {/* Progress Ring */}
