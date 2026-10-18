@@ -61,8 +61,9 @@ pub fn shelf_open_path(path: String) -> Result<(), String> {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let clean_path = path.replace('/', "\\");
         std::process::Command::new("cmd")
-            .args(["/c", "start", "", &path])
+            .args(["/c", "start", "", &clean_path])
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| e.to_string())?;
@@ -82,8 +83,12 @@ pub fn shelf_open_path(path: String) -> Result<(), String> {
 pub fn shelf_show_in_folder(path: String) -> Result<(), String> {
     #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let clean_path = path.replace('/', "\\");
         std::process::Command::new("explorer")
-            .arg(format!("/select,{}", path))
+            .raw_arg(format!("/select,\"{}\"", clean_path))
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -101,8 +106,7 @@ pub fn shelf_copy_path(path: String) -> Result<(), String> {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
-        let mut child = std::process::Command::new("cmd")
-            .args(["/c", "clip"])
+        let mut child = std::process::Command::new("clip.exe")
             .stdin(std::process::Stdio::piped())
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()
@@ -111,6 +115,7 @@ pub fn shelf_copy_path(path: String) -> Result<(), String> {
         if let Some(mut stdin) = child.stdin.take() {
             use std::io::Write;
             let _ = stdin.write_all(path.as_bytes());
+            drop(stdin);
         }
         let _ = child.wait();
         Ok(())

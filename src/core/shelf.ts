@@ -37,10 +37,12 @@ export function getFileCategory(name: string, isDir: boolean): 'folder' | 'image
 }
 
 type ShelfListener = (items: ShelfItem[]) => void
+type ShelfFullListener = () => void
 
 class ShelfEngine {
   private items: ShelfItem[] = []
   private listeners: Set<ShelfListener> = new Set()
+  private fullListeners: Set<ShelfFullListener> = new Set()
 
   constructor() {
     this.items = this.load()
@@ -82,6 +84,23 @@ class ShelfEngine {
     })
   }
 
+  public notifyFull(): void {
+    this.fullListeners.forEach((listener) => {
+      try {
+        listener()
+      } catch (err) {
+        console.error('Shelf full listener error:', err)
+      }
+    })
+  }
+
+  public onShelfFull(listener: ShelfFullListener): () => void {
+    this.fullListeners.add(listener)
+    return () => {
+      this.fullListeners.delete(listener)
+    }
+  }
+
   public getItems(): ShelfItem[] {
     return [...this.items]
   }
@@ -94,8 +113,18 @@ class ShelfEngine {
     }
   }
 
+  public reorder(items: ShelfItem[]): void {
+    this.items = [...items].slice(0, MAX_SHELF_ITEMS)
+    this.save()
+  }
+
   public async addPaths(paths: string[]): Promise<void> {
     if (!paths || paths.length === 0) return
+
+    if (this.items.length >= MAX_SHELF_ITEMS) {
+      this.notifyFull()
+      return
+    }
 
     try {
       // Query metadata from Rust
@@ -130,6 +159,9 @@ class ShelfEngine {
       }
 
       if (newItems.length > 0) {
+        if (this.items.length + newItems.length > MAX_SHELF_ITEMS) {
+          this.notifyFull()
+        }
         // Prepend newest items and clamp to max limit
         this.items = [...newItems, ...this.items].slice(0, MAX_SHELF_ITEMS)
         this.save()
@@ -167,9 +199,13 @@ class ShelfEngine {
 
   public async copyPath(path: string): Promise<boolean> {
     try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(path)
-        return true
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(path)
+          return true
+        } catch (clipErr) {
+          console.debug('Navigator clipboard error, falling back to Rust:', clipErr)
+        }
       }
       await invoke('shelf_copy_path', { path })
       return true

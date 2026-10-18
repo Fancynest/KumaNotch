@@ -47,6 +47,8 @@ export const translations = {
     backToHome: 'Kembali',
     openTimer: 'Buka Timer',
     activeTimer: 'Timer Aktif',
+    shelfFull: 'File Shelf sudah penuh! (Maks. 10 file)',
+    shelfFullSub: 'Hapus beberapa file lama untuk menambahkan file baru',
   },
   en: {
     quickTimer: 'Quick Timer',
@@ -85,6 +87,8 @@ export const translations = {
     backToHome: 'Back',
     openTimer: 'Open Timer',
     activeTimer: 'Active Timer',
+    shelfFull: 'File Shelf is full! (Max 10 files)',
+    shelfFullSub: 'Remove older items to add new files',
   },
 }
 
