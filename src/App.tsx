@@ -74,8 +74,10 @@ export default function App() {
   // Expanded focus state: null (compact), 'home', 'timer', or 'music'
   const [expandedActivity, setExpandedActivity] = useState<'home' | 'timer' | 'music' | null>(null)
 
-  // Custom timer minutes input on Home card
+  // Custom timer duration inputs on Home card (Jam, Menit, Detik)
+  const [customHours, setCustomHours] = useState<string>('0')
   const [customMins, setCustomMins] = useState<string>('10')
+  const [customSecs, setCustomSecs] = useState<string>('0')
   const [showCustomInput, setShowCustomInput] = useState<boolean>(false)
 
   // Dev controls active ONLY in normal browser development mode (NOT inside Tauri window)
@@ -340,12 +342,15 @@ export default function App() {
     }
   }
 
-  // Handle custom duration start
+  // Handle custom duration start (Jam, Menit, Detik)
   const handleStartCustom = (e: React.FormEvent) => {
     e.preventDefault()
-    const parsed = parseFloat(customMins)
-    if (!isNaN(parsed) && parsed > 0) {
-      globalTimerEngine.startTimer(parsed)
+    const h = parseInt(customHours, 10) || 0
+    const m = parseInt(customMins, 10) || 0
+    const s = parseInt(customSecs, 10) || 0
+    const totalSecs = Math.max(0, h) * 3600 + Math.max(0, m) * 60 + Math.max(0, s)
+    if (totalSecs > 0) {
+      globalTimerEngine.startTimerSeconds(totalSecs)
       setShowCustomInput(false)
       setExpandedActivity(null)
     }
@@ -454,22 +459,49 @@ export default function App() {
                 </div>
 
                 {showCustomInput ? (
-                  <form onSubmit={handleStartCustom} className="flex items-center gap-2 mt-1">
-                    <input
-                      type="number"
-                      min="1"
-                      max="180"
-                      step="0.5"
-                      value={customMins}
-                      onChange={(e) => setCustomMins(e.target.value)}
-                      className="w-24 bg-white/10 border border-white/20 rounded-xl px-2.5 py-1 text-sm text-white font-mono focus:outline-none focus:border-amber-400"
-                      placeholder="Menit"
-                      autoFocus
-                    />
-                    <span className="text-xs text-white/60">menit</span>
+                  <form onSubmit={handleStartCustom} className="flex items-center gap-1.5 mt-1">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="23"
+                        value={customHours}
+                        onChange={(e) => setCustomHours(e.target.value)}
+                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        placeholder="0"
+                      />
+                      <span className="text-[11px] text-white/50 font-mono">j</span>
+                    </div>
+                    <span className="text-white/30 text-xs font-mono">:</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={customMins}
+                        onChange={(e) => setCustomMins(e.target.value)}
+                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        placeholder="10"
+                        autoFocus
+                      />
+                      <span className="text-[11px] text-white/50 font-mono">m</span>
+                    </div>
+                    <span className="text-white/30 text-xs font-mono">:</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="59"
+                        value={customSecs}
+                        onChange={(e) => setCustomSecs(e.target.value)}
+                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        placeholder="0"
+                      />
+                      <span className="text-[11px] text-white/50 font-mono">d</span>
+                    </div>
                     <button
                       type="submit"
-                      className="px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-colors ml-auto active:scale-95"
+                      className="px-3.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-colors ml-auto active:scale-95 shadow-sm"
                     >
                       Mulai
                     </button>

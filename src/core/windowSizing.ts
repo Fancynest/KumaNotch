@@ -43,7 +43,7 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     y: 0, // vertical center anchored at y = 24px (8 + 0 + 16)
   },
   singleTimer: {
-    width: 112,
+    width: 118,
     height: 32,
     borderRadius: 16,
     boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',

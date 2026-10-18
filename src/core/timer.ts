@@ -65,8 +65,13 @@ export function calculateRemainingSeconds(data: TimerData | null): number {
 }
 
 export function formatTimeDisplay(secs: number): string {
-  const m = Math.floor(secs / 60)
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
   const s = secs % 60
+
+  if (h > 0) {
+    return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`
+  }
   return `${m}:${s < 10 ? '0' : ''}${s}`
 }
 
@@ -103,15 +108,15 @@ export class TimerEngine {
     return calculateRemainingSeconds(this.data)
   }
 
-  public startTimer(durationMinutes: number, label = 'Timer'): void {
-    const durationSeconds = Math.round(durationMinutes * 60)
+  public startTimerSeconds(durationSeconds: number, label = 'Timer'): void {
+    const validSeconds = Math.max(1, Math.round(durationSeconds))
     const now = Date.now()
-    const endsAt = now + durationSeconds * 1000
+    const endsAt = now + validSeconds * 1000
 
     this.data = {
       id: 'timer-main',
       label,
-      totalDurationSeconds: durationSeconds,
+      totalDurationSeconds: validSeconds,
       startedAt: now,
       endsAt,
       status: 'running',
@@ -122,6 +127,10 @@ export class TimerEngine {
     this.syncActivityRegistry()
     this.startTick()
     this.notify()
+  }
+
+  public startTimer(durationMinutes: number, label = 'Timer'): void {
+    this.startTimerSeconds(durationMinutes * 60, label)
   }
 
   public startPomodoro(phase: PomodoroPhase = 'focus', cycle = 1): void {
