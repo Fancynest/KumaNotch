@@ -30,9 +30,12 @@ export default function App() {
   // Expanded focus state: null (compact), 'home', 'timer', or 'music'
   const [expandedActivity, setExpandedActivity] = useState<'home' | 'timer' | 'music' | null>(null)
 
-  // Dev controls active ONLY in Vite development mode
-  const isDev = import.meta.env.DEV
-  const [showDevControls, setShowDevControls] = useState(isDev)
+  // Dev controls active ONLY in normal browser development mode (NOT inside Tauri window)
+  const isBrowserDev =
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    !('__TAURI_INTERNALS__' in window)
+  const [showDevControls, setShowDevControls] = useState(isBrowserDev)
 
   // System Clock state
   const [timeStr, setTimeStr] = useState(() => {
@@ -349,8 +352,8 @@ export default function App() {
         </AnimatePresence>
       </div>
 
-      {/* Dev Controls - Visible ONLY in Dev Mode */}
-      {isDev && showDevControls && (
+      {/* Dev Controls - Visible ONLY when developing in standard browser, never inside Tauri window */}
+      {isBrowserDev && showDevControls && (
         <div className="mt-3 flex items-center gap-1.5 bg-black/90 border border-white/15 px-3 py-1 rounded-full text-[11px] text-white/80 shadow-lg">
           <Sparkles className="w-3 h-3 text-amber-400" />
           <button
