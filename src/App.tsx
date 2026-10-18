@@ -513,7 +513,7 @@ export default function App() {
                       { label: '15m', action: () => globalTimerEngine.startTimer(15) },
                       { label: '25m', action: () => globalTimerEngine.startTimer(25) },
                       {
-                        label: 'Pomodoro',
+                        label: 'Fokus',
                         action: () => globalTimerEngine.startPomodoro('focus', 1),
                         highlight: true,
                       },
