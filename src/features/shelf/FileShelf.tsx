@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   GripVertical,
   ChevronLeft,
+  ChevronDown,
 } from 'lucide-react'
 import { Reorder, useDragControls } from 'framer-motion'
 import {
@@ -32,6 +33,7 @@ import { getT } from '../../core/i18n'
 interface FileShelfProps {
   isDragOver?: boolean
   onBack?: () => void
+  onClose?: () => void
 }
 
 function renderFileIcon(item: ShelfItem) {
@@ -276,7 +278,7 @@ function ShelfItemRow({
   )
 }
 
-export function FileShelf({ isDragOver = false, onBack }: FileShelfProps) {
+export function FileShelf({ isDragOver = false, onBack, onClose }: FileShelfProps) {
   const t = getT()
   const [items, setItems] = useState<ShelfItem[]>(() => globalShelfEngine.getItems())
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -339,15 +341,27 @@ export function FileShelf({ isDragOver = false, onBack }: FileShelfProps) {
           </span>
         </div>
 
-        {items.length > 0 && (
-          <button
-            onClick={() => globalShelfEngine.clear()}
-            className="text-[10px] text-white/40 hover:text-red-400 transition-colors flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white/5"
-          >
-            <Trash2 className="w-3 h-3" />
-            <span>{t.clearAll}</span>
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {items.length > 0 && (
+            <button
+              onClick={() => globalShelfEngine.clear()}
+              className="text-[10px] text-white/40 hover:text-red-400 transition-colors flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white/5 mr-0.5"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>{t.clearAll}</span>
+            </button>
+          )}
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
+              title="Tutup"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Shelf Full Warning Toast */}

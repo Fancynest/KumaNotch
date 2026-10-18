@@ -535,8 +535,17 @@ export default function App() {
   const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
   const isPomodoroBreak = timerData?.isPomodoro && timerData.pomodoroPhase !== 'focus'
 
+  const handleBackdropPointerDown = (e: React.PointerEvent) => {
+    if (e.target === e.currentTarget && expandedActivity !== null) {
+      setExpandedActivity(null)
+    }
+  }
+
   return (
-    <div className="w-full h-full relative select-none overflow-hidden flex flex-col items-center justify-start">
+    <div
+      className="w-full h-full relative select-none overflow-hidden flex flex-col items-center justify-start"
+      onPointerDown={handleBackdropPointerDown}
+    >
       {/* Ripple progress cue during 2s dwell hover - outside shell so not clipped by overflow-hidden */}
       {currentView === 'droplet' && isDwelling && (
         <motion.div
@@ -560,7 +569,10 @@ export default function App() {
       )}
 
       {/* CENTERED SHELL & SPLIT ROW CONTAINER */}
-      <div className={`pt-2 flex items-center justify-center z-40 ${currentView === 'split' ? 'gap-2.5' : ''}`}>
+      <div
+        className={`pt-2 flex items-center justify-center z-40 ${currentView === 'split' ? 'gap-2.5' : ''}`}
+        onPointerDown={handleBackdropPointerDown}
+      >
         {/* SINGLE PERSISTENT SHELL */}
         <motion.div
           animate={{
@@ -619,29 +631,47 @@ export default function App() {
                   {/* Page 0: Clock & Quick Timer */}
                   <div className="w-1/2 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between shrink-0">
                     <div>
-                      {/* Top Bar: Date & Shelf Navigation Pill */}
+                      {/* Top Bar: Date & Shelf Navigation Pill & Collapse Button */}
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">
+                        <span
+                          onClick={() => setExpandedActivity(null)}
+                          className="text-[11px] font-semibold text-white/50 hover:text-white/80 cursor-pointer uppercase tracking-wider transition-colors"
+                          title="Klik untuk mengecilkan"
+                        >
                           {dateStr}
                         </span>
 
-                        <button
-                          onClick={() => setHomePage(1)}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[10px] font-medium transition-all active:scale-95"
-                          title={t.fileShelf}
-                        >
-                          <Folder className="w-3 h-3 text-amber-400" />
-                          <span>{t.fileShelf}</span>
-                          {shelfCount > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-full bg-amber-400/25 text-amber-300 text-[9px] font-mono font-bold">
-                              {shelfCount}
-                            </span>
-                          )}
-                          <ChevronRight className="w-3 h-3 text-white/40" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setHomePage(1)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-[10px] font-medium transition-all active:scale-95"
+                            title={t.fileShelf}
+                          >
+                            <Folder className="w-3 h-3 text-amber-400" />
+                            <span>{t.fileShelf}</span>
+                            {shelfCount > 0 && (
+                              <span className="px-1.5 py-0.2 rounded-full bg-amber-400/25 text-amber-300 text-[9px] font-mono font-bold">
+                                {shelfCount}
+                              </span>
+                            )}
+                            <ChevronRight className="w-3 h-3 text-white/40" />
+                          </button>
+
+                          <button
+                            onClick={() => setExpandedActivity(null)}
+                            className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
+                            title="Tutup (Kecilkan)"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="text-3xl font-bold tracking-tight text-white/95 mt-1 font-mono">
+                      <div
+                        onClick={() => setExpandedActivity(null)}
+                        className="text-3xl font-bold tracking-tight text-white/95 mt-1 font-mono cursor-pointer hover:text-amber-300 transition-colors inline-block"
+                        title="Klik untuk mengecilkan"
+                      >
                         {timeStr}
                       </div>
                     </div>
@@ -816,6 +846,7 @@ export default function App() {
                     <FileShelf
                       isDragOver={isDragOver}
                       onBack={() => setHomePage(0)}
+                      onClose={() => setExpandedActivity(null)}
                     />
                   </div>
                 </motion.div>
