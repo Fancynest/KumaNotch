@@ -147,14 +147,14 @@ export function FileShelf({ isDragOver = false, onBack }: FileShelfProps) {
             </span>
           </div>
         ) : (
-          <div className="flex flex-col gap-1 max-h-[135px] overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-white/20">
+          <div className="shelf-file-list flex flex-col gap-1 max-h-[135px] overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-white/20">
             {items.map((item) => (
               <div
                 key={item.id}
                 onMouseDown={(e) => handleStartDrag(e, item)}
                 onClick={() => globalShelfEngine.openItem(item.path)}
                 title={`${item.name}\n${item.path}\n(${t.dragOutHint})`}
-                className={`group flex items-center justify-between px-2 py-1 rounded-lg text-xs transition-colors cursor-pointer select-none ${
+                className={`shelf-item group flex items-center justify-between px-2 py-1 rounded-lg text-xs transition-colors cursor-pointer select-none ${
                   item.exists
                     ? 'hover:bg-white/10 bg-white/[0.04] text-white/90'
                     : 'bg-red-500/10 hover:bg-red-500/20 text-white/60'

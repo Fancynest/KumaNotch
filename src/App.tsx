@@ -176,6 +176,71 @@ export default function App() {
     }
   }, [])
 
+  // Wheel and swipe gesture handling for Home 2-page pager
+  const lastWheelTime = useRef<number>(0)
+  const pointerStartX = useRef<number | null>(null)
+  const isSwiping = useRef<boolean>(false)
+
+  const handleHomeWheel = (e: React.WheelEvent) => {
+    const now = Date.now()
+    if (now - lastWheelTime.current < 260) return
+
+    const dx = e.deltaX
+    const dy = e.deltaY
+
+    // If on Page 1 (File Shelf) and cursor is over the file list, preserve vertical list scrolling
+    const target = e.target as HTMLElement | null
+    const fileList = target?.closest('.shelf-file-list') as HTMLElement | null
+
+    if (homePage === 1 && fileList) {
+      const canScrollDown = fileList.scrollHeight > fileList.clientHeight &&
+        fileList.scrollTop + fileList.clientHeight < fileList.scrollHeight - 2
+      const canScrollUp = fileList.scrollTop > 2
+
+      // Only preserve list scrolling if the list can actually scroll in that direction
+      if (dy > 10 && canScrollDown) return
+      if (dy < -10 && canScrollUp) return
+    }
+
+    // Direction detection:
+    // Next page (Page 1): mouse wheel down (dy > 15) OR swipe left (dx > 15)
+    // Prev page (Page 0): mouse wheel up (dy < -15) OR swipe right (dx < -15)
+    if (dx > 15 || dy > 15) {
+      if (homePage === 0) {
+        lastWheelTime.current = now
+        setHomePage(1)
+      }
+    } else if (dx < -15 || dy < -15) {
+      if (homePage === 1) {
+        lastWheelTime.current = now
+        setHomePage(0)
+      }
+    }
+  }
+
+  const handleHomePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement | null
+    if (target?.closest('button, input, select, textarea, [data-shelf-item], .shelf-item')) return
+    pointerStartX.current = e.clientX
+    isSwiping.current = true
+  }
+
+  const handleHomePointerUp = (e: React.PointerEvent) => {
+    if (!isSwiping.current || pointerStartX.current === null) return
+    const diffX = e.clientX - pointerStartX.current
+    const threshold = 30
+
+    if (diffX < -threshold) {
+      setHomePage(1)
+    } else if (diffX > threshold) {
+      setHomePage(0)
+    }
+
+    isSwiping.current = false
+    pointerStartX.current = null
+  }
+
   // Synchronized persistent shell state
   const targetView = getIslandView(displayState, expandedActivity, timerData, isDragOver)
   const [currentView, setCurrentView] = useState<IslandView>(targetView)
@@ -514,15 +579,13 @@ export default function App() {
           {/* 1. EXPANDED HOME VIEW (Horizontal Multi-Page Pager) */}
           {currentView === 'home' && (
             <div
-              className="absolute inset-0 flex flex-col justify-between text-white cursor-default overflow-hidden select-none"
+              className="absolute inset-0 flex flex-col justify-between text-white cursor-default overflow-hidden select-none touch-none"
               onClick={(e) => e.stopPropagation()}
-              onWheel={(e) => {
-                if (e.deltaX > 25) {
-                  setHomePage(1)
-                } else if (e.deltaX < -25) {
-                  setHomePage(0)
-                }
-              }}
+              onWheel={handleHomeWheel}
+              onPointerDown={handleHomePointerDown}
+              onPointerUp={handleHomePointerUp}
+              onPointerLeave={handleHomePointerUp}
+              onPointerCancel={handleHomePointerUp}
             >
               {/* Horizontal Slider Content */}
               <div className="relative flex-1 w-full overflow-hidden">
