@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence, type Transition } from 'framer-motion'
 import {
   Play,
@@ -12,7 +12,13 @@ import {
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
-import { WINDOW_SIZES, resizeWindow, type WindowSize } from './core/windowSizing'
+import {
+  WINDOW_SIZES,
+  SHELL_CONFIGS,
+  resizeWindow,
+  type WindowSize,
+  type ShellConfig,
+} from './core/windowSizing'
 
 // Authentic Apple Dynamic Island spring transition curve
 const springTransition: Transition = {
@@ -20,6 +26,20 @@ const springTransition: Transition = {
   stiffness: 420,
   damping: 32,
   mass: 0.8,
+}
+
+type IslandView = 'droplet' | 'idle' | 'singleTimer' | 'home' | 'expandedTimer'
+
+function getIslandView(
+  displayState: 'capsule' | 'droplet',
+  expandedActivity: 'home' | 'timer' | 'music' | null,
+  timerActive: boolean,
+): IslandView {
+  if (expandedActivity === 'home') return 'home'
+  if (expandedActivity === 'timer') return 'expandedTimer'
+  if (displayState === 'droplet') return 'droplet'
+  if (timerActive) return 'singleTimer'
+  return 'idle'
 }
 
 export default function App() {
@@ -56,6 +76,63 @@ export default function App() {
       month: 'long',
     })
   })
+
+  // Synchronized persistent shell state
+  const targetView = getIslandView(displayState, expandedActivity, timerActive)
+  const [currentView, setCurrentView] = useState<IslandView>(targetView)
+  const [shellConfig, setShellConfig] = useState<ShellConfig>(SHELL_CONFIGS[targetView])
+  const pendingWindowResizeRef = useRef<WindowSize | null>(null)
+  const currentWindowSizeRef = useRef<WindowSize>(WINDOW_SIZES[targetView])
+
+  // Synchronize OS window bounds and shell spring animation
+  useEffect(() => {
+    if (targetView === currentView) return
+
+    const prevSize = currentWindowSizeRef.current
+    const nextSize = WINDOW_SIZES[targetView]
+    const isExpanding = nextSize.width > prevSize.width || nextSize.height > prevSize.height
+
+    let isMounted = true
+
+    if (isExpanding) {
+      // EXPAND FLOW:
+      // 1. Resize OS window first so expansion is never clipped
+      resizeWindow(nextSize.width, nextSize.height).then(() => {
+        if (!isMounted) return
+        currentWindowSizeRef.current = nextSize
+        // 2. Wait 1-2 animation frames for OS/WebView viewport layout to settle
+        requestAnimationFrame(() => {
+          if (!isMounted) return
+          requestAnimationFrame(() => {
+            if (!isMounted) return
+            // 3. Trigger shell spring animation to expand
+            setCurrentView(targetView)
+            setShellConfig(SHELL_CONFIGS[targetView])
+          })
+        })
+      })
+    } else {
+      // COLLAPSE FLOW:
+      // 1. Animate shell first to the smaller target dimensions
+      pendingWindowResizeRef.current = nextSize
+      setCurrentView(targetView)
+      setShellConfig(SHELL_CONFIGS[targetView])
+      // 2. Window will be resized in handleAnimationComplete once the spring settles
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [targetView, currentView])
+
+  const handleAnimationComplete = () => {
+    if (pendingWindowResizeRef.current) {
+      const nextSize = pendingWindowResizeRef.current
+      pendingWindowResizeRef.current = null
+      currentWindowSizeRef.current = nextSize
+      resizeWindow(nextSize.width, nextSize.height)
+    }
+  }
 
   // Listen to OS foreground state changes from Rust detector (event-driven)
   useEffect(() => {
@@ -214,42 +291,6 @@ export default function App() {
     }
   }, [expandedActivity])
 
-  // Determine current active mode
-  const isSplit = musicActive && timerActive && !expandedActivity
-
-  // Choreographed window sizing
-  useEffect(() => {
-    let target: WindowSize = WINDOW_SIZES.idle
-    if (displayState === 'droplet' && !expandedActivity) {
-      target = WINDOW_SIZES.droplet
-    } else if (expandedActivity === 'home') {
-      target = WINDOW_SIZES.home
-    } else if (expandedActivity === 'timer') {
-      target = WINDOW_SIZES.expandedTimer
-    } else if (expandedActivity === 'music') {
-      target = WINDOW_SIZES.expandedMusic
-    } else if (isSplit) {
-      target = WINDOW_SIZES.split
-    } else if (timerActive) {
-      target = WINDOW_SIZES.singleTimer
-    } else if (musicActive) {
-      target = WINDOW_SIZES.singleMusic
-    }
-
-    // Expanding from droplet/compact: resize window first so no clipping occurs
-    const isExpanding = (displayState === 'capsule' && target !== WINDOW_SIZES.droplet) || expandedActivity !== null
-
-    if (isExpanding) {
-      resizeWindow(target.width, target.height)
-    } else {
-      // Collapsing into droplet/compact: wait for spring animation before shrinking window
-      const timer = setTimeout(() => {
-        resizeWindow(target.width, target.height)
-      }, 350)
-      return () => clearTimeout(timer)
-    }
-  }, [displayState, expandedActivity, isSplit, musicActive, timerActive])
-
   // Timer countdown effect - pure updater without side-effects
   useEffect(() => {
     if (!timerActive || !timerRunning) return
@@ -284,18 +325,77 @@ export default function App() {
     return `${m}:${s < 10 ? '0' : ''}${s}`
   }
 
+  // Shell click handler
+  const handleShellClick = () => {
+    if (currentView === 'idle') {
+      setExpandedActivity('home')
+    } else if (currentView === 'singleTimer') {
+      setExpandedActivity('timer')
+    } else if (currentView === 'droplet') {
+      setIsDwelling(false)
+      setDisplayState('capsule')
+      setExpandedActivity('home')
+    }
+  }
+
   return (
-    <div className="w-full h-full flex flex-col items-center justify-start pt-2 select-none relative">
-      {/* Dynamic Island Container */}
-      <div className="relative z-50 flex items-center justify-center">
-        <AnimatePresence mode="popLayout">
-          {/* 1. EXPANDED HOME VIEW (Clock & Quick Actions) */}
-          {expandedActivity === 'home' && (
+    <div className="w-full h-full relative select-none overflow-hidden flex flex-col items-center justify-start">
+      {/* Ripple progress cue during 2s dwell hover - outside shell so not clipped by overflow-hidden */}
+      {currentView === 'droplet' && isDwelling && (
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0.9 }}
+          animate={{ scale: 2.6, opacity: 0 }}
+          transition={{ duration: 1.8, ease: 'easeOut', repeat: Infinity }}
+          style={{
+            position: 'absolute',
+            top: shellConfig.y + 8 + shellConfig.height / 2, // exact droplet vertical center y = 24px
+            left: '50%',
+            x: '-50%',
+            y: '-50%',
+            width: shellConfig.width,
+            height: shellConfig.height,
+            borderRadius: '9999px',
+            border: '2px solid rgba(255, 255, 255, 0.65)',
+            pointerEvents: 'none',
+            zIndex: 30,
+          }}
+        />
+      )}
+
+      {/* SINGLE PERSISTENT SHELL */}
+      <motion.div
+        animate={{
+          width: shellConfig.width,
+          height: shellConfig.height,
+          borderRadius: shellConfig.borderRadius,
+          boxShadow: shellConfig.boxShadow,
+          y: shellConfig.y,
+        }}
+        transition={springTransition}
+        onAnimationComplete={handleAnimationComplete}
+        onClick={handleShellClick}
+        onMouseEnter={() => currentView === 'droplet' && setIsDwelling(true)}
+        onMouseLeave={() => setIsDwelling(false)}
+        style={{
+          position: 'absolute',
+          top: 8,
+          left: '50%',
+          x: '-50%',
+          transformOrigin: 'top center',
+        }}
+        className="bg-black border border-white/20 overflow-hidden cursor-pointer z-40"
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          {/* 1. EXPANDED HOME VIEW */}
+          {currentView === 'home' && (
             <motion.div
-              key="expanded-home"
-              layoutId="island-core"
-              transition={springTransition}
-              className="bg-black text-white rounded-[36px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.6)] border border-white/20 w-[350px] flex flex-col gap-3"
+              key="view-home"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              className="w-full h-full p-5 flex flex-col gap-3 text-white cursor-default"
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -340,12 +440,15 @@ export default function App() {
           )}
 
           {/* 2. EXPANDED TIMER VIEW */}
-          {expandedActivity === 'timer' && (
+          {currentView === 'expandedTimer' && (
             <motion.div
-              key="expanded-timer"
-              layoutId="island-core"
-              transition={springTransition}
-              className="bg-black text-white rounded-[36px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.6)] border border-white/20 w-[330px] flex flex-col gap-3.5"
+              key="view-timer"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              className="w-full h-full p-5 flex flex-col gap-3.5 text-white cursor-default"
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -398,58 +501,39 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 3. MODE DROPLET (Spec Section 5.1 & Fase 1b) */}
-          {!expandedActivity && displayState === 'droplet' && (
+          {/* 3. DROPLET VIEW */}
+          {currentView === 'droplet' && (
             <motion.div
-              key="droplet"
-              layoutId="island-core"
-              transition={springTransition}
-              onMouseEnter={() => setIsDwelling(true)}
-              onMouseLeave={() => setIsDwelling(false)}
-              onClick={() => {
-                setIsDwelling(false)
-                setDisplayState('capsule')
-                setExpandedActivity('home')
-              }}
+              key="view-droplet"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.14 }}
               whileHover={{ scale: 1.15 }}
               whileTap={{ scale: 0.9 }}
-              className="relative h-8 flex items-center justify-center cursor-pointer select-none"
+              className="w-full h-full relative flex items-center justify-center overflow-hidden"
             >
-              {/* Ripple progress cue during 2s dwell hover */}
-              {isDwelling && (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0.9 }}
-                  animate={{ scale: 2.4, opacity: 0 }}
-                  transition={{ duration: 1.8, ease: 'easeOut', repeat: Infinity }}
-                  className="absolute w-4 h-4 rounded-full border-2 border-white/60 pointer-events-none"
-                />
+              <div className="absolute top-0.5 left-0.5 w-1 h-1 rounded-full bg-white/40 blur-[0.2px]" />
+              {timerActive && (
+                <span className="w-1.5 h-1.5 rounded-full bg-[#ff9500] shadow-[0_0_4px_#ff9500]" />
               )}
-
-              {/* ~14px black circle with water droplet highlight */}
-              <div className="relative w-3.5 h-3.5 rounded-full bg-black border border-white/30 shadow-[0_2px_8px_rgba(0,0,0,0.8)] flex items-center justify-center overflow-hidden">
-                <div className="absolute top-0.5 left-0.5 w-1 h-1 rounded-full bg-white/40 blur-[0.2px]" />
-
-                {/* Activity Dots: Orange for timer, Emerald for media */}
-                {timerActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#ff9500] shadow-[0_0_4px_#ff9500]" />
-                )}
-                {!timerActive && musicActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_#10b981]" />
-                )}
-              </div>
+              {!timerActive && musicActive && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_#10b981]" />
+              )}
             </motion.div>
           )}
 
-          {/* 4. ACTIVE TIMER COMPACT CAPSULE */}
-          {!expandedActivity && displayState === 'capsule' && timerActive && (
+          {/* 4. COMPACT TIMER VIEW */}
+          {currentView === 'singleTimer' && (
             <motion.div
-              key="compact-timer"
-              layoutId="island-core"
-              onClick={() => setExpandedActivity('timer')}
-              transition={springTransition}
+              key="view-singleTimer"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.14 }}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
-              className="bg-black text-white h-8 px-3.5 rounded-full flex items-center gap-2 cursor-pointer shadow-[0_2px_10px_rgba(0,0,0,0.45)] border border-white/20"
+              className="w-full h-full px-3.5 flex items-center justify-center gap-2 text-white"
             >
               <TimerIcon className="w-3.5 h-3.5 text-[#ff9500]" />
               <span className="text-xs font-mono font-semibold text-white tracking-tight">
@@ -458,16 +542,17 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 5. DEFAULT IDLE CLOCK CAPSULE (Spec Section 1 & 4 & 5) */}
-          {!expandedActivity && displayState === 'capsule' && !timerActive && !musicActive && (
+          {/* 5. IDLE CLOCK VIEW */}
+          {currentView === 'idle' && (
             <motion.div
-              key="idle-clock"
-              layoutId="island-core"
-              onClick={() => setExpandedActivity('home')}
-              transition={springTransition}
+              key="view-idle"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.14 }}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
-              className="bg-black text-white h-8 px-3 rounded-full flex items-center justify-center gap-2 cursor-pointer shadow-[0_2px_10px_rgba(0,0,0,0.45)] border border-white/20"
+              className="w-full h-full px-3 flex items-center justify-center gap-2 text-white"
             >
               <Clock className="w-3.5 h-3.5 text-white/70" />
               <span className="text-xs font-semibold text-white/95 font-mono tracking-tight">
@@ -476,11 +561,11 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
 
       {/* Dev Controls - Visible ONLY when developing in standard browser, never inside Tauri window */}
       {isBrowserDev && showDevControls && (
-        <div className="mt-3 flex items-center gap-1.5 bg-black/90 border border-white/15 px-3 py-1 rounded-full text-[11px] text-white/80 shadow-lg">
+        <div className="absolute bottom-2 z-50 flex items-center gap-1.5 bg-black/90 border border-white/15 px-3 py-1 rounded-full text-[11px] text-white/80 shadow-lg">
           <Sparkles className="w-3 h-3 text-amber-400" />
           <button
             onClick={() => startPresetTimer(5)}

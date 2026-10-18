@@ -5,6 +5,14 @@ export interface WindowSize {
   height: number
 }
 
+export interface ShellConfig {
+  width: number
+  height: number
+  borderRadius: number
+  boxShadow: string
+  y: number
+}
+
 // Window sizes include tight padding for lighter shadow without clipping
 export const WINDOW_SIZES: Record<string, WindowSize> = {
   idle: { width: 170, height: 58 },
@@ -17,7 +25,46 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   expandedTimer: { width: 370, height: 220 },
 }
 
-export async function resizeWindow(width: number, height: number) {
+// Single persistent shell geometry configurations
+export const SHELL_CONFIGS: Record<string, ShellConfig> = {
+  droplet: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.8)',
+    y: 8, // vertical center anchored at y = 24px (8 + 8 + 8)
+  },
+  idle: {
+    width: 96,
+    height: 32,
+    borderRadius: 16,
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
+    y: 0, // vertical center anchored at y = 24px (8 + 0 + 16)
+  },
+  singleTimer: {
+    width: 108,
+    height: 32,
+    borderRadius: 16,
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
+    y: 0,
+  },
+  home: {
+    width: 350,
+    height: 190,
+    borderRadius: 36,
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)',
+    y: 0,
+  },
+  expandedTimer: {
+    width: 330,
+    height: 175,
+    borderRadius: 36,
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)',
+    y: 0,
+  },
+}
+
+export async function resizeWindow(width: number, height: number): Promise<void> {
   try {
     await invoke('resize_island', { width, height })
   } catch (err) {

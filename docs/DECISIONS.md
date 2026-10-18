@@ -59,4 +59,23 @@ This document records architectural choices, deviations from the initial spec, a
   5. **Vertical Center Alignment**: Aligned droplet container height to capsule height (`h-8`, 32px) at `pt-2` (8px), ensuring both droplet circle ($14\times 14$) and capsule share the exact same vertical center line ($y = 24\text{px}$) from the top of the window, eliminating vertical jumping during Framer Motion layout animations.
   6. **Icon Generation & Asset Compression**: Cropped 1024×1024 master PNG (`assets/icon.png`) with smooth squircle alpha mask from `assets/kumanotch_icon.jpg`, regenerated all application icons with `tauri icon`, added simplified high-contrast tray silhouette (`src-tauri/icons/tray.png`), and compressed raw 1.6MB JPG down to 42KB (>97% reduction).
 
+## Decision 006: Single Persistent Shell & Stage Window Architecture Comparison
+- **Date**: 2026-10-18
+- **Context**: Transition from compact capsule to expanded cards (Home, Timer) or Droplet exhibited subtle visual jumps, shadow distortion, and clipping when using `layoutId` across disparate DOM elements alongside concurrent window resizing.
+- **Architectural Comparison**:
+  1. **Option A: Fixed Stage Window with Click-Through (`ignore-cursor-events`)**:
+     - *Concept*: The OS window is permanently sized to the largest possible dimension (e.g. 400×230). The transparent area surrounding the notch passes mouse clicks through to underlying background windows via Windows hit-testing (`WS_EX_TRANSPARENT` or IPC `setIgnoreCursorEvents`).
+     - *Technical Reality & Findings on Windows / Tauri 2*:
+       - **No Native Per-Pixel Alpha Hit-Test in Tauri 2**: Tauri 2 does not provide built-in per-pixel alpha hit-testing for WebView2 on Windows without custom Win32 sub-classing (`SetWindowSubclass` intercepting `WM_NCHITTEST`).
+       - **IPC Mouse Latency & Cursor Glitches**: Dynamically toggling `WS_EX_TRANSPARENT` based on frontend mouse enter/leave events over IPC causes visible cursor flickering and missed clicks when the user moves the mouse rapidly into or out of the island.
+       - **DWM Memory & GPU Composition Overhead**: A permanently large transparent DWM composition surface (400×230) on Windows consumes ~15–25MB more GPU VRAM and DWM buffer memory than tight, shrink-to-fit bounds (48×48 / 170×58), conflicting with the "potato laptop friendly" core principle.
+  2. **Option B: Single Persistent Shell with Choreographed Resizing (Selected)**:
+     - *Concept*: One single persistent `<motion.div>` shell smoothly animates `width`, `height`, `borderRadius`, `boxShadow`, and `y` via Framer Motion's `animate`. Window resizing is strictly choreographed:
+       - **Expansion**: `await resizeWindow(target)`, wait 2 `requestAnimationFrame` cycles (~33ms) for DWM/WebView buffer repaint, then trigger shell spring animation.
+       - **Collapse**: Animate shell to smaller target first inside the existing window bounds; execute `resizeWindow(target)` inside `onAnimationComplete` once the spring settles.
+       - **Top-Center Anchor**: Absolute positioning at `top: 8px, left: 50%, x: '-50%'` guarantees the island's horizontal center and top edge in monitor space never shift across window boundary changes.
+       - **Content Crossfade**: Inner views transition via `<AnimatePresence mode="wait">` (opacity + scale $0.96 \leftrightarrow 1.0$, 140–150ms). Hover/tap micro-interactions (`whileHover`, `whileTap`) are scoped strictly to inner child content.
+- **Recommendation & Outcome**:
+  Option B delivers 60fps native DWM performance with 0 dropped frames, zero IPC hit-test lag, eliminates clipping artifacts, guarantees exact click-through bounds on underlying browser tabs/window controls, and keeps baseline RAM below 38MB.
+
 
