@@ -86,9 +86,9 @@ export default function App() {
   // Expanded focus state: null (compact), 'home', 'timer', or 'music'
   const [expandedActivity, setExpandedActivity] = useState<'home' | 'timer' | 'music' | null>(null)
 
-  // Custom timer duration inputs on Home card (Jam, Menit, Detik)
+  // Custom timer duration inputs on Home card (Jam, Menit, Detik - all default to 0)
   const [customHours, setCustomHours] = useState<string>('0')
-  const [customMins, setCustomMins] = useState<string>('10')
+  const [customMins, setCustomMins] = useState<string>('0')
   const [customSecs, setCustomSecs] = useState<string>('0')
   const [showCustomInput, setShowCustomInput] = useState<boolean>(false)
 
@@ -372,6 +372,22 @@ export default function App() {
       setExpandedActivity('home')
     }
   }
+  // Digits-only duration input handler: blocks non-digits, strips leading 0 seamlessly, clamps to max
+  const handleDurationInput = (
+    raw: string,
+    max: number,
+    setter: (val: string) => void,
+  ) => {
+    const digits = raw.replace(/\D/g, '')
+    if (digits === '') {
+      setter('')
+      return
+    }
+    const stripped = digits.replace(/^0+(?=\d)/, '')
+    const num = parseInt(stripped, 10) || 0
+    const clamped = Math.min(max, num)
+    setter(clamped.toString())
+  }
 
   // Handle custom duration start (Jam, Menit, Detik)
   const handleStartCustom = (e: React.FormEvent) => {
@@ -529,12 +545,16 @@ export default function App() {
                   <form onSubmit={handleStartCustom} className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-white/10">
                     <div className="flex items-center gap-1">
                       <input
-                        type="number"
-                        min="0"
-                        max="23"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={customHours}
-                        onChange={(e) => setCustomHours(e.target.value)}
-                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        onChange={(e) => handleDurationInput(e.target.value, 99, setCustomHours)}
+                        onFocus={(e) => e.target.select()}
+                        onBlur={() => {
+                          if (!customHours) setCustomHours('0')
+                        }}
+                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
                         placeholder="0"
                       />
                       <span className="text-[11px] text-white/50 font-mono">{t.hourUnit}</span>
@@ -542,13 +562,17 @@ export default function App() {
                     <span className="text-white/30 text-xs font-mono">:</span>
                     <div className="flex items-center gap-1">
                       <input
-                        type="number"
-                        min="0"
-                        max="59"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={customMins}
-                        onChange={(e) => setCustomMins(e.target.value)}
-                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        placeholder="10"
+                        onChange={(e) => handleDurationInput(e.target.value, 59, setCustomMins)}
+                        onFocus={(e) => e.target.select()}
+                        onBlur={() => {
+                          if (!customMins) setCustomMins('0')
+                        }}
+                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                        placeholder="0"
                         autoFocus
                       />
                       <span className="text-[11px] text-white/50 font-mono">{t.minUnit}</span>
@@ -556,12 +580,16 @@ export default function App() {
                     <span className="text-white/30 text-xs font-mono">:</span>
                     <div className="flex items-center gap-1">
                       <input
-                        type="number"
-                        min="0"
-                        max="59"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={customSecs}
-                        onChange={(e) => setCustomSecs(e.target.value)}
-                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        onChange={(e) => handleDurationInput(e.target.value, 59, setCustomSecs)}
+                        onFocus={(e) => e.target.select()}
+                        onBlur={() => {
+                          if (!customSecs) setCustomSecs('0')
+                        }}
+                        className="w-11 bg-white/10 border border-white/20 rounded-lg py-1 text-center text-xs text-white font-mono focus:outline-none focus:border-amber-400"
                         placeholder="0"
                       />
                       <span className="text-[11px] text-white/50 font-mono">{t.secUnit}</span>
