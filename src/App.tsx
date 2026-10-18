@@ -14,6 +14,7 @@ import {
   Brain,
   UploadCloud,
   Hourglass,
+  Music2,
 } from 'lucide-react'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { listen } from '@tauri-apps/api/event'
@@ -32,6 +33,9 @@ import {
 } from './core/timer'
 import { globalShelfEngine } from './core/shelf'
 import { FileShelf } from './features/shelf/FileShelf'
+import { globalMediaEngine, type MediaData } from './core/media'
+import { ExpandedMusic } from './features/media/ExpandedMusic'
+import { AudioWaveform } from './features/media/AudioWaveform'
 import { getT } from './core/i18n'
 
 // Authentic Apple Dynamic Island spring transition curve
@@ -55,20 +59,42 @@ function formatClockTime(now: Date, mode: 'auto' | '12h' | '24h' = 'auto'): stri
   return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
-type IslandView = 'droplet' | 'idle' | 'split' | 'singleTimer' | 'home' | 'expandedTimer' | 'alert' | 'dropTarget'
+type IslandView =
+  | 'droplet'
+  | 'idle'
+  | 'split'
+  | 'singleTimer'
+  | 'singleMusic'
+  | 'home'
+  | 'expandedTimer'
+  | 'expandedMusic'
+  | 'alert'
+  | 'dropTarget'
 
 function getIslandView(
   displayState: 'capsule' | 'droplet',
   expandedActivity: 'home' | 'timer' | 'music' | null,
   timerData: TimerData | null,
+  mediaData: MediaData | null,
   isDragOver: boolean,
 ): IslandView {
   if (timerData?.status === 'completed') return 'alert'
   if (expandedActivity === 'home') return 'home'
   if (expandedActivity === 'timer') return 'expandedTimer'
+  if (expandedActivity === 'music') return 'expandedMusic'
   if (isDragOver) return 'dropTarget'
-  if (timerData && (timerData.status === 'running' || timerData.status === 'paused')) {
+
+  const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
+  const isMediaActive = mediaData !== null && mediaData.isActive
+
+  if (isTimerActive && isMediaActive) {
     return 'split'
+  }
+  if (isTimerActive) {
+    return 'singleTimer'
+  }
+  if (isMediaActive) {
+    return 'singleMusic'
   }
   if (displayState === 'droplet') return 'droplet'
   return 'idle'
@@ -85,6 +111,15 @@ export default function App() {
     return globalTimerEngine.subscribe((data, remaining) => {
       setTimerData(data ? { ...data } : null)
       setRemainingSeconds(remaining)
+    })
+  }, [])
+
+  // Global SMTC Media Engine subscription (Spec Fase 4)
+  const [mediaData, setMediaData] = useState<MediaData | null>(() => globalMediaEngine.getData())
+
+  useEffect(() => {
+    return globalMediaEngine.subscribe((data) => {
+      setMediaData(data ? { ...data } : null)
     })
   }, [])
 
@@ -283,7 +318,7 @@ export default function App() {
   }
 
   // Synchronized persistent shell state
-  const targetView = getIslandView(displayState, expandedActivity, timerData, isDragOver)
+  const targetView = getIslandView(displayState, expandedActivity, timerData, mediaData, isDragOver)
   const [currentView, setCurrentView] = useState<IslandView>(targetView)
   const [shellConfig, setShellConfig] = useState<ShellConfig>(SHELL_CONFIGS[targetView])
   const currentWindowSizeRef = useRef<WindowSize>(WINDOW_SIZES[targetView])
@@ -483,14 +518,22 @@ export default function App() {
 
   // Shell click handler
   const handleShellClick = () => {
-    if (currentView === 'idle' || currentView === 'split') {
+    if (currentView === 'idle') {
       setExpandedActivity('home')
-    } else if (currentView === 'singleTimer') {
+    } else if (currentView === 'singleTimer' || currentView === 'split') {
       setExpandedActivity('timer')
+    } else if (currentView === 'singleMusic') {
+      setExpandedActivity('music')
     } else if (currentView === 'droplet') {
       setIsDwelling(false)
       setDisplayState('capsule')
-      setExpandedActivity('home')
+      if (isTimerActive) {
+        setExpandedActivity('timer')
+      } else if (isMediaActive) {
+        setExpandedActivity('music')
+      } else {
+        setExpandedActivity('home')
+      }
     } else if (currentView === 'dropTarget') {
       setExpandedActivity('home')
     }
@@ -534,6 +577,7 @@ export default function App() {
   const isTimerRunning = timerData?.status === 'running'
   const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
   const isPomodoroBreak = timerData?.isPomodoro && timerData.pomodoroPhase !== 'focus'
+  const isMediaActive = mediaData !== null && mediaData.isActive
 
   const handleBackdropPointerDown = (e: React.PointerEvent) => {
     if (e.target === e.currentTarget && expandedActivity !== null) {
@@ -713,6 +757,53 @@ export default function App() {
                             className="px-2.5 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-bold transition-transform active:scale-95"
                           >
                             {t.openTimer}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Active Media Banner if music is active */}
+                    {isMediaActive && mediaData && (
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpandedActivity('music')
+                        }}
+                        className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 cursor-pointer my-0.5 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {mediaData.thumbnailBase64 ? (
+                            <img
+                              src={mediaData.thumbnailBase64}
+                              alt={mediaData.title}
+                              className="w-4 h-4 rounded object-cover shrink-0"
+                            />
+                          ) : (
+                            <Music2 className="w-3.5 h-3.5 text-[#1ed760] shrink-0" />
+                          )}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-xs font-semibold text-white truncate max-w-[130px]">
+                              {mediaData.title}
+                            </span>
+                            <span className="text-[10px] text-white/50 truncate max-w-[90px]">
+                              {mediaData.artist}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <AudioWaveform
+                            isPlaying={mediaData.playbackStatus === 'playing'}
+                            barCount={3}
+                            size="sm"
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExpandedActivity('music')
+                            }}
+                            className="px-2.5 py-0.5 rounded-lg bg-[#1ed760] hover:bg-[#1ed760]/90 text-black text-[10px] font-bold transition-transform active:scale-95"
+                          >
+                            Buka
                           </button>
                         </div>
                       </div>
@@ -899,6 +990,17 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {isMediaActive && (
+                    <button
+                      onClick={() => setExpandedActivity('music')}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1ed760]/20 hover:bg-[#1ed760]/30 text-[#1ed760] text-[10px] font-medium transition-all active:scale-95 border border-[#1ed760]/30"
+                      title="Buka Musik"
+                    >
+                      <Music2 className="w-3 h-3" />
+                      <span>Musik</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => {
                       setExpandedActivity('home')
@@ -972,6 +1074,19 @@ export default function App() {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* 3. EXPANDED MUSIC VIEW (Spec Fase 4) */}
+          {currentView === 'expandedMusic' && (
+            <ExpandedMusic
+              onClose={() => setExpandedActivity(null)}
+              onOpenShelf={() => {
+                setExpandedActivity('home')
+                setHomePage(1)
+              }}
+              onOpenTimer={() => setExpandedActivity('timer')}
+              isTimerActive={isTimerActive}
+            />
           )}
 
           {/* 3. ALERT VIEW - Automatically Expands when Timer Completes (Spec 5.1 point 6 & line 156) */}
@@ -1066,7 +1181,7 @@ export default function App() {
               className="absolute inset-0 flex items-center justify-center overflow-hidden"
             >
               <div className="absolute top-0.5 left-0.5 w-1 h-1 rounded-full bg-white/40 blur-[0.2px]" />
-              {isTimerActive && (
+              {isTimerActive ? (
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
                     isPomodoroBreak
@@ -1074,12 +1189,18 @@ export default function App() {
                       : 'bg-[#ff9500] shadow-[0_0_4px_#ff9500]'
                   } ${isTimerRunning ? 'animate-pulse' : 'opacity-80'}`}
                 />
-              )}
+              ) : isMediaActive ? (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full bg-[#1ed760] shadow-[0_0_4px_#1ed760] ${
+                    mediaData?.playbackStatus === 'playing' ? 'animate-pulse' : 'opacity-80'
+                  }`}
+                />
+              ) : null}
             </motion.div>
           )}
 
-          {/* 5. COMPACT TIMER VIEW (Progress Ring + mm:ss - Spec line 156) */}
-          {currentView === 'singleTimer' && timerData && (
+          {/* 5. COMPACT TIMER VIEW (used in singleTimer and split) */}
+          {(currentView === 'singleTimer' || currentView === 'split') && timerData && (
             <motion.div
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
@@ -1126,8 +1247,47 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 6. IDLE & SPLIT CLOCK VIEW */}
-          {(currentView === 'idle' || currentView === 'split') && (
+          {/* 6. COMPACT SINGLE MUSIC VIEW (Spec Fase 4) */}
+          {currentView === 'singleMusic' && mediaData && (
+            <motion.div
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="absolute inset-0 px-2.5 flex items-center justify-between gap-2 text-white overflow-hidden whitespace-nowrap"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {mediaData.thumbnailBase64 ? (
+                  <img
+                    src={mediaData.thumbnailBase64}
+                    alt={mediaData.title}
+                    className="w-5 h-5 rounded-md object-cover border border-white/10 shrink-0"
+                  />
+                ) : (
+                  <div className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center shrink-0">
+                    <Music2 className="w-3 h-3 text-[#1ed760]" />
+                  </div>
+                )}
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-semibold text-white tracking-tight truncate max-w-[110px] leading-tight">
+                    {mediaData.title}
+                  </span>
+                  <span className="text-[9px] text-white/50 truncate max-w-[110px] leading-tight">
+                    {mediaData.artist || 'Unknown'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="shrink-0 pr-0.5">
+                <AudioWaveform
+                  isPlaying={mediaData.playbackStatus === 'playing'}
+                  barCount={4}
+                  size="sm"
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {/* 7. IDLE CLOCK VIEW */}
+          {currentView === 'idle' && (
             <motion.div
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
@@ -1139,7 +1299,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* 7. DROP TARGET COMPACT CAPSULE VIEW */}
+          {/* 8. DROP TARGET COMPACT CAPSULE VIEW */}
           {currentView === 'dropTarget' && (
             <motion.div
               whileHover={{ scale: 1.04 }}
@@ -1153,7 +1313,7 @@ export default function App() {
           )}
       </motion.div>
 
-        {/* DETACHED SECONDARY BUBBLE (Dynamic Island Split Mode) */}
+        {/* DETACHED SECONDARY BUBBLE (Dynamic Island Split Mode - Media) */}
         <AnimatePresence>
           {currentView === 'split' && (
             <motion.div
@@ -1165,56 +1325,28 @@ export default function App() {
               whileTap={{ scale: 0.92 }}
               onClick={(e) => {
                 e.stopPropagation()
-                setExpandedActivity('timer')
+                setExpandedActivity('music')
               }}
               style={{
                 height: 32,
                 transformOrigin: 'center center',
               }}
-              className="relative rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
-              title="Timer"
+              className="relative rounded-full bg-black border border-[#1ed760]/40 shadow-[0_2px_12px_rgba(30,215,96,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+              title={`${mediaData?.title || 'Musik'} • Klik untuk membuka`}
             >
-              {/* Progress Ring */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 32 32">
-                  <circle
-                    cx="16"
-                    cy="16"
-                    r="13"
-                    fill="none"
-                    stroke="rgba(255, 255, 255, 0.15)"
-                    strokeWidth="2.5"
-                  />
-                  <circle
-                    cx="16"
-                    cy="16"
-                    r="13"
-                    fill="none"
-                    stroke={isPomodoroBreak ? '#10b981' : '#ff9500'}
-                    strokeWidth="2.5"
-                    strokeDasharray={81.68}
-                    strokeDashoffset={81.68 * (1 - timerProgress)}
-                    strokeLinecap="round"
-                    className="transition-all duration-300"
-                  />
-                </svg>
-              </div>
-
-              {/* Animated Flipping Hourglass Icon */}
-              <motion.div
-                animate={isTimerRunning ? {
-                  rotate: [0, 0, 180, 180, 360],
-                } : { rotate: 0 }}
-                transition={{
-                  duration: 5.0,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  times: [0, 0.38, 0.50, 0.88, 1.0],
-                }}
-                className="flex items-center justify-center text-amber-400 z-10"
-              >
-                <Hourglass className="w-3.5 h-3.5 fill-amber-400/25" />
-              </motion.div>
+              {mediaData?.thumbnailBase64 ? (
+                <img
+                  src={mediaData.thumbnailBase64}
+                  alt={mediaData.title}
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                <AudioWaveform
+                  isPlaying={mediaData?.playbackStatus === 'playing'}
+                  barCount={3}
+                  size="sm"
+                />
+              )}
             </motion.div>
           )}
         </AnimatePresence>

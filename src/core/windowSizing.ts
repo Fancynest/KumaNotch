@@ -64,6 +64,13 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
     y: 0,
   },
+  singleMusic: {
+    width: 210,
+    height: 32,
+    borderRadius: 16,
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
+    y: 0,
+  },
   home: {
     width: 350,
     height: 220,
@@ -74,6 +81,13 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
   expandedTimer: {
     width: 330,
     height: 175,
+    borderRadius: 36,
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)',
+    y: 0,
+  },
+  expandedMusic: {
+    width: 350,
+    height: 210,
     borderRadius: 36,
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)',
     y: 0,

@@ -1,4 +1,5 @@
 mod detector;
+mod media;
 mod shelf;
 mod tray;
 mod window;
@@ -29,12 +30,20 @@ pub fn run() {
             shelf::shelf_show_in_folder,
             shelf::shelf_copy_path,
             shelf::shelf_start_drag,
+            media::media_get_state,
+            media::media_play,
+            media::media_pause,
+            media::media_toggle_play_pause,
+            media::media_next,
+            media::media_prev,
+            media::media_seek,
         ])
         .setup(|app| {
             let handle = app.handle();
             let _ = window::setup_window(handle);
             let _ = tray::create_tray(handle);
             detector::start_detector(handle.clone());
+            media::init_media(handle.clone());
             Ok(())
         })
         .run(tauri::generate_context!())
