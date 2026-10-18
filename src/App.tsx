@@ -11,7 +11,6 @@ import {
   Bell,
   Coffee,
   Brain,
-  Plus,
 } from 'lucide-react'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { listen } from '@tauri-apps/api/event'
@@ -423,43 +422,79 @@ export default function App() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
               transition={{ duration: 0.15, ease: 'easeInOut' }}
-              className="w-full h-full p-5 flex flex-col gap-3 text-white cursor-default"
+              className="w-full h-full px-5 py-4 flex flex-col gap-2.5 text-white cursor-default"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">
-                    {dateStr}
-                  </span>
-                  <div className="text-3xl font-bold tracking-tight text-white/95 mt-0.5">
-                    {timeStr}
-                  </div>
+              <div>
+                <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">
+                  {dateStr}
+                </span>
+                <div className="text-3xl font-bold tracking-tight text-white/95 mt-0.5">
+                  {timeStr}
                 </div>
-                <button
-                  onClick={() => setExpandedActivity(null)}
-                  className="text-white/40 hover:text-white transition-colors p-1"
-                >
-                  <ChevronDown className="w-5 h-5" />
-                </button>
               </div>
 
-              {/* Quick Timer Presets & Pomodoro Mode */}
-              <div className="flex flex-col gap-1.5 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
-                    Mulai Timer Cepat
-                  </span>
-                  <button
-                    onClick={() => setShowCustomInput(!showCustomInput)}
-                    className="text-[10px] text-white/50 hover:text-amber-400 transition-colors flex items-center gap-1 font-medium"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>{showCustomInput ? 'Tutup Custom' : 'Custom'}</span>
-                  </button>
+              {/* Quick Timer Presets */}
+              <div className="flex flex-col gap-1.5 pt-0.5">
+                <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
+                  Mulai Timer Cepat
+                </span>
+
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[
+                    {
+                      label: '5m',
+                      action: () => {
+                        globalTimerEngine.startTimer(5)
+                        setExpandedActivity(null)
+                      },
+                    },
+                    {
+                      label: '15m',
+                      action: () => {
+                        globalTimerEngine.startTimer(15)
+                        setExpandedActivity(null)
+                      },
+                    },
+                    {
+                      label: '25m',
+                      action: () => {
+                        globalTimerEngine.startTimer(25)
+                        setExpandedActivity(null)
+                      },
+                    },
+                    {
+                      label: 'Fokus',
+                      action: () => {
+                        globalTimerEngine.startPomodoro('focus', 1)
+                        setExpandedActivity(null)
+                      },
+                      highlight: true,
+                    },
+                    {
+                      label: 'Custom',
+                      action: () => setShowCustomInput(!showCustomInput),
+                      active: showCustomInput,
+                    },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={preset.action}
+                      className={`py-1.5 px-1 rounded-xl text-xs font-medium transition-all text-center active:scale-95 ${
+                        preset.active
+                          ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
+                          : preset.highlight
+                          ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30'
+                          : 'bg-white/10 hover:bg-white/20 text-white'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
                 </div>
 
-                {showCustomInput ? (
-                  <form onSubmit={handleStartCustom} className="flex items-center gap-1.5 mt-1">
+                {showCustomInput && (
+                  <form onSubmit={handleStartCustom} className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-white/10">
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
@@ -506,34 +541,6 @@ export default function App() {
                       Mulai
                     </button>
                   </form>
-                ) : (
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { label: '5m', action: () => globalTimerEngine.startTimer(5) },
-                      { label: '15m', action: () => globalTimerEngine.startTimer(15) },
-                      { label: '25m', action: () => globalTimerEngine.startTimer(25) },
-                      {
-                        label: 'Fokus',
-                        action: () => globalTimerEngine.startPomodoro('focus', 1),
-                        highlight: true,
-                      },
-                    ].map((preset) => (
-                      <button
-                        key={preset.label}
-                        onClick={() => {
-                          preset.action()
-                          setExpandedActivity(null)
-                        }}
-                        className={`py-1.5 px-1 rounded-xl text-xs font-medium transition-all text-center active:scale-95 ${
-                          preset.highlight
-                            ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30'
-                            : 'bg-white/10 hover:bg-white/20 text-white'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
                 )}
               </div>
             </motion.div>
