@@ -661,6 +661,8 @@ export default function App() {
   const [isDragging, setIsDragging] = useState<boolean>(false)
   const [isMagnetSnapped, setIsMagnetSnapped] = useState<boolean>(false)
   const dragRef = useRef<{ startScreenX: number; startOffset: number; hasMoved: boolean } | null>(null)
+  const isDraggingRef = useRef<boolean>(false)
+  const lastDragEndTimeRef = useRef<number>(0)
 
   useEffect(() => {
     if (settings.horizontalOffset !== undefined && settings.horizontalOffset !== 0) {
@@ -668,12 +670,63 @@ export default function App() {
     }
   }, [settings.horizontalOffset])
 
-  useEffect(() => {
-    const handleGlobalPointerUp = () => {
-      if (dragRef.current) {
-        dragRef.current = null
-      }
+  const rafIdRef = useRef<number | null>(null)
+  const pendingOffsetRef = useRef<number | null>(null)
+
+  const endDrag = (screenX: number) => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current)
+      rafIdRef.current = null
+    }
+    if (!dragRef.current) {
       setIsDragging(false)
+      isDraggingRef.current = false
+      return
+    }
+    const deltaX = screenX - dragRef.current.startScreenX
+    const hadMoved = dragRef.current.hasMoved
+    const startOffset = dragRef.current.startOffset
+    dragRef.current = null
+
+    if (hadMoved) {
+      lastDragEndTimeRef.current = Date.now()
+      isDraggingRef.current = true
+
+      const rawCandidate = startOffset + deltaX
+      const SNAP_RADIUS = 85
+
+      if (Math.abs(rawCandidate) <= SNAP_RADIUS) {
+        setHorizontalOffset(0)
+        setIslandOffset(0)
+        globalSettingsEngine.update({ horizontalOffset: 0 })
+
+        // If pulled/snapped into center from outside: TRIGGER SURPRISE REACTION!
+        if (Math.abs(startOffset) > 15 || Math.abs(rawCandidate) > 15) {
+          setIsMagnetSnapped(true)
+          setTimeout(() => setIsMagnetSnapped(false), 2600)
+        }
+      } else {
+        setHorizontalOffset(rawCandidate)
+        setIslandOffset(rawCandidate)
+        globalSettingsEngine.update({ horizontalOffset: rawCandidate })
+      }
+
+      // Suppress dragging flag after 500ms to guarantee any subsequent click event is dropped
+      setTimeout(() => {
+        setIsDragging(false)
+        isDraggingRef.current = false
+      }, 500)
+    } else {
+      setIsDragging(false)
+      isDraggingRef.current = false
+    }
+  }
+
+  useEffect(() => {
+    const handleGlobalPointerUp = (e: PointerEvent) => {
+      if (dragRef.current) {
+        endDrag(e.screenX)
+      }
     }
     window.addEventListener('pointerup', handleGlobalPointerUp)
     window.addEventListener('pointercancel', handleGlobalPointerUp)
@@ -682,9 +735,6 @@ export default function App() {
       window.removeEventListener('pointercancel', handleGlobalPointerUp)
     }
   }, [])
-
-  const rafIdRef = useRef<number | null>(null)
-  const pendingOffsetRef = useRef<number | null>(null)
 
   const handleShellPointerDown = (e: React.PointerEvent) => {
     // Only allow island dragging when in idle capsule view!
@@ -700,6 +750,7 @@ export default function App() {
       startOffset: horizontalOffset,
       hasMoved: false,
     }
+    isDraggingRef.current = false
     try {
       ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     } catch {}
@@ -709,8 +760,9 @@ export default function App() {
     if (currentView !== 'idle' || !dragRef.current) return
     const deltaX = e.screenX - dragRef.current.startScreenX
     if (!dragRef.current.hasMoved) {
-      if (Math.abs(deltaX) >= 14) {
+      if (Math.abs(deltaX) >= 5) {
         dragRef.current.hasMoved = true
+        isDraggingRef.current = true
         setIsDragging(true)
       } else {
         return
@@ -735,59 +787,17 @@ export default function App() {
   }
 
   const handleShellPointerUp = (e: React.PointerEvent) => {
-    if (rafIdRef.current !== null) {
-      cancelAnimationFrame(rafIdRef.current)
-      rafIdRef.current = null
-    }
-    if (!dragRef.current) {
-      setIsDragging(false)
-      return
-    }
-    const deltaX = e.screenX - dragRef.current.startScreenX
-    const hadMoved = dragRef.current.hasMoved
-    const startOffset = dragRef.current.startOffset
-    dragRef.current = null
-
     try {
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
     } catch {}
-
-    if (hadMoved) {
-      const rawCandidate = startOffset + deltaX
-      const SNAP_RADIUS = 85
-
-      if (Math.abs(rawCandidate) <= SNAP_RADIUS) {
-        setHorizontalOffset(0)
-        setIslandOffset(0)
-        globalSettingsEngine.update({ horizontalOffset: 0 })
-
-        // If pulled/snapped into center from outside: TRIGGER SURPRISE REACTION!
-        if (Math.abs(startOffset) > 15 || Math.abs(rawCandidate) > 15) {
-          setIsMagnetSnapped(true)
-          setTimeout(() => setIsMagnetSnapped(false), 2600)
-        }
-      } else {
-        setHorizontalOffset(rawCandidate)
-        setIslandOffset(rawCandidate)
-        globalSettingsEngine.update({ horizontalOffset: rawCandidate })
-      }
-
-      setTimeout(() => setIsDragging(false), 50)
-    } else {
-      setIsDragging(false)
-    }
+    endDrag(e.screenX)
   }
 
   const handleShellPointerCancel = (e: React.PointerEvent) => {
-    if (rafIdRef.current !== null) {
-      cancelAnimationFrame(rafIdRef.current)
-      rafIdRef.current = null
-    }
-    dragRef.current = null
-    setIsDragging(false)
     try {
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
     } catch {}
+    endDrag(e.screenX)
   }
 
   const handleShellDoubleClick = () => {
@@ -801,8 +811,19 @@ export default function App() {
     }
   }
 
-  const handleShellClick = () => {
-    if (isDragging) return
+  const handleShellClick = (e?: React.MouseEvent) => {
+    // If we were dragging or just finished dragging (< 500ms), DO NOT EXPAND!
+    if (
+      isDragging ||
+      isDraggingRef.current ||
+      Date.now() - lastDragEndTimeRef.current < 500
+    ) {
+      if (e) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+      return
+    }
     openedViaHoverRef.current = false
     if (currentView === 'idle') {
       setExpandedActivity('home')
