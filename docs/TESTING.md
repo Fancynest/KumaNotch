@@ -305,3 +305,49 @@ Create test files in a temporary directory with the following filename patterns:
   - **Expected**:
     1. Status text is laid out on a single horizontal line (`Device Name • Connected` / `Device Name • Terhubung`).
     2. Connection indicator dot has a generous gap (`gap-3`) from Kuma's right cheek blush and does not overlap.
+
+
+---
+
+## 8. Fase 6b: Process Watcher, CLI Runner & Expressive Emotions
+
+### 8.1 Local TCP Daemon & CLI Runner (`kuma.cmd`)
+- [ ] **Daemon Port Binding**:
+  - Launch KumaNotch desktop app.
+  - Run in terminal: `curl -s http://127.0.0.1:45454/status`.
+  - **Expected**: JSON response `{"status":"ok","app":"kumanotch","version":"0.1.0"}`.
+- [ ] **CLI Notification (`kuma notify`)**:
+  - Run: `.\kuma.cmd notify "Build Selesai" "Semua aset terkompilasi"`.
+  - **Expected**:
+    1. KumaNotch morphs to `processAlert` card (300×64px).
+    2. Shows checkmark icon, title, and message.
+    3. Auto-dismisses after 4.5 seconds.
+- [ ] **CLI Process Execution (`kuma run`)**:
+  - Run: `.\kuma.cmd run npm --version`.
+  - **Expected**:
+    1. During run: KumaNotch displays `focus` emotion in `ClockCapsule`.
+    2. On exit 0: Island expands with `ProcessNotificationCard`, displays execution duration (e.g. `120ms`), green checkmark, and Mata Kuma smiling (`happy`).
+    3. Auto-dismisses after 4.5 seconds.
+- [ ] **Command Failure & Sad Emotion**:
+  - Run a failing command or click **❌ kuma err** in Dev Mode.
+  - **Expected**:
+    1. Island shows red error icon with command name and exit code 1.
+    2. Mata Kuma displays `sad` emotion with downturned arcs and tear shimmer.
+    3. Physical `-6px` upward nudge triggers upon error arrival.
+
+### 8.2 In-Window Cursor Tracking & Pupil Dynamics
+- [ ] **Cursor Gaze Tracking**:
+  - Move mouse cursor inside the KumaNotch island window bounds.
+  - **Expected**: Mata Kuma's pupils smoothly track cursor movement within clamped range `[-2.2, 2.2]` on X and `[-1.5, 1.5]` on Y.
+- [ ] **Mouse Departure (Clean Center Snap)**:
+  - Move cursor outside the window or off-screen.
+  - **Expected**: Pupils immediately snap smoothly back to `(0, 0)` center without remaining stuck to the edge.
+
+### 8.3 Favorite Artist Setting
+- [ ] **Configure Favorite Artist**:
+  - Open Island -> Settings -> Personality.
+  - Type "Taylor Swift" or "NIKI" into the **Artis favorit** input.
+  - Play a matching song on Spotify/YouTube.
+  - **Expected**: Mata Kuma triggers celebration mode (happy eyes, vibrant purple blush aura, floating musical note/heart charms).
+  - Play an unmatching song: Kuma stays in normal listening mood.
+  - Clear the input field: Default empty setting disables artist celebration mode.

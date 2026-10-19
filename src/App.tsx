@@ -38,6 +38,8 @@ import { globalFreshFileEngine, type FreshFileInfo } from './core/freshFile'
 import { FreshFileCard } from './components/island/FreshFileCard'
 import { globalAudioDeviceEngine, type AudioDeviceNotification } from './core/audioDevice'
 import { DeviceNotificationCard } from './components/island/DeviceNotificationCard'
+import { globalProcessWatcherEngine, type ProcessEvent } from './core/processWatcher'
+import { ProcessNotificationCard } from './components/island/ProcessNotificationCard'
 
 function formatClockTime(now: Date, mode: 'auto' | '12h' | '24h' = 'auto'): string {
   if (mode === '12h') {
@@ -64,8 +66,10 @@ function getIslandView(
   timerData: TimerData | null,
   isDragOver: boolean,
   deviceNotification: AudioDeviceNotification | null,
+  processAlert: ProcessEvent | null,
 ): IslandView {
   if (timerData?.status === 'completed') return 'alert'
+  if (processAlert !== null) return 'processAlert'
   if (expandedActivity === 'settings') return 'settings'
   if (expandedActivity === 'music') return 'expandedMusic'
   if (expandedActivity === 'home') return 'home'
@@ -98,14 +102,14 @@ function getDynamicDimensions(
     }
   }
 
-  if (view === 'deviceNotification') {
+  if (view === 'deviceNotification' || view === 'processAlert') {
     const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
     if (auxCount >= 2) {
       baseWin.width = 380
     } else if (auxCount === 1) {
       baseWin.width = 340
     } else {
-      baseWin.width = 290
+      baseWin.width = 300
     }
   }
 
@@ -185,6 +189,20 @@ export default function App() {
   useEffect(() => {
     return globalAudioDeviceEngine.subscribe((notif) => {
       setDeviceNotification(notif ? { ...notif } : null)
+    })
+  }, [])
+
+  // Process Watcher Engine subscription (Fase 6b)
+  const [activeProcess, setActiveProcess] = useState<ProcessEvent | null>(() =>
+    globalProcessWatcherEngine.getActiveProcess(),
+  )
+  const [processAlert, setProcessAlert] = useState<ProcessEvent | null>(() =>
+    globalProcessWatcherEngine.getLatestAlert(),
+  )
+  useEffect(() => {
+    return globalProcessWatcherEngine.subscribe((state) => {
+      setActiveProcess(state.activeProcess ? { ...state.activeProcess } : null)
+      setProcessAlert(state.latestAlert ? { ...state.latestAlert } : null)
     })
   }, [])
 
@@ -313,11 +331,48 @@ export default function App() {
   const hasFresh = isFreshActive && !isExpanded && !isDroplet
 
   // Dynamic dimensions & window synchronization
-  const currentView = getIslandView(displayState, expandedActivity, timerData, isDragOver, deviceNotification)
+  const currentView = getIslandView(
+    displayState,
+    expandedActivity,
+    timerData,
+    isDragOver,
+    deviceNotification,
+    processAlert,
+  )
   const dims = getDynamicDimensions(currentView, showCustomInput, hasMusic, hasTimer, hasFresh)
   const currentWindowSizeRef = useRef<WindowSize>(dims.win)
   const targetWinWidth = dims.win.width
   const targetWinHeight = dims.win.height
+
+  // Track growing vs shrinking for asymmetric spring physics
+  // Melebar (stiffness 380, damping 26, mass 1) vs Menciut (stiffness 200, damping 28, mass 1)
+  const [prevShell, setPrevShell] = useState(dims.shell)
+  const [isGrowing, setIsGrowing] = useState(false)
+
+  if (dims.shell.width !== prevShell.width || dims.shell.height !== prevShell.height) {
+    setIsGrowing(dims.shell.width > prevShell.width || dims.shell.height > prevShell.height)
+    setPrevShell(dims.shell)
+  }
+
+  // Upward physical nudge (-6px) on new events
+  const [nudge, setNudge] = useState(false)
+  const lastNudgeKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const currentNudgeKey =
+      processAlert?.id ||
+      deviceNotification?.id ||
+      (timerData?.status === 'completed' ? 'timer-alert' : null) ||
+      freshFile?.id ||
+      null
+
+    if (currentNudgeKey && currentNudgeKey !== lastNudgeKeyRef.current) {
+      lastNudgeKeyRef.current = currentNudgeKey
+      setNudge(true)
+      const timer = setTimeout(() => setNudge(false), 320)
+      return () => clearTimeout(timer)
+    }
+  }, [processAlert?.id, deviceNotification?.id, timerData?.status, freshFile?.id])
 
   useEffect(() => {
     if (
@@ -798,6 +853,8 @@ export default function App() {
         <Shell
           shellConfig={dims.shell}
           currentView={currentView}
+          growing={isGrowing}
+          nudge={nudge}
           onClick={handleShellClick}
           onMouseEnter={() => {
             if (currentView === 'droplet') setIsDwelling(true)
@@ -879,6 +936,13 @@ export default function App() {
             />
           )}
 
+          {currentView === 'processAlert' && processAlert && (
+            <ProcessNotificationCard
+              event={processAlert}
+              onDismiss={() => globalProcessWatcherEngine.dismissAlert()}
+            />
+          )}
+
           {currentView === 'idle' && (
             <ClockCapsule
               timeStr={timeStr}
@@ -886,11 +950,13 @@ export default function App() {
               idleBeforeEyesSeconds={settings.idleBeforeEyesSeconds}
               systemMode={systemMode}
               isIdleView={currentView === 'idle'}
+              favoriteArtist={settings.favoriteArtist}
               isMusicPlaying={mediaData?.playbackStatus === 'playing'}
               isTimerRunning={isTimerActive}
               isTimerCompleted={timerData?.status === 'completed'}
               freshFileDetected={isFreshActive}
               deviceConnected={deviceNotification?.event_type === 'connected'}
+              isProcessRunning={activeProcess !== null}
               mediaData={mediaData}
             />
           )}
@@ -1175,6 +1241,29 @@ export default function App() {
             title="Simulate playing Olivia Rodrigo - vampire"
           >
             💜 Olivia
+          </button>
+          <button
+            onClick={() => globalProcessWatcherEngine.runCommand('npm run build')}
+            className="px-1.5 py-0.5 rounded bg-amber-950/80 hover:bg-amber-900 border border-amber-400/60 text-amber-300 font-medium font-mono text-[10px]"
+            title="Simulate kuma run npm run build"
+          >
+            ⚡ kuma run
+          </button>
+          <button
+            onClick={() =>
+              globalProcessWatcherEngine.handleEvent({
+                id: `mock-err-${Date.now()}`,
+                command: 'cargo test',
+                status: 'error',
+                exit_code: 1,
+                duration_ms: 3120,
+                message: 'Process exited with error code 1',
+              })
+            }
+            className="px-1.5 py-0.5 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-400/60 text-rose-300 font-medium font-mono text-[10px]"
+            title="Simulate kuma process error"
+          >
+            ❌ kuma err
           </button>
           <button
             onClick={() => setShowDevControls(false)}

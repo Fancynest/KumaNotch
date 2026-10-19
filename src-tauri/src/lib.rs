@@ -2,6 +2,7 @@ mod audio_device;
 mod detector;
 mod fresh_file;
 mod media;
+mod process_watcher;
 mod shelf;
 mod tray;
 mod window;
@@ -10,8 +11,22 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let log_level = if cfg!(debug_assertions) {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log_level)
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                ])
+                .build(),
+        )
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![]),
@@ -47,6 +62,7 @@ pub fn run() {
             fresh_file::fresh_dismiss,
             fresh_file::fresh_get_sources,
             fresh_file::fresh_set_sources,
+            process_watcher::kuma_run_command,
         ])
         .setup(|app| {
             let handle = app.handle();
@@ -56,6 +72,7 @@ pub fn run() {
             media::init_media(handle.clone());
             fresh_file::init_fresh_file_watcher(handle.clone());
             audio_device::start_audio_device_watcher(handle.clone());
+            process_watcher::start_process_watcher(handle.clone());
             Ok(())
         })
         .run(tauri::generate_context!())

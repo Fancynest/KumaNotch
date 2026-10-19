@@ -3,11 +3,23 @@ import { motion, type Transition } from 'framer-motion'
 import type { ShellConfig } from '../../core/windowSizing'
 import type { IslandView } from '../../core/islandStore'
 
-const springTransition: Transition = {
+// Spring physics specifications:
+// Melebar (growing): stiffness 380, damping 26, mass 1
+// Menciut (shrinking): stiffness 200, damping 28, mass 1
+const expandSpring: Transition = {
   type: 'spring',
-  stiffness: 340,
-  damping: 30,
-  mass: 0.85,
+  stiffness: 380,
+  damping: 26,
+  mass: 1,
+  restDelta: 0.4,
+  restSpeed: 0.4,
+}
+
+const shrinkSpring: Transition = {
+  type: 'spring',
+  stiffness: 200,
+  damping: 28,
+  mass: 1,
   restDelta: 0.4,
   restSpeed: 0.4,
 }
@@ -15,6 +27,8 @@ const springTransition: Transition = {
 interface ShellProps {
   shellConfig: ShellConfig
   currentView: IslandView
+  growing?: boolean
+  nudge?: boolean
   onClick?: () => void
   onMouseEnter?: () => void
   onMouseLeave?: () => void
@@ -24,27 +38,33 @@ interface ShellProps {
 export const Shell: React.FC<ShellProps> = ({
   shellConfig,
   currentView,
+  growing = false,
+  nudge = false,
   onClick,
   onMouseEnter,
   onMouseLeave,
   children,
 }) => {
+  const activeSpring = growing ? expandSpring : shrinkSpring
+
   return (
     <motion.div
       animate={{
         width: shellConfig.width,
         height: shellConfig.height,
         borderRadius: shellConfig.borderRadius,
-        boxShadow: shellConfig.boxShadow,
-        y: shellConfig.y,
+        y: nudge ? [shellConfig.y - 6, shellConfig.y] : shellConfig.y,
       }}
-      transition={springTransition}
+      transition={activeSpring}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onScroll={(e) => {
         e.currentTarget.scrollLeft = 0
         e.currentTarget.scrollTop = 0
+      }}
+      style={{
+        boxShadow: shellConfig.boxShadow,
       }}
       className={`bg-black border overflow-hidden cursor-pointer relative shrink-0 ${
         currentView === 'alert'

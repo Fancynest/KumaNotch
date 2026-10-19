@@ -5,6 +5,8 @@ import { motion } from 'framer-motion'
 export type KumaEmotion =
   | 'neutral'   // Relaxed round eyes with reflection
   | 'happy'     // Bold curved smiling arcs ^_^ with rosy blush
+  | 'sad'       // Downturned gentle arc with tear shimmer
+  | 'focus'     // Determined, narrowed intense gaze
   | 'sleepy'    // Half-closed relaxed eyelids with gentle pulse
   | 'curious'   // Inquisitive side glance
   | 'surprised' // Wide open enlarged eyes
@@ -18,6 +20,7 @@ export interface MataKumaContext {
   isTimerCompleted?: boolean
   freshFileDetected?: boolean
   deviceConnected?: boolean
+  isProcessRunning?: boolean
   idleDurationMs?: number
   isOliviaRodrigo?: boolean
   isHovered?: boolean
@@ -31,7 +34,7 @@ interface MataKumaProps {
 
 // ─── Vector Eye Renderer ──────────────────────────────────────────
 interface VectorEyeProps {
-  type: 'round' | 'arc' | 'sleepy' | 'winkSlit' | 'wide'
+  type: 'round' | 'arc' | 'sleepy' | 'winkSlit' | 'wide' | 'sad' | 'focus'
   offsetX?: number
   offsetY?: number
   scaleX?: number
@@ -70,6 +73,30 @@ const VectorEye: React.FC<VectorEyeProps> = React.memo(
               strokeWidth="2.2"
               strokeLinecap="round"
             />
+          ) : type === 'sad' && !isBlinking ? (
+            // Sad downturned arc with subtle tear shimmer
+            <>
+              <path
+                d="M 1.5 5 C 3 9.5, 9 9.5, 10.5 5"
+                fill="none"
+                stroke="rgba(255, 255, 255, 0.88)"
+                strokeWidth="2.1"
+                strokeLinecap="round"
+              />
+              <circle cx="9.2" cy="7.8" r="1.1" fill="#60a5fa" opacity="0.9" />
+            </>
+          ) : type === 'focus' && !isBlinking ? (
+            // Sharp determined focused eyes
+            <>
+              <path
+                d="M 1.2 4.2 L 10.8 4.2"
+                stroke="#ffffff"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <circle cx="6" cy="7" r="2.8" fill="#ffffff" />
+              <circle cx="6" cy="7" r="1.2" fill="rgba(0, 0, 0, 0.5)" />
+            </>
           ) : type === 'sleepy' && !isBlinking ? (
             // Sleepy droop arc
             <path
@@ -159,8 +186,9 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   context,
 }) => {
   const [isBlinking, setIsBlinking] = useState(false)
-  const [idleSpontaneousEmotion, setIdleSpontaneousEmotion] = useState<KumaEmotion | null>(null)
+  const [rawSpontaneousEmotion, setRawSpontaneousEmotion] = useState<KumaEmotion | null>(null)
   const [microGaze, setMicroGaze] = useState<'left' | 'right' | null>(null)
+  const [pupilOffset, setPupilOffset] = useState({ x: 0, y: 0 })
   const activeRef = useRef(true)
 
   // 1. External context flags
@@ -170,13 +198,26 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   const isTimerRunning = Boolean(context?.isTimerRunning)
   const isFresh = Boolean(context?.freshFileDetected)
   const isDeviceConnected = Boolean(context?.deviceConnected)
+  const isProcessRunning = Boolean(context?.isProcessRunning)
   const isHovered = Boolean(context?.isHovered)
   const isDeepSleepy = Boolean(context?.idleDurationMs && context.idleDurationMs > 35000)
 
+  // Only run spontaneous mood cycles when idle (no active music/timer/device/process)
+  const isBusy =
+    isOlivia ||
+    isMusic ||
+    isTimerRunning ||
+    isTimerDone ||
+    isFresh ||
+    isDeviceConnected ||
+    isProcessRunning
+  const idleSpontaneousEmotion = isBusy ? null : rawSpontaneousEmotion
+
   // 2. Derive base context emotion
-  // Precedence: Olivia > Device Connect > Timer Done > Fresh File > Timer Running (Thinking) > Hovered > Music > Sleepy > Spontaneous
+  // Precedence: Olivia > Process Running (Focus) > Device Connect > Timer Done > Fresh File > Timer Running (Thinking) > Hovered > Music > Sleepy > Spontaneous
   const contextualEmotion = useMemo<KumaEmotion>(() => {
     if (isOlivia) return 'happy'
+    if (isProcessRunning) return 'focus'
     if (isDeviceConnected) return 'surprised'
     if (isTimerDone) return 'happy'
     if (isFresh) return 'curious'
@@ -187,6 +228,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     return idleSpontaneousEmotion || 'neutral'
   }, [
     isOlivia,
+    isProcessRunning,
     isDeviceConnected,
     isTimerDone,
     isFresh,
@@ -199,20 +241,50 @@ export const MataKuma: React.FC<MataKumaProps> = ({
 
   const currentEmotion: KumaEmotion = externalEmotion ?? contextualEmotion
 
-  // ─── Autonomous Organic Mood Cycle During Idle ────────────────────
-  // When no high-priority event is occurring, Kuma mostly stays calm and neutral.
-  // Periodically shows gentle, subtle expressions without constantly grinning.
+  // ─── Pupil Tracking Cursor (Only when cursor is within window) ───
   useEffect(() => {
     if (!isVisible) return
-    let active = true
 
-    // Only run spontaneous mood cycles when idle (no active music/timer/device)
-    const isBusy = isOlivia || isMusic || isTimerRunning || isTimerDone || isFresh || isDeviceConnected
+    const handleMouseMove = (e: MouseEvent) => {
+      if (
+        e.clientX < 0 ||
+        e.clientX > window.innerWidth ||
+        e.clientY < 0 ||
+        e.clientY > window.innerHeight
+      ) {
+        setPupilOffset({ x: 0, y: 0 })
+        return
+      }
 
-    if (isBusy) {
-      setIdleSpontaneousEmotion(null)
-      return
+      const centerX = window.innerWidth / 2
+      const centerY = 24
+      const dx = e.clientX - centerX
+      const dy = e.clientY - centerY
+
+      const clampedX = Math.max(-2.2, Math.min(2.2, dx / 35))
+      const clampedY = Math.max(-1.5, Math.min(1.5, dy / 20))
+      setPupilOffset({ x: clampedX, y: clampedY })
     }
+
+    const handleMouseLeave = () => {
+      setPupilOffset({ x: 0, y: 0 })
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseleave', handleMouseLeave)
+    document.addEventListener('mouseleave', handleMouseLeave)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseleave', handleMouseLeave)
+      document.removeEventListener('mouseleave', handleMouseLeave)
+    }
+  }, [isVisible])
+
+  // ─── Autonomous Organic Mood Cycle During Idle ────────────────────
+  useEffect(() => {
+    if (!isVisible || isBusy) return
+    let active = true
 
     const scheduleNextMood = () => {
       if (!active) return
@@ -245,12 +317,12 @@ export const MataKuma: React.FC<MataKumaProps> = ({
           duration = 1000
         }
 
-        setIdleSpontaneousEmotion(nextMood)
+        setRawSpontaneousEmotion(nextMood)
 
         // Return to neutral after duration
         setTimeout(() => {
           if (!active) return
-          setIdleSpontaneousEmotion(null)
+          setRawSpontaneousEmotion(null)
           scheduleNextMood()
         }, duration)
       }, delay)
@@ -264,7 +336,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
       active = false
       if (initialTimer) clearTimeout(initialTimer)
     }
-  }, [isVisible, isOlivia, isMusic, isTimerRunning, isTimerDone, isFresh, isDeviceConnected])
+  }, [isVisible, isBusy])
 
   // ─── Periodic Micro-Gaze (Looking Around) ─────────────────────────
   useEffect(() => {
@@ -399,6 +471,20 @@ export const MataKuma: React.FC<MataKumaProps> = ({
           blush: false,
           noseOpacity: 0.35,
         }
+      case 'sad':
+        return {
+          left: { type: 'sad' as const, scaleX: 1.05, scaleY: 1.0, offsetY: 0.6 },
+          right: { type: 'sad' as const, scaleX: 1.05, scaleY: 1.0, offsetY: 0.6 },
+          blush: false,
+          noseOpacity: 0.25,
+        }
+      case 'focus':
+        return {
+          left: { type: 'focus' as const, scaleX: 1.1, scaleY: 0.95, offsetX: gazeOffset, offsetY: -0.2 },
+          right: { type: 'focus' as const, scaleX: 1.1, scaleY: 0.95, offsetX: gazeOffset, offsetY: -0.2 },
+          blush: false,
+          noseOpacity: 0.4,
+        }
       case 'neutral':
       default:
         return {
@@ -411,6 +497,14 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   }
 
   const eyeConfig = getEyeConfig()
+
+  const canFollowCursor = (type: string) =>
+    type === 'round' || type === 'wide' || type === 'focus'
+
+  const leftCursorX = canFollowCursor(eyeConfig.left.type) ? pupilOffset.x : 0
+  const leftCursorY = canFollowCursor(eyeConfig.left.type) ? pupilOffset.y : 0
+  const rightCursorX = canFollowCursor(eyeConfig.right.type) ? pupilOffset.x : 0
+  const rightCursorY = canFollowCursor(eyeConfig.right.type) ? pupilOffset.y : 0
 
   // Olivia Rodrigo aesthetic colors: signature lilac/purple (#c084fc) or vibrant rose (#f43f5e)
   const blushColor = isOlivia ? '#c084fc' : '#f43f5e'
@@ -501,8 +595,8 @@ export const MataKuma: React.FC<MataKumaProps> = ({
         {/* Left Eye */}
         <VectorEye
           type={eyeConfig.left.type}
-          offsetX={eyeConfig.left.offsetX}
-          offsetY={eyeConfig.left.offsetY}
+          offsetX={(eyeConfig.left.offsetX ?? 0) + leftCursorX}
+          offsetY={(eyeConfig.left.offsetY ?? 0) + leftCursorY}
           scaleX={eyeConfig.left.scaleX}
           scaleY={eyeConfig.left.scaleY}
           isBlinking={isBlinking}
@@ -514,8 +608,8 @@ export const MataKuma: React.FC<MataKumaProps> = ({
         {/* Right Eye */}
         <VectorEye
           type={eyeConfig.right.type}
-          offsetX={eyeConfig.right.offsetX}
-          offsetY={eyeConfig.right.offsetY}
+          offsetX={(eyeConfig.right.offsetX ?? 0) + rightCursorX}
+          offsetY={(eyeConfig.right.offsetY ?? 0) + rightCursorY}
           scaleX={eyeConfig.right.scaleX}
           scaleY={eyeConfig.right.scaleY}
           isBlinking={isBlinking}

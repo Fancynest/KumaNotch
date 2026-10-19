@@ -148,6 +148,7 @@ struct FreshFileState {
     sources: FreshFileSources,
     recent_files: Vec<FreshFileInfo>,
     thumbnail_cache: HashMap<String, String>,
+    thumbnail_order: Vec<String>,
     initial_baseline: HashSet<PathBuf>,
     recent_arrivals: Vec<(Instant, PathBuf)>,
     processing_paths: HashSet<PathBuf>,
@@ -161,6 +162,7 @@ fn get_state() -> &'static Mutex<FreshFileState> {
             sources: FreshFileSources::default(),
             recent_files: Vec::new(),
             thumbnail_cache: HashMap::new(),
+            thumbnail_order: Vec::new(),
             initial_baseline: HashSet::new(),
             recent_arrivals: Vec::new(),
             processing_paths: HashSet::new(),
@@ -168,14 +170,31 @@ fn get_state() -> &'static Mutex<FreshFileState> {
     })
 }
 
+// Inserts into thumbnail cache respecting an LRU capacity of ~32 items
+fn insert_thumbnail_lru(state: &mut FreshFileState, path: String, data_url: String) {
+    if state.thumbnail_cache.contains_key(&path) {
+        state.thumbnail_order.retain(|p| p != &path);
+    } else if state.thumbnail_cache.len() >= 32 {
+        if !state.thumbnail_order.is_empty() {
+            let oldest = state.thumbnail_order.remove(0);
+            state.thumbnail_cache.remove(&oldest);
+        }
+    }
+    state.thumbnail_order.push(path.clone());
+    state.thumbnail_cache.insert(path, data_url);
+}
+
 // Generate thumbnail for file (supports PNG, JPG, WEBP, and shell fallback)
 pub fn generate_file_thumbnail(path: &Path) -> Option<String> {
-    // Check in-memory cache first
+    // Check in-memory LRU cache first
     let path_str = path.to_string_lossy().to_string();
     {
-        let state = get_state().lock().unwrap();
-        if let Some(cached) = state.thumbnail_cache.get(&path_str) {
-            return Some(cached.clone());
+        let mut state = get_state().lock().unwrap();
+        if let Some(cached) = state.thumbnail_cache.get(&path_str).cloned() {
+            // Touch key in LRU order
+            state.thumbnail_order.retain(|p| p != &path_str);
+            state.thumbnail_order.push(path_str.clone());
+            return Some(cached);
         }
     }
 
@@ -194,9 +213,7 @@ pub fn generate_file_thumbnail(path: &Path) -> Option<String> {
                 let b64 = base64::engine::general_purpose::STANDARD.encode(buf.into_inner());
                 let data_url = format!("data:image/png;base64,{}", b64);
                 let mut state = get_state().lock().unwrap();
-                state
-                    .thumbnail_cache
-                    .insert(path_str.clone(), data_url.clone());
+                insert_thumbnail_lru(&mut state, path_str.clone(), data_url.clone());
                 return Some(data_url);
             }
         }
@@ -206,9 +223,7 @@ pub fn generate_file_thumbnail(path: &Path) -> Option<String> {
     {
         if let Some(data_url) = generate_shell_thumbnail_win32(path) {
             let mut state = get_state().lock().unwrap();
-            state
-                .thumbnail_cache
-                .insert(path_str.clone(), data_url.clone());
+            insert_thumbnail_lru(&mut state, path_str.clone(), data_url.clone());
             return Some(data_url);
         }
     }
@@ -218,168 +233,93 @@ pub fn generate_file_thumbnail(path: &Path) -> Option<String> {
 
 #[cfg(windows)]
 fn generate_shell_thumbnail_win32(path: &Path) -> Option<String> {
-    #[repr(C)]
-    struct SIZE {
-        cx: i32,
-        cy: i32,
-    }
-
-    const IID_ISHELL_ITEM_IMAGE_FACTORY: GUID = GUID {
-        data1: 0xBCC18B79,
-        data2: 0xBA16,
-        data3: 0x442F,
-        data4: [0x80, 0xC4, 0x8A, 0x59, 0xC0, 0x7C, 0x59, 0x30],
+    use windows::Win32::Foundation::SIZE;
+    use windows::Win32::Graphics::Gdi::{
+        DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFOHEADER,
+        BI_RGB, DIB_RGB_COLORS,
     };
-
-    #[repr(C)]
-    struct IShellItemImageFactoryVtbl {
-        query_interface: unsafe extern "system" fn(
-            *mut std::ffi::c_void,
-            *const GUID,
-            *mut *mut std::ffi::c_void,
-        ) -> i32,
-        add_ref: unsafe extern "system" fn(*mut std::ffi::c_void) -> u32,
-        release: unsafe extern "system" fn(*mut std::ffi::c_void) -> u32,
-        get_image: unsafe extern "system" fn(
-            *mut std::ffi::c_void,
-            SIZE,
-            u32,
-            *mut isize,
-        ) -> i32,
-    }
-
-    #[repr(C)]
-    struct BITMAP {
-        bm_type: i32,
-        bm_width: i32,
-        bm_height: i32,
-        bm_width_bytes: i32,
-        bm_planes: u16,
-        bm_bits_pixel: u16,
-        bm_bits: *mut std::ffi::c_void,
-    }
-
-    #[repr(C)]
-    struct BITMAPINFOHEADER {
-        bi_size: u32,
-        bi_width: i32,
-        bi_height: i32,
-        bi_planes: u16,
-        bi_bit_count: u16,
-        bi_compression: u32,
-        bi_size_image: u32,
-        bi_x_pels_per_meter: i32,
-        bi_y_pels_per_meter: i32,
-        bi_clr_used: u32,
-        bi_clr_important: u32,
-    }
-
-    unsafe extern "system" {
-        fn CoInitializeEx(pv_reserved: *mut std::ffi::c_void, dw_co_init: u32) -> i32;
-        fn CoUninitialize();
-        fn SHCreateItemFromParsingName(
-            pszpath: *const u16,
-            pbc: *mut std::ffi::c_void,
-            riid: *const GUID,
-            ppv: *mut *mut std::ffi::c_void,
-        ) -> i32;
-        fn GetObjectW(h: isize, c: i32, pv: *mut std::ffi::c_void) -> i32;
-        fn DeleteObject(ho: isize) -> i32;
-        fn GetDC(hwnd: isize) -> isize;
-        fn ReleaseDC(hwnd: isize, hdc: isize) -> i32;
-        fn GetDIBits(
-            hdc: isize,
-            hbm: isize,
-            start: u32,
-            lines: u32,
-            lpvbits: *mut std::ffi::c_void,
-            lpbmi: *mut BITMAPINFOHEADER,
-            usage: u32,
-        ) -> i32;
-    }
+    use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
+    use windows::Win32::UI::Shell::{
+        SHCreateItemFromParsingName, IShellItemImageFactory, SIIGBF_RESIZETOFIT,
+    };
+    use windows_core::HSTRING;
 
     unsafe {
-        let co_res = CoInitializeEx(std::ptr::null_mut(), 0);
-        let wide_path: Vec<u16> = path
-            .to_string_lossy()
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
+        let co_res = CoInitializeEx(None, COINIT_MULTITHREADED);
 
-        let mut factory_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
-        if SHCreateItemFromParsingName(
-            wide_path.as_ptr(),
-            std::ptr::null_mut(),
-            &IID_ISHELL_ITEM_IMAGE_FACTORY,
-            &mut factory_ptr,
-        ) != 0
-            || factory_ptr.is_null()
+        let path_hstring = HSTRING::from(path.as_os_str());
+        let factory: Result<IShellItemImageFactory, _> =
+            SHCreateItemFromParsingName(&path_hstring, None);
+
+        let factory = match factory {
+            Ok(f) => f,
+            Err(_) => {
+                if co_res.is_ok() {
+                    CoUninitialize();
+                }
+                return None;
+            }
+        };
+
+        let hbitmap = match factory.GetImage(SIZE { cx: 256, cy: 256 }, SIIGBF_RESIZETOFIT) {
+            Ok(h) => h,
+            Err(_) => {
+                if co_res.is_ok() {
+                    CoUninitialize();
+                }
+                return None;
+            }
+        };
+
+        let mut bm: BITMAP = std::mem::zeroed();
+        if GetObjectW(
+            hbitmap.into(),
+            std::mem::size_of::<BITMAP>() as i32,
+            Some(&mut bm as *mut _ as *mut _),
+        ) == 0
         {
-            if co_res == 0 || co_res == 1 {
+            let _ = DeleteObject(hbitmap.into());
+            if co_res.is_ok() {
                 CoUninitialize();
             }
             return None;
         }
 
-        let vtbl = *(factory_ptr as *mut *mut IShellItemImageFactoryVtbl);
-        let mut hbitmap: isize = 0;
-        let hr = ((*vtbl).get_image)(
-            factory_ptr,
-            SIZE { cx: 256, cy: 256 },
-            0, // SIIGBF_RESIZETOFIT
-            &mut hbitmap,
-        );
-        ((*vtbl).release)(factory_ptr);
-
-        if hr != 0 || hbitmap == 0 {
-            return None;
-        }
-
-        let mut bm: BITMAP = std::mem::zeroed();
-        if GetObjectW(
-            hbitmap,
-            std::mem::size_of::<BITMAP>() as i32,
-            &mut bm as *mut _ as *mut _,
-        ) == 0
-        {
-            DeleteObject(hbitmap);
-            return None;
-        }
-
-        let width = bm.bm_width;
-        let height = bm.bm_height;
+        let width = bm.bmWidth;
+        let height = bm.bmHeight;
         if width <= 0 || height <= 0 {
-            DeleteObject(hbitmap);
+            let _ = DeleteObject(hbitmap.into());
+            if co_res.is_ok() {
+                CoUninitialize();
+            }
             return None;
         }
 
-        let mut bmi_header = BITMAPINFOHEADER {
-            bi_size: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            bi_width: width,
-            bi_height: -height, // top-down
-            bi_planes: 1,
-            bi_bit_count: 32,
-            bi_compression: 0, // BI_RGB
-            bi_size_image: 0,
-            bi_x_pels_per_meter: 0,
-            bi_y_pels_per_meter: 0,
-            bi_clr_used: 0,
-            bi_clr_important: 0,
-        };
+        let mut bmi_header: BITMAPINFOHEADER = std::mem::zeroed();
+        bmi_header.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+        bmi_header.biWidth = width;
+        bmi_header.biHeight = -height; // top-down
+        bmi_header.biPlanes = 1;
+        bmi_header.biBitCount = 32;
+        bmi_header.biCompression = BI_RGB.0;
 
-        let hdc = GetDC(0);
+        let hdc = GetDC(None);
         let mut raw_pixels = vec![0u8; (width * height * 4) as usize];
         let lines_copied = GetDIBits(
             hdc,
             hbitmap,
             0,
             height as u32,
-            raw_pixels.as_mut_ptr() as *mut _,
-            &mut bmi_header,
-            0, // DIB_RGB_COLORS
+            Some(raw_pixels.as_mut_ptr() as *mut _),
+            &mut bmi_header as *mut _ as *mut _,
+            DIB_RGB_COLORS,
         );
-        ReleaseDC(0, hdc);
-        DeleteObject(hbitmap);
+        let _ = ReleaseDC(None, hdc);
+        let _ = DeleteObject(hbitmap.into());
+
+        if co_res.is_ok() {
+            CoUninitialize();
+        }
 
         if lines_copied == 0 {
             return None;
@@ -391,7 +331,6 @@ fn generate_shell_thumbnail_win32(path: &Path) -> Option<String> {
             let r = chunk[2];
             chunk[0] = r;
             chunk[2] = b;
-            // If alpha is 0, give full opacity
             if chunk[3] == 0 {
                 chunk[3] = 255;
             }

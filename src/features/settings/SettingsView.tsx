@@ -380,6 +380,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
               </div>
             )}
 
+            {/* Favorite Artist Setting */}
+            {settings.personalityEnabled && (
+              <div className="space-y-1.5 pt-1 border-t border-white/10">
+                <div className="flex items-center justify-between">
+                  <div className="max-w-[210px]">
+                    <span className="text-xs font-medium text-white block">{t.favoriteArtist}</span>
+                    <span className="text-[10px] text-white/40 block leading-tight">{t.favoriteArtistDesc}</span>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={settings.favoriteArtist}
+                  onChange={(e) => updateSetting('favoriteArtist', e.target.value)}
+                  placeholder={t.favoriteArtistPlaceholder}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-white/10 border border-white/15 text-xs text-white placeholder-white/30 focus:outline-none focus:border-amber-400/80 transition-colors"
+                />
+              </div>
+            )}
+
             {/* Timer Chime Toggle */}
             <div className="flex items-center justify-between pt-1 border-t border-white/10">
               <div className="flex items-center gap-1.5">

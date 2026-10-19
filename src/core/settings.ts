@@ -19,6 +19,7 @@ export interface AppSettings {
   freshFileDurationSeconds: number
   freshFileDismissOnDrag: boolean
   freshFileSound: boolean
+  favoriteArtist: string
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -40,6 +41,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   freshFileDurationSeconds: 8,
   freshFileDismissOnDrag: true,
   freshFileSound: false,
+  favoriteArtist: '',
 }
 
 const STORAGE_KEY = 'kumanotch_settings'

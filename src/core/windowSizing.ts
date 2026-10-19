@@ -27,6 +27,7 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   alert: { width: 370, height: 210 },
   expandedFreshFile: { width: 390, height: 240 },
   deviceNotification: { width: 290, height: 64 },
+  processAlert: { width: 300, height: 64 },
   settings: { width: 410, height: 380 },
 }
 
@@ -111,6 +112,13 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
   },
   deviceNotification: {
     width: 260,
+    height: 38,
+    borderRadius: 19,
+    boxShadow: '0 4px 18px rgba(0, 0, 0, 0.55)',
+    y: 0,
+  },
+  processAlert: {
+    width: 270,
     height: 38,
     borderRadius: 19,
     boxShadow: '0 4px 18px rgba(0, 0, 0, 0.55)',

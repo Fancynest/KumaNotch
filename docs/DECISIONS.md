@@ -278,3 +278,45 @@ This document records architectural choices, deviations from the initial spec, a
      - Formatted status badge horizontally inline (`Realtek Audio • Connected` or `OPPO Enco Buds3 • Terhubung`).
      - Spaced connection indicator light dot (`gap-3`, `ml-3`, `pr-0.5`) to eliminate visual overlap with Mata Kuma's right cheek blush.
      - Adjusted notification capsule width and window bounds to prevent text truncation while maintaining a compact footprint.
+
+
+## Decision 022: Logging Privacy, COM Vtable Migration, Asymmetric Physics, Expressive Emotions & Fase 6b Process Watcher
+- **Date**: 2026-10-19
+- **Context**: Code review identified several refinement and privacy opportunities:
+  1. `tauri_plugin_log` was writing raw device names to file/console.
+  2. `fresh_file.rs` maintained an unbounded thumbnail cache and used manual raw COM vtable pointers.
+  3. `Shell.tsx` had symmetric spring physics, sequential crossfade latency, and animated `boxShadow` with large blur causing compositor rasterization spikes.
+  4. React Compiler flagged 3 `set-state-in-effect` purity warnings in `ClockCapsule.tsx` and `MataKuma.tsx`.
+  5. The Olivia Rodrigo mode was hardcoded rather than being a customizable user preference.
+  6. Mata Kuma lacked `sad` and `focus` emotions and had no pupil gaze tracking.
+  7. Fase 6b Process Watcher specification needed implementation.
+- **Decision**:
+  1. **Logging Sanitization & Level Configuration**:
+     - Configured `tauri_plugin_log` in `src-tauri/src/lib.rs` with `Stdout` and `Webview` targets (file target disabled to protect local user privacy). Log level set to `Debug` in debug builds, `Info` in release builds.
+     - Sanitized all log entries in `src-tauri/src/audio_device.rs`: removed device names from format strings; only category `dev_type` is logged.
+  2. **Official Windows Crate COM & LRU Cache Bound**:
+     - Migrated `src-tauri/src/fresh_file.rs` from manual `IShellItemImageFactoryVtbl` raw pointer calls to the official `windows::Win32::UI::Shell::IShellItemImageFactory` and `SHCreateItemFromParsingName` APIs.
+     - Implemented `insert_thumbnail_lru` with a hard capacity of ~32 entries (`thumbnail_order: Vec<String>`), clamping resident memory to ~1.44 MB.
+  3. **Asymmetric Spring Physics & Shadow Rasterization Optimization**:
+     - Main `Shell.tsx` uses asymmetric springs selected via the `growing` prop:
+       - Expansion: `stiffness: 380, damping: 26, mass: 1` for snappy, lively opening.
+       - Contraction: `stiffness: 200, damping: 28, mass: 1` for controlled, soft closing without overshoot.
+     - Added `-6px` upward physical nudge keyframe animation on new event arrival.
+     - Removed animated `boxShadow` from Framer Motion's `animate` object, converting it to a static inline CSS property to eliminate per-frame blur filter re-rasterization (dropping paint time by ~95% and locking frame-times to 16.6ms / 60 FPS).
+     - Converted `ClockCapsule.tsx` from sequential `<AnimatePresence mode="wait">` to simultaneous overlapping crossfade (`initial={false}`, exiting view `position: 'absolute'`), dropping transition delay to 0ms.
+  4. **React Compiler Purity (Zero Lint Warnings)**:
+     - Fixed `idleDurationMs` and `idleSpontaneousEmotion` to derive cleanly in render scope rather than triggering cascading state updates inside effects.
+     - Maintained `oxlint` status at 0 warnings and 0 errors across 31 files.
+  5. **Configurable "Favorite Artist" Setting**:
+     - Replaced hardcoded Olivia Rodrigo discography matching in `src/core/oliviaRodrigo.ts` with `isFavoriteArtistMedia(media, favoriteArtist)`.
+     - Matching strictly compares artist name (default empty string `""`). All track title and album hardcoding was removed.
+     - Added text input setting in Personality tab with full Indonesian and English localization (`i18n.ts`).
+  6. **Mata Kuma Sad, Focus & Pupil Gaze Tracking**:
+     - Added `sad` (downturned arc with soft blue tear shimmer) and `focus` (narrowed brow line with sharp pupil).
+     - Added pupil offset tracking the mouse cursor within window coordinates, clamped to `[-2.2, 2.2]` horizontally and `[-1.5, 1.5]` vertically, snapping back to center on `mouseleave`.
+  7. **Fase 6b: Process Watcher & `kuma` CLI Runner**:
+     - Implemented a lightweight standard-library `TcpListener` on `127.0.0.1:45454` in `src-tauri/src/process_watcher.rs` accepting `/status`, `/notify`, and `/run`.
+     - Created `kuma.cmd` CLI runner in repository root (`kuma run <command>`, `kuma notify <title> [message]`, `kuma status`).
+     - Added `kuma_run_command` Tauri command for zero-latency direct process execution.
+     - Built `ProcessNotificationCard.tsx` rendering terminal status, execution duration, and embedded Mata Kuma.
+     - Mata Kuma expresses `focus` while a process is actively running, `happy` on exit code 0, and `sad` on exit code failure.

@@ -235,8 +235,7 @@ fn should_emit_device_event(
     // 1. Filter out non-notifiable devices (phones, background BLE beacons)
     if !is_notifiable_device(dev_type) {
         log::debug!(
-            "DeviceWatcher: Suppressing notification for non-peripheral '{}' ({})",
-            device_name,
+            "DeviceWatcher: Suppressing notification for non-peripheral device ({})",
             dev_type
         );
         return false;
@@ -255,8 +254,8 @@ fn should_emit_device_event(
     if let Some(cooldown) = record.cooldown_until {
         if now < cooldown {
             log::debug!(
-                "DeviceWatcher: Device '{}' in anti-flapping cooldown, suppressing {}",
-                device_name,
+                "DeviceWatcher: Peripheral ({}) in anti-flapping cooldown, suppressing {}",
+                dev_type,
                 event_type
             );
             return false;
@@ -280,8 +279,8 @@ fn should_emit_device_event(
         // If it flapped 2 or more times rapidly, silence it for 20 seconds
         if record.flap_count >= 2 {
             log::warn!(
-                "DeviceWatcher: Connection flapping detected on '{}' ({} flips in {:?}), muting for 20s",
-                device_name,
+                "DeviceWatcher: Connection flapping detected on ({}) ({} flips in {:?}), muting for 20s",
+                dev_type,
                 record.flap_count,
                 elapsed
             );
@@ -295,8 +294,8 @@ fn should_emit_device_event(
     // 5. Suppress ephemeral disconnects if connected for < 2.5 seconds
     if event_type == "disconnected" && record.current_state == "connected" && elapsed < std::time::Duration::from_millis(2500) {
         log::debug!(
-            "DeviceWatcher: Suppressing transient disconnect for '{}' (connected for only {:?})",
-            device_name,
+            "DeviceWatcher: Suppressing transient disconnect for ({}) (connected for only {:?})",
+            dev_type,
             elapsed
         );
         record.current_state = "disconnected".to_string();

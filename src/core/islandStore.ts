@@ -14,6 +14,7 @@ export type IslandView =
   | 'dropTarget'
   | 'settings'
   | 'deviceNotification'
+  | 'processAlert'
 
 interface IslandStoreState {
   displayState: DisplayState
@@ -21,7 +22,7 @@ interface IslandStoreState {
   homePage: number // 0 = Music, 1 = Clock/Timer, 2 = Shelf
   systemMode: SystemMode
   isDwelling: boolean
-  hoveredTarget: 'timer' | 'music' | 'freshFile' | null
+  hoveredTarget: 'timer' | 'music' | 'freshFile' | 'process' | null
   isDragOver: boolean
   showCustomInput: boolean
 
@@ -30,7 +31,7 @@ interface IslandStoreState {
   setHomePage: (page: number) => void
   setSystemMode: (mode: SystemMode) => void
   setIsDwelling: (dwelling: boolean) => void
-  setHoveredTarget: (target: 'timer' | 'music' | 'freshFile' | null) => void
+  setHoveredTarget: (target: 'timer' | 'music' | 'freshFile' | 'process' | null) => void
   setIsDragOver: (isDragOver: boolean) => void
   setShowCustomInput: (show: boolean) => void
   collapseAll: () => void
