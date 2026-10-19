@@ -101,11 +101,11 @@ function getDynamicDimensions(
   if (view === 'deviceNotification') {
     const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
     if (auxCount >= 2) {
-      baseWin.width = 320
+      baseWin.width = 380
     } else if (auxCount === 1) {
-      baseWin.width = 280
+      baseWin.width = 340
     } else {
-      baseWin.width = 240
+      baseWin.width = 290
     }
   }
 

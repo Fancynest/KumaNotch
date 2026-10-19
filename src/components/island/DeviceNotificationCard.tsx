@@ -133,13 +133,13 @@ export const DeviceNotificationCard: React.FC<DeviceNotificationCardProps> = ({
           )}
         </div>
 
-        {/* Text Details */}
-        <div className="flex flex-col min-w-0 pr-1">
-          <span className="text-[11px] font-semibold text-white/95 truncate leading-tight tracking-tight">
+        {/* Text Details: Sejajar Horizontal */}
+        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+          <span className="text-xs font-semibold text-white/95 truncate tracking-tight whitespace-nowrap leading-none">
             {notification.device_name}
           </span>
           <span
-            className={`text-[9px] font-medium leading-none tracking-tight mt-0.5 ${
+            className={`text-[10px] font-medium tracking-tight whitespace-nowrap shrink-0 leading-none ${
               isConnected
                 ? isBluetooth
                   ? 'text-sky-400'
@@ -147,20 +147,20 @@ export const DeviceNotificationCard: React.FC<DeviceNotificationCardProps> = ({
                 : 'text-zinc-400'
             }`}
           >
-            {subtitle}
+            • {statusAction}
           </span>
         </div>
       </div>
 
-      {/* Right: Mata Kuma surprised reaction & connection pulse */}
-      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+      {/* Right: Mata Kuma surprised reaction & connection pulse (geser ke kanan, tidak menempel ke blush) */}
+      <div className="flex items-center gap-3 shrink-0 ml-3 pr-0.5">
         <MataKuma
           emotion={isConnected ? 'surprised' : 'content'}
           isVisible
         />
         {isConnected && (
           <span
-            className={`w-1.5 h-1.5 rounded-full ${
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
               isBluetooth ? 'bg-sky-400 shadow-[0_0_6px_#38bdf8] animate-pulse' : 'bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse'
             }`}
           />
