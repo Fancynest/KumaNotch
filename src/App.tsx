@@ -282,9 +282,10 @@ export default function App() {
   const isMediaActive = mediaData !== null && mediaData.isActive
   const isFreshActive = freshFile !== null && settings.freshFileEnabled
   const isExpanded = expandedActivity !== null || timerData?.status === 'completed'
-  const hasMusic = isMediaActive && !isExpanded
-  const hasTimer = isTimerActive && !isExpanded
-  const hasFresh = isFreshActive && !isExpanded
+  const isDroplet = displayState === 'droplet'
+  const hasMusic = isMediaActive && !isExpanded && !isDroplet
+  const hasTimer = isTimerActive && !isExpanded && !isDroplet
+  const hasFresh = isFreshActive && !isExpanded && !isDroplet
 
   // Dynamic dimensions & window synchronization
   const currentView = getIslandView(displayState, expandedActivity, timerData, isDragOver)
@@ -611,12 +612,14 @@ export default function App() {
 
       {/* CENTERED CONTAINER FOR MULTI-BUBBLE 3-TASK ISLAND */}
       <div
-        className="pt-2 flex items-center justify-center z-40 gap-2.5"
+        className={`pt-2 flex items-center justify-center z-40 ${
+          isDroplet ? 'gap-0' : 'gap-2.5'
+        }`}
         onPointerDown={handleBackdropPointerDown}
       >
         {/* LEFT BUBBLE: FRESH FILE OR MUSIC */}
         <AnimatePresence>
-          {isFreshActive && !isExpanded && (!isMediaActive || isTimerActive) ? (
+          {!isDroplet && !isExpanded && isFreshActive && (!isMediaActive || isTimerActive) ? (
             <motion.div
               key="bubble-fresh"
               initial={{
@@ -684,7 +687,7 @@ export default function App() {
                 />
               )}
             </motion.div>
-          ) : isMediaActive && !isExpanded ? (
+          ) : !isDroplet && !isExpanded && isMediaActive ? (
             <motion.div
               key="bubble-music"
               initial={{
@@ -865,7 +868,7 @@ export default function App() {
 
         {/* RIGHT BUBBLE: TIMER OR FRESH FILE */}
         <AnimatePresence>
-          {isTimerActive && !isExpanded ? (
+          {!isDroplet && !isExpanded && isTimerActive ? (
             <motion.div
               key="bubble-timer"
               initial={{
@@ -954,7 +957,7 @@ export default function App() {
                 />
               )}
             </motion.div>
-          ) : isFreshActive && isMediaActive && !isExpanded ? (
+          ) : !isDroplet && !isExpanded && isFreshActive && isMediaActive ? (
             <motion.div
               key="bubble-fresh-right"
               initial={{
