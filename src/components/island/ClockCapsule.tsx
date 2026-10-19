@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import React, { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { SystemMode } from '../../core/islandStore'
+import { MataKuma } from './MataKuma'
 
 interface ClockCapsuleProps {
   timeStr: string
@@ -8,6 +9,12 @@ interface ClockCapsuleProps {
   idleBeforeEyesSeconds: number
   systemMode: SystemMode
   isIdleView: boolean
+  /** Context signals for emotion inference */
+  isMusicPlaying?: boolean
+  isTimerRunning?: boolean
+  isTimerCompleted?: boolean
+  freshFileDetected?: boolean
+  deviceConnected?: boolean
 }
 
 export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
@@ -16,9 +23,14 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
   idleBeforeEyesSeconds,
   systemMode,
   isIdleView,
+  isMusicPlaying,
+  isTimerRunning,
+  isTimerCompleted,
+  freshFileDetected,
+  deviceConnected,
 }) => {
   const [isPersonalityIdle, setIsPersonalityIdle] = useState(false)
-  const [isBlinking, setIsBlinking] = useState(false)
+  const idleSinceRef = useRef<number>(Date.now())
 
   const isEligible = isIdleView && personalityEnabled && systemMode !== 'hidden'
 
@@ -29,6 +41,7 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
     const idleDelayMs = (idleBeforeEyesSeconds || 6) * 1000
     let timerId = setTimeout(() => {
       setIsPersonalityIdle(true)
+      idleSinceRef.current = Date.now()
     }, idleDelayMs)
 
     const handleActivity = () => {
@@ -36,6 +49,7 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
       clearTimeout(timerId)
       timerId = setTimeout(() => {
         setIsPersonalityIdle(true)
+        idleSinceRef.current = Date.now()
       }, idleDelayMs)
     }
 
@@ -51,38 +65,23 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
     }
   }, [isEligible, idleBeforeEyesSeconds])
 
-  // Randomized blink scheduler (3s - 6s) when idle eyes are shown
+  // Track how long we've been idle for sleepy detection
+  const [idleDurationMs, setIdleDurationMs] = useState(0)
   useEffect(() => {
-    if (!isEligible || !isPersonalityIdle) return
-
-    let blinkTimeout: ReturnType<typeof setTimeout> | null = null
-    let resetTimeout: ReturnType<typeof setTimeout> | null = null
-    let active = true
-
-    const scheduleNextBlink = () => {
-      const delay = Math.floor(Math.random() * 3000) + 3000
-      blinkTimeout = setTimeout(() => {
-        if (!active) return
-        setIsBlinking(true)
-        resetTimeout = setTimeout(() => {
-          if (!active) return
-          setIsBlinking(false)
-          scheduleNextBlink()
-        }, 140)
-      }, delay)
+    if (!isPersonalityIdle) {
+      setIdleDurationMs(0)
+      return
     }
 
-    scheduleNextBlink()
+    // Update idle duration every 5 seconds (not spammy)
+    const interval = setInterval(() => {
+      setIdleDurationMs(Date.now() - idleSinceRef.current)
+    }, 5000)
 
-    return () => {
-      active = false
-      if (blinkTimeout) clearTimeout(blinkTimeout)
-      if (resetTimeout) clearTimeout(resetTimeout)
-    }
-  }, [isEligible, isPersonalityIdle])
+    return () => clearInterval(interval)
+  }, [isPersonalityIdle])
 
   const showEyes = isEligible && isPersonalityIdle
-  const blinkingNow = showEyes && isBlinking
 
   return (
     <motion.div
@@ -91,28 +90,40 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
       onMouseEnter={() => setIsPersonalityIdle(false)}
       className="absolute inset-0 px-3 flex items-center justify-center text-white overflow-hidden whitespace-nowrap"
     >
-      {showEyes ? (
-        <div className="flex items-center justify-center gap-2.5">
-          {/* Left eye */}
+      <AnimatePresence mode="wait">
+        {showEyes ? (
           <motion.div
-            animate={{ scaleY: blinkingNow ? 0.1 : 1 }}
-            transition={{ duration: 0.1 }}
-            className="w-1.5 h-1.5 rounded-full bg-white/95"
-          />
-          {/* Cute subtle bear nose */}
-          <div className="w-1 h-0.5 rounded-full bg-white/30" />
-          {/* Right eye */}
-          <motion.div
-            animate={{ scaleY: blinkingNow ? 0.1 : 1 }}
-            transition={{ duration: 0.1 }}
-            className="w-1.5 h-1.5 rounded-full bg-white/95"
-          />
-        </div>
-      ) : (
-        <span className="text-xs font-semibold text-white/95 font-mono tracking-tight">
-          {timeStr}
-        </span>
-      )}
+            key="eyes"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            <MataKuma
+              isVisible
+              context={{
+                isMusicPlaying,
+                isTimerRunning,
+                isTimerCompleted,
+                freshFileDetected,
+                deviceConnected,
+                idleDurationMs,
+              }}
+            />
+          </motion.div>
+        ) : (
+          <motion.span
+            key="clock"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="text-xs font-semibold text-white/95 font-mono tracking-tight"
+          >
+            {timeStr}
+          </motion.span>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }

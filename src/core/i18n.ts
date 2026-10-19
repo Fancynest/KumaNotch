@@ -108,6 +108,11 @@ export const translations = {
     displayDuration: 'Durasi tampil di notch',
     dismissOnDrag: 'Tutup otomatis setelah ditarik (drag-out)',
     dragOutThumbnail: 'Tarik thumbnail ke chat/email/Explorer',
+    deviceConnected: 'Terhubung',
+    deviceDisconnected: 'Terputus',
+    bluetoothDevice: 'Perangkat Bluetooth',
+    headphones: 'Headphone',
+    speakers: 'Speaker',
   },
   en: {
     quickTimer: 'Quick Timer',
@@ -207,6 +212,11 @@ export const translations = {
     displayDuration: 'Display duration in notch',
     dismissOnDrag: 'Auto-dismiss after drag-out',
     dragOutThumbnail: 'Drag thumbnail directly to chat/email/Explorer',
+    deviceConnected: 'Connected',
+    deviceDisconnected: 'Disconnected',
+    bluetoothDevice: 'Bluetooth Device',
+    headphones: 'Headphones',
+    speakers: 'Speakers',
   },
 }
 

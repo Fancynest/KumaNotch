@@ -36,6 +36,8 @@ import { TimerCard } from './components/island/TimerCard'
 import { AlertCard } from './components/island/AlertCard'
 import { globalFreshFileEngine, type FreshFileInfo } from './core/freshFile'
 import { FreshFileCard } from './components/island/FreshFileCard'
+import { globalAudioDeviceEngine, type AudioDeviceNotification } from './core/audioDevice'
+import { DeviceNotificationCard } from './components/island/DeviceNotificationCard'
 
 function formatClockTime(now: Date, mode: 'auto' | '12h' | '24h' = 'auto'): string {
   if (mode === '12h') {
@@ -61,6 +63,7 @@ function getIslandView(
   expandedActivity: ExpandedActivity,
   timerData: TimerData | null,
   isDragOver: boolean,
+  deviceNotification: AudioDeviceNotification | null,
 ): IslandView {
   if (timerData?.status === 'completed') return 'alert'
   if (expandedActivity === 'settings') return 'settings'
@@ -69,6 +72,7 @@ function getIslandView(
   if (expandedActivity === 'timer') return 'expandedTimer'
   if (expandedActivity === 'freshFile') return 'expandedFreshFile'
   if (isDragOver) return 'dropTarget'
+  if (deviceNotification !== null) return 'deviceNotification'
   if (displayState === 'droplet') return 'droplet'
   return 'idle'
 }
@@ -91,6 +95,17 @@ function getDynamicDimensions(
       baseWin.width = 220
     } else {
       baseWin.width = 170
+    }
+  }
+
+  if (view === 'deviceNotification') {
+    const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
+    if (auxCount >= 2) {
+      baseWin.width = 320
+    } else if (auxCount === 1) {
+      baseWin.width = 280
+    } else {
+      baseWin.width = 240
     }
   }
 
@@ -160,6 +175,16 @@ export default function App() {
   useEffect(() => {
     return globalFreshFileEngine.subscribe((active) => {
       setFreshFile(active ? { ...active } : null)
+    })
+  }, [])
+
+  // Audio & Bluetooth Device Engine subscription
+  const [deviceNotification, setDeviceNotification] = useState<AudioDeviceNotification | null>(
+    () => globalAudioDeviceEngine.getActiveNotification(),
+  )
+  useEffect(() => {
+    return globalAudioDeviceEngine.subscribe((notif) => {
+      setDeviceNotification(notif ? { ...notif } : null)
     })
   }, [])
 
@@ -288,7 +313,7 @@ export default function App() {
   const hasFresh = isFreshActive && !isExpanded && !isDroplet
 
   // Dynamic dimensions & window synchronization
-  const currentView = getIslandView(displayState, expandedActivity, timerData, isDragOver)
+  const currentView = getIslandView(displayState, expandedActivity, timerData, isDragOver, deviceNotification)
   const dims = getDynamicDimensions(currentView, showCustomInput, hasMusic, hasTimer, hasFresh)
   const currentWindowSizeRef = useRef<WindowSize>(dims.win)
   const targetWinWidth = dims.win.width
@@ -459,6 +484,13 @@ export default function App() {
 
     return () => clearTimeout(dwellTimer)
   }, [isDwelling, displayState, settings.dwellSeconds, setIsDwelling, setDisplayState])
+
+  // Re-emerge capsule from droplet mode when a device connects/disconnects
+  useEffect(() => {
+    if (deviceNotification && displayState === 'droplet') {
+      setDisplayState('capsule')
+    }
+  }, [deviceNotification, displayState, setDisplayState])
 
   // Alert Auto-Dismiss after 30s
   useEffect(() => {
@@ -646,9 +678,9 @@ export default function App() {
               }}
               transition={{
                 type: 'spring',
-                stiffness: 450,
-                damping: 24,
-                mass: 0.7,
+                stiffness: 320,
+                damping: 20,
+                mass: 0.75,
               }}
               whileHover={{ scale: 1.14 }}
               whileTap={{ scale: 0.94 }}
@@ -714,9 +746,9 @@ export default function App() {
               }}
               transition={{
                 type: 'spring',
-                stiffness: 450,
-                damping: 24,
-                mass: 0.7,
+                stiffness: 320,
+                damping: 20,
+                mass: 0.75,
               }}
               whileHover={{ scale: 1.14 }}
               whileTap={{ scale: 0.94 }}
@@ -839,6 +871,14 @@ export default function App() {
             </div>
           )}
 
+          {currentView === 'deviceNotification' && deviceNotification && (
+            <DeviceNotificationCard
+              notification={deviceNotification}
+              language={settings.language}
+              onDismiss={() => globalAudioDeviceEngine.dismiss()}
+            />
+          )}
+
           {currentView === 'idle' && (
             <ClockCapsule
               timeStr={timeStr}
@@ -846,6 +886,11 @@ export default function App() {
               idleBeforeEyesSeconds={settings.idleBeforeEyesSeconds}
               systemMode={systemMode}
               isIdleView={currentView === 'idle'}
+              isMusicPlaying={mediaData?.playbackStatus === 'playing'}
+              isTimerRunning={isTimerActive}
+              isTimerCompleted={timerData?.status === 'completed'}
+              freshFileDetected={isFreshActive}
+              deviceConnected={deviceNotification?.event_type === 'connected'}
             />
           )}
 
@@ -895,9 +940,9 @@ export default function App() {
               }}
               transition={{
                 type: 'spring',
-                stiffness: 450,
-                damping: 24,
-                mass: 0.7,
+                stiffness: 320,
+                damping: 20,
+                mass: 0.75,
               }}
               whileHover={{ scale: 1.14 }}
               whileTap={{ scale: 0.94 }}
@@ -984,9 +1029,9 @@ export default function App() {
               }}
               transition={{
                 type: 'spring',
-                stiffness: 450,
-                damping: 24,
-                mass: 0.7,
+                stiffness: 320,
+                damping: 20,
+                mass: 0.75,
               }}
               whileHover={{ scale: 1.14 }}
               whileTap={{ scale: 0.94 }}
@@ -1044,6 +1089,19 @@ export default function App() {
             className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20"
           >
             Stop
+          </button>
+          <button
+            onClick={() =>
+              globalAudioDeviceEngine.simulate({
+                event_type: 'connected',
+                device_name: 'AirPods Pro',
+                device_type: 'bluetooth',
+                is_default: true,
+              })
+            }
+            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
+          >
+            BT Test
           </button>
           <button
             onClick={() => setShowDevControls(false)}

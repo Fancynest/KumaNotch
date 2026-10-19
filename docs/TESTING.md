@@ -184,3 +184,52 @@ Create test files in a temporary directory with the following filename patterns:
 - [ ] Observe for 60 seconds with no file activity in Downloads or Screenshots.
   - **Expected**: 0 context switches from polling loops, CPU remains firmly at 0.00%.
 
+---
+
+## 7. Expressive Mata Kuma & Bluetooth/Audio Device HUD (Polish & Enhancements)
+
+### 7.1 Expressive Mata Kuma Emotional Variations
+- [ ] **Idle Eye Appearance**:
+  - Keep cursor stationary for 6 seconds (or configured `idleBeforeEyesSeconds`).
+  - **Expected**: Clock smoothly fades out and Mata Kuma bear eyes fade in.
+- [ ] **Emotion: Sleepy**:
+  - Leave desktop idle for >30 seconds.
+  - **Expected**: Mata Kuma eyes relax into a sleepy, half-closed squint with slower, deeper blinks.
+- [ ] **Emotion: Content / Happy (Music Playing)**:
+  - Start playing music in Spotify or browser.
+  - **Expected**: Eyes transition to curved joyful arcs (`^_^`) with soft pink cheek blushes.
+- [ ] **Emotion: Thinking (Timer Running)**:
+  - Start a Pomodoro or Quick Timer.
+  - **Expected**: Eyes look thoughtfully up and to the right while timer is active.
+- [ ] **Emotion: Curious (New File Arrived)**:
+  - Take a screenshot with `Win + PrtScn`.
+  - **Expected**: Mata Kuma looks inquisitively towards the left/right bubble.
+- [ ] **Micro-Expressions & Double-Blinks**:
+  - Observe eyes over a 30-second window.
+  - **Expected**: Occasional double-blinks (~20% frequency) and subtle micro-looks (glancing left/right every 5–13 seconds) simulate living presence.
+
+### 7.2 Bluetooth & Audio Device Connect / Disconnect HUD
+- [ ] **Bluetooth Headphones Connection**:
+  - Turn on or connect Bluetooth headphones (e.g. AirPods, Sony WH-1000XM, Galaxy Buds).
+  - **Expected**:
+    1. KumaNotch immediately morphs into the 210×36px Device Notification HUD.
+    2. Displays the **Bluetooth** icon with cyan glowing border, device friendly name, and "Terhubung" / "Connected" status with a pulsing dot.
+    3. Mata Kuma eyes show wide-eyed surprise.
+    4. Auto-dismisses after 3.8 seconds with smooth spring collapse.
+- [ ] **3.5mm Headphone Jack / Audio Endpoint Plug-In**:
+  - Plug 3.5mm headphones or USB DAC into audio port.
+  - **Expected**: KumaNotch displays the **Headphones** icon with green glowing aura and friendly name, auto-dismissing after 3.8s.
+- [ ] **Device Disconnection**:
+  - Turn off Bluetooth or unplug audio jack.
+  - **Expected**: Displays a muted grey status pill showing "Terputus" / "Disconnected" and the device name.
+- [ ] **Dev Mode Simulation (Browser Dev)**:
+  - In browser dev mode, click the **BT Test** button in the bottom floating toolbar.
+  - **Expected**: Fires mock "AirPods Pro" connection event, expanding the pill with full animation.
+- [ ] **Droplet Mode Emergence**:
+  - In droplet mode, connect or disconnect audio device.
+  - **Expected**: Notch temporarily wakes up to capsule view to display the notification, then smoothly re-settles.
+- [ ] **Zero-Polling Hardware Verification**:
+  - Observe CPU in Process Explorer when no audio device changes occur.
+  - **Expected**: Windows RPC callbacks remain idle; zero CPU consumption.
+
+

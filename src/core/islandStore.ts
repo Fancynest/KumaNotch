@@ -13,6 +13,7 @@ export type IslandView =
   | 'alert'
   | 'dropTarget'
   | 'settings'
+  | 'deviceNotification'
 
 interface IslandStoreState {
   displayState: DisplayState

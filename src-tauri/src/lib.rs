@@ -1,3 +1,4 @@
+mod audio_device;
 mod detector;
 mod fresh_file;
 mod media;
@@ -54,6 +55,7 @@ pub fn run() {
             detector::start_detector(handle.clone());
             media::init_media(handle.clone());
             fresh_file::init_fresh_file_watcher(handle.clone());
+            audio_device::start_audio_device_watcher(handle.clone());
             Ok(())
         })
         .run(tauri::generate_context!())

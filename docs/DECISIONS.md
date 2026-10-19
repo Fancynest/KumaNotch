@@ -151,15 +151,41 @@ This document records architectural choices, deviations from the initial spec, a
   6. **Transient Activity with Inactivity Countdown & Hover Pause**: Emits as priority 55 `fresh-file` activity. Displays for 8 seconds (customizable 5–15s in Settings), auto-pausing the countdown when hovered, and resuming when the cursor departs.
   7. **Native Drag-Out & In-Memory Shelf Strip**: Dragging the thumbnail initiates native OS OLE drag (`tauri-plugin-drag`) directly into Windows Explorer, web browsers, or chat apps. The 5 most recent files of the session appear in a dedicated "Baru" strip at the top of the File Shelf.
 
-## Decision 014: User-Configurable Inactivity Auto-Collapse for Expanded Island
+## Decision 015: Expressive Mata Kuma Personality Engine & Contextual Emotions
 - **Date**: 2026-10-19
-- **Context**: When the island is expanded (Home, Timer, Music, Fresh File, Settings), leaving it open indefinitely if the user gets distracted or steps away obstructs the upper-screen area. Previously, only Home had a hardcoded 10-second inactivity collapse, which was not configurable and did not cover other expanded views.
+- **Context**: The previous Mata Kuma implementation in `ClockCapsule.tsx` was limited to randomized vertical scale squishing for simple blinking. The user requested expressive, multi-emotion eyes so Kuma feels like a living companion on the desktop rather than a static widget.
 - **Decision**:
-  1. **Unified Inactivity Timer**: When any view is expanded (`expandedActivity !== null`), an inactivity timer runs for `settings.autoCollapseSeconds` (default 10s, range 5–60s).
-  2. **Activity Reset**: Mouse movement, mouse clicks (`mousedown`), keyboard input (`keydown`), and scrolling (`wheel`) reset the inactivity timer.
-  3. **Hover Dwell vs Direct Click Distinction**: Cards expanded via 2-second hover dwell still support quick 250ms collapse when the cursor departs; however, direct clicking or clicking within the card marks it as intentionally pinned (`openedViaHoverRef = false`), switching it exclusively to the user-configured inactivity timeout to prevent accidental dismissal during use.
-  4. **Settings & Localization**: Added `autoCollapseExpanded` (toggle) and `autoCollapseSeconds` (slider 5–60s) under the Droplet / Notch tab in Settings, with full Indonesian and English i18n support.
-  5. **Alert Preservation**: Completion alerts (`currentView === 'alert'`) are preserved, retaining their dedicated 30-second completion action cycle and chime.
+  1. **Emotion States**: Implemented 8 distinct emotional expressions in `MataKuma.tsx`:
+     - `neutral`: Default soft round eyes with subtle bear nose.
+     - `happy`: Curved upward arc eyes (`^_^`) with soft pink cheek blushes.
+     - `sleepy`: Half-closed relaxed eyelids with prolonged, slow blinks after extended desktop idle (>30s).
+     - `curious`: Horizontal gaze tracking (looking left and right) triggered when fresh files appear.
+     - `surprised`: Enlarged wide eyes triggered when a new Bluetooth or audio device connects.
+     - `content`: Soft squint with blush during active music playback.
+     - `thinking`: Eyes gazing up-and-right while a focus timer is running.
+     - `wink`: Playful single-eye wink.
+  2. **Context-Aware Inference**: The eyes automatically transition between emotions based on live app signals (`isMusicPlaying`, `isTimerRunning`, `isTimerCompleted`, `freshFileDetected`, `deviceConnected`, `idleDurationMs`).
+  3. **Organic Micro-Expressions**: Integrated occasional double-blinks (20% probability) and periodic micro-looks (looking left/right every 5-13s) to simulate lifelike curiosity.
+  4. **Zero CPU When Hidden**: All emotion intervals and blink timeouts completely stop when the capsule is hidden or in droplet mode, strictly preserving the ~0% idle CPU constraint.
+
+## Decision 016: Fluid Spring Physics & Asymmetric Notch Dynamics
+- **Date**: 2026-10-19
+- **Context**: Reference analysis of `devcode90/Dynamic-Island-for-Windows` revealed that the authentic "Apple Dynamic Island" feel relies on sub-stepped spring physics and directional asymmetry.
+- **Decision**:
+  1. **Directional Spring Physics**: Tuned Framer Motion spring physics on `Shell` and auxiliary bubbles:
+     - Main Shell: `stiffness: 340, damping: 30, mass: 0.85` for smooth, organic morphing without snappy mechanical jerkiness.
+     - Auxiliary Bubbles (Music, Timer, Fresh File): `stiffness: 320, damping: 20, mass: 0.75` for an organic water droplet separation and reabsorption effect.
+  2. **Fixed Padding Stage Sizing**: Window dimensions accommodate expanded card bounding boxes and shadows without frame-by-frame OS window destruction, eliminating window border flicker and compositor latency on high-refresh-rate displays.
+
+## Decision 017: Event-Driven Bluetooth & Audio Device Connect/Disconnect HUD
+- **Date**: 2026-10-19
+- **Context**: Users frequently plug in 3.5mm headphones or connect/disconnect Bluetooth headphones/speakers without visual feedback from the desktop island.
+- **Decision**:
+  1. **Windows Core Audio Notification Client (`IMMNotificationClient`)**: Implemented a native Rust listener in `src-tauri/src/audio_device.rs` using `IMMDeviceEnumerator::RegisterEndpointNotificationCallback`.
+  2. **Zero Polling & Event-Driven**: `OnDefaultDeviceChanged` and `OnDeviceStateChanged` fire via Windows RPC callbacks on hardware change. Zero CPU polling.
+  3. **Device Classification & Enumerator Inspection**: Reads `PKEY_Device_FriendlyName` and inspects `PKEY_Device_EnumeratorName`. If enumerator starts with `"BTH"`, it is classified as `bluetooth`. Form factors and device names determine `headphones` or `speakers`.
+  4. **Transient Notch HUD (`DeviceNotificationCard`)**: When a device connects or disconnects, the island smoothly morphs into a dedicated 210×36px status pill displaying the device icon (Bluetooth/Headphones/Speaker), friendly name, connection status, and pulsing indicator dot, auto-dismissing after 3.8 seconds.
+  5. **Droplet Emergence**: If the island is in droplet mode when a device connects or disconnects, it temporarily re-emerges as a capsule to display the notification before returning to droplet state.
 
 
 

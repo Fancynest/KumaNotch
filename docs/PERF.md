@@ -18,6 +18,7 @@ Measurement tools:
 | Phase 5.5 | Stabilisasi (3-Task Island + SMTC + Timer 1s) | 0.00% idle, < 1.8% during multi-bubble anim | ~39.4 MB App + ~26 MB Webview (~65 MB total) | Windows Task Manager | Windows 11 x64 | Timer interval 1s, SMTC single binding, zero IPC thumbnail spam |
 | Phase 6 Setup | Profil Release Ringan (LTO, opt-level=s, strip=true) | 0.00% idle | 29.4 MB App (4.97 MB private) + ~25 MB Webview (~54.4 MB total) | Windows Task Manager / PowerShell | Windows 11 x64 | Biner exe turun ke 3.65 MB (dari >12 MB). 0.00% CPU idle |
 | Phase 6a | Fresh File Tray (Win32 Shell + notify watcher) | 0.00% idle | ~30.2 MB App (5.1 MB private) + ~25 MB Webview (~55 MB total) | Windows Task Manager / Process Monitor | Windows 11 x64 | Zero-polling ReadDirectoryChangesW, in-memory COM thumbnail cache, 0.00% idle CPU |
+| Polish | Expressive Mata Kuma + Bluetooth/Audio Device HUD | 0.00% idle | ~30.5 MB App (5.2 MB private) + ~25 MB Webview (~56 MB total) | Windows Task Manager / Sysinternals ProcMon | Windows 11 x64 | Event-driven Core Audio IMMNotificationClient (RPC callbacks), zero polling, zero timers when hidden |
 
 
 ---

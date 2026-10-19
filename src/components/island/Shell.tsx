@@ -5,11 +5,11 @@ import type { IslandView } from '../../core/islandStore'
 
 const springTransition: Transition = {
   type: 'spring',
-  stiffness: 420,
-  damping: 32,
-  mass: 0.8,
-  restDelta: 0.5,
-  restSpeed: 0.5,
+  stiffness: 340,
+  damping: 30,
+  mass: 0.85,
+  restDelta: 0.4,
+  restSpeed: 0.4,
 }
 
 interface ShellProps {
