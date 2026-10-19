@@ -241,4 +241,23 @@ Create test files in a temporary directory with the following filename patterns:
   - Observe CPU in Process Explorer when no audio/Bluetooth device changes occur.
   - **Expected**: Windows RPC callbacks and WinRT watchers remain idle; zero CPU consumption (~0.00%).
 
+### 7.3 Olivia Rodrigo Mode & Autonomous Idle Mood Cycles
+- [ ] **Olivia Rodrigo Song / Video Detection (Live Media)**:
+  - Play any song by Olivia Rodrigo on Spotify, YouTube, Chrome, or Windows Media Player (e.g. *vampire*, *drivers license*, *good 4 u*, *bad idea right?*, *get him back!*, *deja vu*).
+  - **Expected**:
+    1. Mata Kuma instantly awakens into the **Happy** smiling arc emotion (`^_^`).
+    2. Vibrant lilac/purple blush (`#c084fc`) glows on both cheeks.
+    3. Floating purple heart `💜` and music note `♪` bob gently above the eyes.
+    4. Eyes rhythmically bop to the music (`y: [0, -1.8, 0]`).
+- [ ] **Dev Mode Olivia Simulation**:
+  - In browser dev mode, click the **💜 Olivia** button in the floating toolbar.
+  - **Expected**: Immediately triggers Olivia Rodrigo state; Kuma beams with purple blush and joyful bobbing.
+- [ ] **Autonomous Mood Cycles in Idle**:
+  - Leave desktop sitting with Mata Kuma active and no active music or timers.
+  - Observe over a 30–60 second period.
+  - **Expected**: Every 8–15 seconds, Kuma spontaneously expresses a noticeable emotion (warm smiling eyes `^_^`, playful wink `^ _ ~`, relaxed content squint, or curious gaze) for 3–4 seconds before settling back to neutral.
+- [ ] **Interactive Hover Receptivity**:
+  - Move the cursor directly over the ClockCapsule in idle view.
+  - **Expected**: Eyes appear immediately (without waiting for idle timeout) and smile warmly at the user with pink blush.
+
 

@@ -891,6 +891,7 @@ export default function App() {
               isTimerCompleted={timerData?.status === 'completed'}
               freshFileDetected={isFreshActive}
               deviceConnected={deviceNotification?.event_type === 'connected'}
+              mediaData={mediaData}
             />
           )}
 
@@ -1159,6 +1160,21 @@ export default function App() {
             className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
           >
             Mouse
+          </button>
+          <button
+            onClick={() =>
+              globalMediaEngine.simulate({
+                isActive: true,
+                title: 'vampire',
+                artist: 'Olivia Rodrigo',
+                album: 'GUTS',
+                playbackStatus: 'playing',
+              })
+            }
+            className="px-1.5 py-0.5 rounded bg-purple-950/80 hover:bg-purple-900 border border-purple-400/60 text-purple-300 font-medium"
+            title="Simulate playing Olivia Rodrigo - vampire"
+          >
+            💜 Olivia
           </button>
           <button
             onClick={() => setShowDevControls(false)}

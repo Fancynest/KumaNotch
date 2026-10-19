@@ -211,3 +211,22 @@ This document records architectural choices, deviations from the initial spec, a
      - Rich category subtitles formatted with localized names: `{Category} • {Terhubung/Terputus}`.
   5. **Cross-Watcher Duplicate Suppression**:
      - Maintained a 2.5-second sliding debounce cache (`last_emitted`) to eliminate redundant notification bursts when a device reports to both Core Audio and WinRT Bluetooth stacks.
+
+## Decision 019: Bold Vector SVG Emotions, Autonomous Idle Mood Cycles, and Olivia Rodrigo Celebration Mode
+- **Date**: 2026-10-19
+- **Context**: The user observed that Mata Kuma was largely stationary and only blinking/glancing left and right without clearly discernible emotions. Additionally, the user requested an explicit celebration reaction whenever music or videos related to Olivia Rodrigo are playing.
+- **Decision**:
+  1. **Bold Vector SVG Eye Geometry**:
+     - Replaced subtle CSS-border squints with high-contrast, bold SVG vector geometry (`strokeWidth="2.2" strokeLinecap="round"` for smiling arcs `^`, distinct droops for sleepy, wide pupils for surprise, and asymmetric winks).
+     - Rosy and purple cheek blush increased from faint `0.2` opacity blur to vibrant `0.75` opacity with radiant aura, clearly visible against the dark capsule backdrop.
+  2. **Autonomous Organic Mood Cycles in Idle**:
+     - Previously, Mata Kuma stayed strictly in `neutral` during inactivity.
+     - Implemented an organic mood cycle: every 8–15 seconds during idle, Kuma spontaneously expresses adorable moods (happy smile, playful wink, content squint, curious tilt) for 3–4 seconds before settling back to neutral.
+  3. **Olivia Rodrigo Celebration Mode (`isOliviaRodrigoMedia`)**:
+     - Cross-references Windows SMTC media metadata (`artist`, `title`, `album`) across Spotify, YouTube, Chrome, Edge, and media players against Olivia Rodrigo's discography (*SOUR*, *GUTS*, signature tracks like *vampire*, *drivers license*, *good 4 u*, *bad idea right*, *get him back*, *deja vu*, etc.).
+     - When an Olivia Rodrigo track or video is active:
+       - Mata Kuma immediately switches to `happy` smiling eyes with rhythmic head-bobbing.
+       - Cheeks glow with Olivia's signature vibrant lilac/purple blush (`#c084fc`).
+       - A floating purple heart `💜` and musical note `♪` bob gently above the eyes.
+  4. **Interactive Hover Receptivity**:
+     - Moving the mouse cursor over the clock capsule no longer abruptly cancels the eyes. Instead, hovering prompts Kuma to look directly at the user and smile warmly with rosy blush.

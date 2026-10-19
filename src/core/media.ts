@@ -177,6 +177,22 @@ export class MediaEngine {
     }
   }
 
+  public simulate(data: Partial<MediaData>) {
+    this.data = {
+      isActive: true,
+      title: data.title || 'vampire',
+      artist: data.artist || 'Olivia Rodrigo',
+      album: data.album || 'GUTS',
+      playbackStatus: data.playbackStatus || 'playing',
+      positionMs: data.positionMs || 42000,
+      durationMs: data.durationMs || 220000,
+      appId: data.appId || 'Spotify',
+      thumbnailBase64: data.thumbnailBase64 || null,
+      lastUpdated: Date.now(),
+    }
+    this.notify()
+  }
+
   public subscribe(listener: (data: MediaData | null) => void): () => void {
     this.listeners.add(listener)
     listener(this.getData())
