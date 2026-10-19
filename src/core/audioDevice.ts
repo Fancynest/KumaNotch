@@ -1,9 +1,21 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
+export type DeviceCategory =
+  | 'tws'
+  | 'headphones'
+  | 'speaker'
+  | 'speakers'
+  | 'keyboard'
+  | 'mouse'
+  | 'phone'
+  | 'bluetooth'
+  | 'audio'
+
 export interface AudioDeviceEvent {
   event_type: 'connected' | 'disconnected'
   device_name: string
-  device_type: 'bluetooth' | 'headphones' | 'speakers' | 'audio'
+  device_type: DeviceCategory
+  is_bluetooth?: boolean
   is_default: boolean
 }
 

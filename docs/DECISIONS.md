@@ -187,5 +187,27 @@ This document records architectural choices, deviations from the initial spec, a
   4. **Transient Notch HUD (`DeviceNotificationCard`)**: When a device connects or disconnects, the island smoothly morphs into a dedicated 210×36px status pill displaying the device icon (Bluetooth/Headphones/Speaker), friendly name, connection status, and pulsing indicator dot, auto-dismissing after 3.8 seconds.
   5. **Droplet Emergence**: If the island is in droplet mode when a device connects or disconnects, it temporarily re-emerges as a capsule to display the notification before returning to droplet state.
 
-
-
+## Decision 018: Fine-Grained Device Classification (TWS, Speaker, Headphones, Keyboard, Mouse) & Dual-Stack WinRT/CoreAudio Watcher
+- **Date**: 2026-10-19
+- **Context**: Users connect a wide variety of Bluetooth and wired peripherals (e.g. OPPO Enco Buds3, REXUS KL150 Keyboard, JBL Flip Speaker, MX Master Mouse). Previously, all Bluetooth devices showed a generic Bluetooth `B` icon and uncleaned driver endpoint strings (e.g. `Headset (OPPO Enco Buds3 Hands-Free AG Audio)`), while non-audio Bluetooth devices (keyboards, mice) were omitted.
+- **Decision**:
+  1. **Dual-Stack Watcher Architecture**:
+     - **Windows Core Audio (`IMMNotificationClient`)**: Captures all audio endpoints (TWS, headphones, speakers, 3.5mm jack, USB DACs) with zero polling.
+     - **WinRT DeviceWatcher (`BluetoothDevice` & `BluetoothLEDevice`)**: Captures classic and Bluetooth Low Energy (BLE) peripheral connect/disconnect events (keyboards, mice, gamepads, smartphones) using `GetDeviceSelectorFromConnectionStatus(Connected)`. Completely event-driven with 0.00% idle CPU.
+  2. **Device String Sanitization (`clean_device_name`)**:
+     - Strips generic Windows host prefixes: `Headset (...)`, `Headphones (...)`, `Speakers (...)`.
+     - Strips driver noise and transport suffixes: `Hands-Free AG Audio`, `Hands-Free HF Audio`, `Stereo`, `Avrcp Transport`, `A2DP SNK`, `(R)`, `(TM)`.
+     - Example: `Headset (OPPO Enco Buds3 Hands-Free AG Audio)` becomes clean, legible `OPPO Enco Buds3`.
+  3. **High-Precision Categorization (`classify_device`)**:
+     - `tws`: Evaluated first before generic headset keywords (`buds`, `airpod`, `earbud`, `enco`, `in-ear`, `freebud`, `wf-1000`, `galaxy bud`, `tune beam`, etc.).
+     - `speaker`: Desk and portable Bluetooth speakers (`speaker`, `soundbar`, `boombox`, `flip`, `charge`, `megaboom`, `audio ball`, `moncer go`, etc.).
+     - `headphones`: Over-ear/on-ear headsets (`wh-1000`, `quietcomfort`, `qc35`, `qc45`, `kraken`, `arctis`, `blackshark`, `major iv`, etc.).
+     - `keyboard`: Bluetooth/BLE keyboards (`keyboard`, `keychron`, `k380`, `mx keys`, `rexus kl`, `kl150`, etc.).
+     - `mouse`: Bluetooth mice/pointers (`mouse`, `trackball`, `touchpad`, `mx master`, `mx anywhere`, `magic mouse`, `g304`, `pebble`, etc.).
+     - `phone`: Mobile devices (`iphone`, `ipad`, `android`, `galaxy`, `pixel`, etc.).
+  4. **Dedicated Vector Glyphs & Visual Accents**:
+     - Designed custom high-fidelity dual-earbud vector SVG for TWS devices.
+     - Lucide `Headphones`, `Speaker`, `Keyboard`, `Mouse`, `Smartphone`, and `Volume2` with subtle miniature Bluetooth badge overlay when `is_bluetooth` is true.
+     - Rich category subtitles formatted with localized names: `{Category} • {Terhubung/Terputus}`.
+  5. **Cross-Watcher Duplicate Suppression**:
+     - Maintained a 2.5-second sliding debounce cache (`last_emitted`) to eliminate redundant notification bursts when a device reports to both Core Audio and WinRT Bluetooth stacks.

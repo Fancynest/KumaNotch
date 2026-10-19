@@ -26,7 +26,7 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   expandedTimer: { width: 370, height: 220 },
   alert: { width: 370, height: 210 },
   expandedFreshFile: { width: 390, height: 240 },
-  deviceNotification: { width: 260, height: 64 },
+  deviceNotification: { width: 270, height: 64 },
   settings: { width: 410, height: 380 },
 }
 
@@ -110,9 +110,9 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     y: 0,
   },
   deviceNotification: {
-    width: 210,
-    height: 36,
-    borderRadius: 18,
+    width: 228,
+    height: 38,
+    borderRadius: 19,
     boxShadow: '0 4px 18px rgba(0, 0, 0, 0.55)',
     y: 0,
   },

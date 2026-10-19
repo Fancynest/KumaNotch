@@ -209,27 +209,36 @@ Create test files in a temporary directory with the following filename patterns:
   - **Expected**: Occasional double-blinks (~20% frequency) and subtle micro-looks (glancing left/right every 5–13 seconds) simulate living presence.
 
 ### 7.2 Bluetooth & Audio Device Connect / Disconnect HUD
-- [ ] **Bluetooth Headphones Connection**:
-  - Turn on or connect Bluetooth headphones (e.g. AirPods, Sony WH-1000XM, Galaxy Buds).
+- [ ] **TWS / Earbuds Connection (e.g. OPPO Enco Buds3, Galaxy Buds, AirPods)**:
+  - Connect TWS earbuds.
   - **Expected**:
-    1. KumaNotch immediately morphs into the 210×36px Device Notification HUD.
-    2. Displays the **Bluetooth** icon with cyan glowing border, device friendly name, and "Terhubung" / "Connected" status with a pulsing dot.
-    3. Mata Kuma eyes show wide-eyed surprise.
+    1. Raw endpoint `Headset (OPPO Enco Buds3 Hands-Free AG Audio)` is cleanly sanitised to `OPPO Enco Buds3`.
+    2. Displays dedicated **Dual Earbuds (TWS)** vector icon with sky-blue glowing border and Bluetooth badge.
+    3. Subtitle displays `TWS • Terhubung` (or `TWS Earbuds • Connected`).
     4. Auto-dismisses after 3.8 seconds with smooth spring collapse.
-- [ ] **3.5mm Headphone Jack / Audio Endpoint Plug-In**:
+- [ ] **Bluetooth Headphones Connection (e.g. Sony WH-1000XM, Bose QC)**:
+  - Connect Bluetooth over-ear headphones.
+  - **Expected**: Displays **Headphones** icon with sky-blue border, clean device name, and `Headphone • Terhubung`.
+- [ ] **Bluetooth Speaker Connection (e.g. JBL Flip, Soundbar, MONCER GO)**:
+  - Connect Bluetooth speaker.
+  - **Expected**: Displays **Speaker** icon with sky-blue border, clean device name, and `Speaker • Terhubung`.
+- [ ] **Bluetooth Keyboard Connection (e.g. REXUS KL150, Keychron, Logitech K380)**:
+  - Connect Bluetooth or BLE keyboard.
+  - **Expected**: WinRT Bluetooth watcher captures peripheral connect; displays **Keyboard** icon and `Keyboard • Terhubung`.
+- [ ] **Bluetooth Mouse Connection (e.g. Logitech MX Master, Magic Mouse)**:
+  - Connect Bluetooth mouse.
+  - **Expected**: WinRT Bluetooth watcher captures peripheral connect; displays **Mouse** icon and `Mouse • Terhubung`.
+- [ ] **3.5mm Headphone Jack / Wired Audio Plug-In**:
   - Plug 3.5mm headphones or USB DAC into audio port.
-  - **Expected**: KumaNotch displays the **Headphones** icon with green glowing aura and friendly name, auto-dismissing after 3.8s.
+  - **Expected**: Displays green glowing aura, **Headphones** / **Volume2** icon without Bluetooth badge, and `Audio • Terhubung`.
 - [ ] **Device Disconnection**:
-  - Turn off Bluetooth or unplug audio jack.
-  - **Expected**: Displays a muted grey status pill showing "Terputus" / "Disconnected" and the device name.
+  - Disconnect or turn off any connected peripheral.
+  - **Expected**: Displays muted grey status pill showing `{Category} • Terputus` and the sanitized device name.
 - [ ] **Dev Mode Simulation (Browser Dev)**:
-  - In browser dev mode, click the **BT Test** button in the bottom floating toolbar.
-  - **Expected**: Fires mock "AirPods Pro" connection event, expanding the pill with full animation.
-- [ ] **Droplet Mode Emergence**:
-  - In droplet mode, connect or disconnect audio device.
-  - **Expected**: Notch temporarily wakes up to capsule view to display the notification, then smoothly re-settles.
+  - Click any device button in the bottom floating toolbar (`TWS`, `Headphones`, `Speaker`, `Keyboard`, `Mouse`).
+  - **Expected**: Fires instant mock event, expanding the pill with full animation and matching icon.
 - [ ] **Zero-Polling Hardware Verification**:
-  - Observe CPU in Process Explorer when no audio device changes occur.
-  - **Expected**: Windows RPC callbacks remain idle; zero CPU consumption.
+  - Observe CPU in Process Explorer when no audio/Bluetooth device changes occur.
+  - **Expected**: Windows RPC callbacks and WinRT watchers remain idle; zero CPU consumption (~0.00%).
 
 

@@ -1094,14 +1094,71 @@ export default function App() {
             onClick={() =>
               globalAudioDeviceEngine.simulate({
                 event_type: 'connected',
-                device_name: 'AirPods Pro',
-                device_type: 'bluetooth',
+                device_name: 'OPPO Enco Buds3',
+                device_type: 'tws',
+                is_bluetooth: true,
                 is_default: true,
               })
             }
             className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
           >
-            BT Test
+            TWS
+          </button>
+          <button
+            onClick={() =>
+              globalAudioDeviceEngine.simulate({
+                event_type: 'connected',
+                device_name: 'Sony WH-1000XM5',
+                device_type: 'headphones',
+                is_bluetooth: true,
+                is_default: true,
+              })
+            }
+            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
+          >
+            Headphones
+          </button>
+          <button
+            onClick={() =>
+              globalAudioDeviceEngine.simulate({
+                event_type: 'connected',
+                device_name: 'JBL Flip 6',
+                device_type: 'speaker',
+                is_bluetooth: true,
+                is_default: true,
+              })
+            }
+            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
+          >
+            Speaker
+          </button>
+          <button
+            onClick={() =>
+              globalAudioDeviceEngine.simulate({
+                event_type: 'connected',
+                device_name: 'Keychron K2',
+                device_type: 'keyboard',
+                is_bluetooth: true,
+                is_default: false,
+              })
+            }
+            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
+          >
+            Keyboard
+          </button>
+          <button
+            onClick={() =>
+              globalAudioDeviceEngine.simulate({
+                event_type: 'connected',
+                device_name: 'MX Master 3S',
+                device_type: 'mouse',
+                is_bluetooth: true,
+                is_default: false,
+              })
+            }
+            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
+          >
+            Mouse
           </button>
           <button
             onClick={() => setShowDevControls(false)}

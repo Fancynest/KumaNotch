@@ -111,8 +111,13 @@ export const translations = {
     deviceConnected: 'Terhubung',
     deviceDisconnected: 'Terputus',
     bluetoothDevice: 'Perangkat Bluetooth',
+    tws: 'TWS',
     headphones: 'Headphone',
     speakers: 'Speaker',
+    keyboard: 'Keyboard',
+    mouse: 'Mouse',
+    phone: 'Smartphone',
+    audioDevice: 'Audio',
   },
   en: {
     quickTimer: 'Quick Timer',
@@ -215,8 +220,13 @@ export const translations = {
     deviceConnected: 'Connected',
     deviceDisconnected: 'Disconnected',
     bluetoothDevice: 'Bluetooth Device',
+    tws: 'TWS Earbuds',
     headphones: 'Headphones',
-    speakers: 'Speakers',
+    speakers: 'Speaker',
+    keyboard: 'Keyboard',
+    mouse: 'Mouse',
+    phone: 'Smartphone',
+    audioDevice: 'Audio',
   },
 }
 
