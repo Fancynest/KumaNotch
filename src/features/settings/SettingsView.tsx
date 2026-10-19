@@ -220,6 +220,52 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
         {/* TAB 2: DROPLET & NOTCH */}
         {activeTab === 'notch' && (
           <div className="space-y-3">
+            {/* Auto-Collapse When Open Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="max-w-[210px]">
+                <span className="text-xs font-medium text-white block">{t.autoCollapseExpanded}</span>
+                <span className="text-[10px] text-white/40 block leading-tight">{t.autoCollapseExpandedDesc}</span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.autoCollapseExpanded}
+                onClick={() => updateSetting('autoCollapseExpanded', !settings.autoCollapseExpanded)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  settings.autoCollapseExpanded ? 'bg-amber-500' : 'bg-white/20'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    settings.autoCollapseExpanded ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Auto-Collapse Timeout Slider */}
+            {settings.autoCollapseExpanded && (
+              <div className="space-y-1 pt-0.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-white/80">{t.autoCollapseTimeout}</span>
+                  <span className="font-mono text-amber-400 font-semibold">
+                    {settings.autoCollapseSeconds} {t.secondsUnit}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="60"
+                  step="1"
+                  value={settings.autoCollapseSeconds}
+                  onChange={(e) => updateSetting('autoCollapseSeconds', parseInt(e.target.value, 10))}
+                  className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                />
+              </div>
+            )}
+
+            <div className="border-t border-white/10 pt-1" />
+
             {/* Auto-Droplet Mode Toggle */}
             <div className="flex items-center justify-between">
               <div className="max-w-[210px]">

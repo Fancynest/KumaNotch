@@ -151,4 +151,15 @@ This document records architectural choices, deviations from the initial spec, a
   6. **Transient Activity with Inactivity Countdown & Hover Pause**: Emits as priority 55 `fresh-file` activity. Displays for 8 seconds (customizable 5–15s in Settings), auto-pausing the countdown when hovered, and resuming when the cursor departs.
   7. **Native Drag-Out & In-Memory Shelf Strip**: Dragging the thumbnail initiates native OS OLE drag (`tauri-plugin-drag`) directly into Windows Explorer, web browsers, or chat apps. The 5 most recent files of the session appear in a dedicated "Baru" strip at the top of the File Shelf.
 
+## Decision 014: User-Configurable Inactivity Auto-Collapse for Expanded Island
+- **Date**: 2026-10-19
+- **Context**: When the island is expanded (Home, Timer, Music, Fresh File, Settings), leaving it open indefinitely if the user gets distracted or steps away obstructs the upper-screen area. Previously, only Home had a hardcoded 10-second inactivity collapse, which was not configurable and did not cover other expanded views.
+- **Decision**:
+  1. **Unified Inactivity Timer**: When any view is expanded (`expandedActivity !== null`), an inactivity timer runs for `settings.autoCollapseSeconds` (default 10s, range 5–60s).
+  2. **Activity Reset**: Mouse movement, mouse clicks (`mousedown`), keyboard input (`keydown`), and scrolling (`wheel`) reset the inactivity timer.
+  3. **Hover Dwell vs Direct Click Distinction**: Cards expanded via 2-second hover dwell still support quick 250ms collapse when the cursor departs; however, direct clicking or clicking within the card marks it as intentionally pinned (`openedViaHoverRef = false`), switching it exclusively to the user-configured inactivity timeout to prevent accidental dismissal during use.
+  4. **Settings & Localization**: Added `autoCollapseExpanded` (toggle) and `autoCollapseSeconds` (slider 5–60s) under the Droplet / Notch tab in Settings, with full Indonesian and English i18n support.
+  5. **Alert Preservation**: Completion alerts (`currentView === 'alert'`) are preserved, retaining their dedicated 30-second completion action cycle and chime.
+
+
 

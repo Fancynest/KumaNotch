@@ -306,6 +306,7 @@ export default function App() {
   // Hover Dwell (2s) and Auto-Collapse handlers
   const hoverDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const leaveCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const openedViaHoverRef = useRef(false)
 
   const handleBubblePointerEnter = (type: 'timer' | 'music' | 'freshFile') => {
     if (leaveCollapseTimerRef.current) {
@@ -314,6 +315,7 @@ export default function App() {
     }
     setHoveredTarget(type)
     hoverDwellTimerRef.current = setTimeout(() => {
+      openedViaHoverRef.current = true
       setExpandedActivity(type)
       setHoveredTarget(null)
     }, 2000)
@@ -336,12 +338,14 @@ export default function App() {
 
   const handleExpandedPointerLeave = () => {
     if (
-      expandedActivity === 'timer' ||
-      expandedActivity === 'music' ||
-      expandedActivity === 'freshFile'
+      openedViaHoverRef.current &&
+      (expandedActivity === 'timer' ||
+        expandedActivity === 'music' ||
+        expandedActivity === 'freshFile')
     ) {
       leaveCollapseTimerRef.current = setTimeout(() => {
         setExpandedActivity(null)
+        openedViaHoverRef.current = false
       }, 250)
     }
   }
@@ -501,34 +505,57 @@ export default function App() {
     }
   }, [currentView, timerData?.status, collapseAll])
 
-  // Inactivity collapse for Home (10s)
+  // Auto-collapse when capsule is open and idle/unclicked for settings.autoCollapseSeconds
   useEffect(() => {
-    if (expandedActivity !== 'home') return
+    if (
+      !settings.autoCollapseExpanded ||
+      expandedActivity === null ||
+      currentView === 'alert'
+    )
+      return
+
+    const timeoutMs = (settings.autoCollapseSeconds || 10) * 1000
 
     let timer = setTimeout(() => {
       collapseAll()
-    }, 10000)
+      openedViaHoverRef.current = false
+    }, timeoutMs)
 
     const resetInactivity = () => {
       clearTimeout(timer)
       timer = setTimeout(() => {
         collapseAll()
-      }, 10000)
+        openedViaHoverRef.current = false
+      }, timeoutMs)
+    }
+
+    const handlePointerActivity = () => {
+      openedViaHoverRef.current = false
+      resetInactivity()
     }
 
     window.addEventListener('mousemove', resetInactivity)
-    window.addEventListener('mousedown', resetInactivity)
+    window.addEventListener('mousedown', handlePointerActivity)
     window.addEventListener('keydown', resetInactivity)
+    window.addEventListener('wheel', resetInactivity)
 
     return () => {
       clearTimeout(timer)
       window.removeEventListener('mousemove', resetInactivity)
-      window.removeEventListener('mousedown', resetInactivity)
+      window.removeEventListener('mousedown', handlePointerActivity)
       window.removeEventListener('keydown', resetInactivity)
+      window.removeEventListener('wheel', resetInactivity)
     }
-  }, [expandedActivity, collapseAll])
+  }, [
+    expandedActivity,
+    currentView,
+    settings.autoCollapseExpanded,
+    settings.autoCollapseSeconds,
+    collapseAll,
+  ])
 
   const handleShellClick = () => {
+    openedViaHoverRef.current = false
     if (currentView === 'idle') {
       setExpandedActivity('home')
       setHomePage(1)
@@ -626,6 +653,7 @@ export default function App() {
               onPointerLeave={handleBubblePointerLeave}
               onClick={(e) => {
                 e.stopPropagation()
+                openedViaHoverRef.current = false
                 handleBubblePointerLeave()
                 setExpandedActivity('freshFile')
               }}
@@ -693,6 +721,7 @@ export default function App() {
               onPointerLeave={handleBubblePointerLeave}
               onClick={(e) => {
                 e.stopPropagation()
+                openedViaHoverRef.current = false
                 handleBubblePointerLeave()
                 setExpandedActivity('music')
               }}
@@ -873,6 +902,7 @@ export default function App() {
               onPointerLeave={handleBubblePointerLeave}
               onClick={(e) => {
                 e.stopPropagation()
+                openedViaHoverRef.current = false
                 handleBubblePointerLeave()
                 setExpandedActivity('timer')
               }}
@@ -961,6 +991,7 @@ export default function App() {
               onPointerLeave={handleBubblePointerLeave}
               onClick={(e) => {
                 e.stopPropagation()
+                openedViaHoverRef.current = false
                 handleBubblePointerLeave()
                 setExpandedActivity('freshFile')
               }}

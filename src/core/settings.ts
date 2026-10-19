@@ -7,6 +7,8 @@ export interface AppSettings {
   autoDroplet: boolean
   inactivitySeconds: number
   dwellSeconds: number
+  autoCollapseExpanded: boolean
+  autoCollapseSeconds: number
   personalityEnabled: boolean
   idleBeforeEyesSeconds: number
   timerChimeEnabled: boolean
@@ -26,6 +28,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoDroplet: true,
   inactivitySeconds: 10,
   dwellSeconds: 2,
+  autoCollapseExpanded: true,
+  autoCollapseSeconds: 10,
   personalityEnabled: true,
   idleBeforeEyesSeconds: 6,
   timerChimeEnabled: true,
