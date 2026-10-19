@@ -76,6 +76,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
       aria-label={t.settings}
       className="absolute inset-0 p-4 flex flex-col justify-between text-white cursor-default select-none overflow-hidden"
       onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       {/* Top Header: Title & Close Button */}
       <div className="flex items-center justify-between pb-2 border-b border-white/10 shrink-0">

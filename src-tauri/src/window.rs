@@ -186,7 +186,7 @@ pub fn setup_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             let monitor_size = monitor.size();
             let monitor_pos = monitor.position();
 
-            let initial_width = (170.0 * scale_factor).round() as u32;
+            let initial_width = (130.0 * scale_factor).round() as u32;
             let initial_height = (58.0 * scale_factor).round() as u32;
             let offset_x = CURRENT_OFFSET_X.load(Ordering::Relaxed);
             let x = calculate_clamped_x(

@@ -143,6 +143,7 @@ export const HomePager: React.FC<HomePagerProps> = ({
   }
 
   const handleHomePointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation()
     if (e.button !== 0) return
     const target = e.target as HTMLElement | null
     if (target?.closest('button, input, select, textarea, [data-shelf-item], .shelf-item')) return

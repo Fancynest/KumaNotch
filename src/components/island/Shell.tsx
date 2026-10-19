@@ -86,13 +86,15 @@ export const Shell: React.FC<ShellProps> = ({
       className={`bg-black border overflow-hidden select-none relative shrink-0 ${
         isDragging
           ? 'cursor-grabbing ring-1 ring-amber-400/40'
-          : 'cursor-grab'
+          : currentView === 'idle'
+          ? 'cursor-grab'
+          : 'cursor-default'
       } ${
         currentView === 'alert'
           ? 'border-amber-500/50'
           : currentView === 'dropTarget'
           ? 'border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-          : 'border-white/20'
+          : 'border-white/10'
       }`}
     >
       {children}

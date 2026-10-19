@@ -96,11 +96,11 @@ function getDynamicDimensions(
   if (view === 'idle') {
     const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
     if (auxCount >= 2) {
-      baseWin.width = 270
+      baseWin.width = 200
     } else if (auxCount === 1) {
-      baseWin.width = 220
+      baseWin.width = 180
     } else {
-      baseWin.width = 170
+      baseWin.width = 130
     }
   }
 
@@ -334,6 +334,8 @@ export default function App() {
   const hasMusic = isMediaActive && !isExpanded && !isDroplet
   const hasTimer = isTimerActive && !isExpanded && !isDroplet
   const hasFresh = isFreshActive && !isExpanded && !isDroplet
+  const hasLeftAux = hasMusic || (hasTimer && hasFresh)
+  const hasRightAux = hasTimer || (!hasMusic && hasFresh)
 
   // Dynamic dimensions & window synchronization
   const currentView = getIslandView(
@@ -666,7 +668,14 @@ export default function App() {
     }
   }, [settings.horizontalOffset])
 
+  const rafIdRef = useRef<number | null>(null)
+  const pendingOffsetRef = useRef<number | null>(null)
+
   const handleShellPointerDown = (e: React.PointerEvent) => {
+    // Only allow island dragging when in idle capsule view!
+    if (currentView !== 'idle') {
+      return
+    }
     const target = e.target as HTMLElement
     if (target.closest('button, input, select, textarea, [data-no-drag]')) {
       return
@@ -682,7 +691,7 @@ export default function App() {
   }
 
   const handleShellPointerMove = (e: React.PointerEvent) => {
-    if (!dragRef.current) return
+    if (currentView !== 'idle' || !dragRef.current) return
     const deltaX = e.screenX - dragRef.current.startScreenX
     if (!dragRef.current.hasMoved) {
       if (Math.abs(deltaX) >= 5) {
@@ -696,17 +705,25 @@ export default function App() {
     const rawCandidate = dragRef.current.startOffset + deltaX
     const SNAP_RADIUS = 85
 
-    // Magnetic attraction near center: if within snap radius, magnet locks to center (0)
-    if (Math.abs(rawCandidate) <= SNAP_RADIUS) {
-      setIslandOffset(0)
-      if (isBrowserDev) setHorizontalOffset(0)
-    } else {
-      setIslandOffset(rawCandidate)
-      if (isBrowserDev) setHorizontalOffset(rawCandidate)
+    const targetOffset = Math.abs(rawCandidate) <= SNAP_RADIUS ? 0 : rawCandidate
+
+    pendingOffsetRef.current = targetOffset
+    if (rafIdRef.current === null) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null
+        if (pendingOffsetRef.current !== null) {
+          setIslandOffset(pendingOffsetRef.current)
+          if (isBrowserDev) setHorizontalOffset(pendingOffsetRef.current)
+        }
+      })
     }
   }
 
   const handleShellPointerUp = (e: React.PointerEvent) => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current)
+      rafIdRef.current = null
+    }
     if (!dragRef.current) return
     const deltaX = e.screenX - dragRef.current.startScreenX
     const hadMoved = dragRef.current.hasMoved
@@ -742,6 +759,10 @@ export default function App() {
   }
 
   const handleShellPointerCancel = (e: React.PointerEvent) => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current)
+      rafIdRef.current = null
+    }
     dragRef.current = null
     setIsDragging(false)
     try {
@@ -750,6 +771,7 @@ export default function App() {
   }
 
   const handleShellDoubleClick = () => {
+    if (currentView !== 'idle') return
     if (horizontalOffset !== 0) {
       setHorizontalOffset(0)
       setIslandOffset(0)
@@ -768,8 +790,6 @@ export default function App() {
     } else if (currentView === 'droplet') {
       setIsDwelling(false)
       setDisplayState('capsule')
-      setExpandedActivity('home')
-      setHomePage(1)
     } else if (currentView === 'dropTarget') {
       setExpandedActivity('home')
       setHomePage(2)
@@ -969,6 +989,11 @@ export default function App() {
             </motion.div>
           ) : null}
         </AnimatePresence>
+
+        {/* SYMMETRY BALANCER: If only right aux is active, balance left side so capsule stays centered */}
+        {!isDroplet && !isExpanded && !hasLeftAux && hasRightAux && (
+          <div style={{ width: 32, height: 32 }} className="invisible shrink-0 pointer-events-none" />
+        )}
 
         {/* SINGLE PERSISTENT SHELL */}
         <Shell
@@ -1267,6 +1292,11 @@ export default function App() {
             </motion.div>
           ) : null}
         </AnimatePresence>
+
+        {/* SYMMETRY BALANCER: If only left aux is active, balance right side so capsule stays centered */}
+        {!isDroplet && !isExpanded && hasLeftAux && !hasRightAux && (
+          <div style={{ width: 32, height: 32 }} className="invisible shrink-0 pointer-events-none" />
+        )}
       </div>
 
       {/* Dev Controls */}
