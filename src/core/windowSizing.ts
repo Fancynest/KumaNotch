@@ -20,7 +20,7 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   singleTimer: { width: 180, height: 58 },
   singleMusic: { width: 280, height: 58 },
   split: { width: 220, height: 58 },
-  dropTarget: { width: 260, height: 72 },
+  dropTarget: { width: 300, height: 72 },
   home: { width: 390, height: 270 },
   expandedMusic: { width: 400, height: 230 },
   expandedTimer: { width: 370, height: 220 },

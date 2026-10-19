@@ -1,9 +1,9 @@
 import type { MediaData } from './media'
 
 /**
- * Returns true if the currently active media track is by the user's configured favorite artist.
- * Matches ARTIST name only. Track titles and album names are strictly ignored.
- * If favoriteArtist is empty or unset, returns false.
+ * Returns true if the currently active media track is by the user's configured favorite artist,
+ * or matches the built-in Olivia Rodrigo Easter egg.
+ * Checks artist, title, and album fields.
  */
 export function isFavoriteArtistMedia(
   media: MediaData | null | undefined,
@@ -14,17 +14,17 @@ export function isFavoriteArtistMedia(
   }
 
   const rawTarget = (favoriteArtist || '').trim().toLowerCase()
-  if (!rawTarget) {
-    return false
-  }
-
-  // Support comma/semicolon-separated artists (e.g. "Olivia Rodrigo, Taylor Swift")
   const targets = rawTarget
-    .split(/[,;]/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
+    ? rawTarget
+        .split(/[,;]/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+    : []
 
-  if (targets.length === 0) return false
+  // Built-in Easter egg: Olivia Rodrigo is always recognized!
+  if (!targets.some((t) => t.includes('olivia'))) {
+    targets.push('olivia rodrigo', 'olivia')
+  }
 
   const artist = (media.artist || '').trim().toLowerCase()
   const title = (media.title || '').trim().toLowerCase()
@@ -42,3 +42,4 @@ export function isOliviaRodrigoMedia(
 ): boolean {
   return isFavoriteArtistMedia(media, favoriteArtist || 'olivia rodrigo')
 }
+

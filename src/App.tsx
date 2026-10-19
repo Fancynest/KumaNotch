@@ -331,9 +331,9 @@ export default function App() {
   const isFreshActive = freshFile !== null && settings.freshFileEnabled
   const isExpanded = expandedActivity !== null || timerData?.status === 'completed'
   const isDroplet = displayState === 'droplet'
-  const hasMusic = isMediaActive && !isExpanded && !isDroplet
-  const hasTimer = isTimerActive && !isExpanded && !isDroplet
-  const hasFresh = isFreshActive && !isExpanded && !isDroplet
+  const hasMusic = isMediaActive && !isExpanded && !isDroplet && !isDragOver
+  const hasTimer = isTimerActive && !isExpanded && !isDroplet && !isDragOver
+  const hasFresh = isFreshActive && !isExpanded && !isDroplet && !isDragOver
   const hasLeftAux = hasMusic || (hasTimer && hasFresh)
   const hasRightAux = hasTimer || (!hasMusic && hasFresh)
 
@@ -867,7 +867,7 @@ export default function App() {
       >
         {/* LEFT BUBBLE: MUSIC (PRIMARY) OR FRESH FILE (WHEN TIMER IS OCCUPYING RIGHT) */}
         <AnimatePresence>
-          {!isDroplet && !isExpanded && isMediaActive ? (
+          {!isDroplet && !isExpanded && !isDragOver && isMediaActive ? (
             <motion.div
               key="bubble-music"
               initial={{
@@ -939,7 +939,7 @@ export default function App() {
                 />
               )}
             </motion.div>
-          ) : !isDroplet && !isExpanded && isFreshActive && isTimerActive ? (
+          ) : !isDroplet && !isExpanded && !isDragOver && isFreshActive && isTimerActive ? (
             <motion.div
               key="bubble-fresh-left"
               initial={{
@@ -1011,7 +1011,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* SYMMETRY BALANCER: If only right aux is active, balance left side so capsule stays centered */}
-        {!isDroplet && !isExpanded && !hasLeftAux && hasRightAux && (
+        {!isDroplet && !isExpanded && !isDragOver && !hasLeftAux && hasRightAux && (
           <div style={{ width: 32, height: 32 }} className="invisible shrink-0 pointer-events-none" />
         )}
 
@@ -1153,7 +1153,7 @@ export default function App() {
 
         {/* RIGHT BUBBLE: TIMER OR FRESH FILE */}
         <AnimatePresence>
-          {!isDroplet && !isExpanded && isTimerActive ? (
+          {!isDroplet && !isExpanded && !isDragOver && isTimerActive ? (
             <motion.div
               key="bubble-timer"
               initial={{
@@ -1242,7 +1242,7 @@ export default function App() {
                 />
               )}
             </motion.div>
-          ) : !isDroplet && !isExpanded && isFreshActive ? (
+          ) : !isDroplet && !isExpanded && !isDragOver && isFreshActive ? (
             <motion.div
               key="bubble-fresh-right"
               initial={{
@@ -1314,7 +1314,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* SYMMETRY BALANCER: If only left aux is active, balance right side so capsule stays centered */}
-        {!isDroplet && !isExpanded && hasLeftAux && !hasRightAux && (
+        {!isDroplet && !isExpanded && !isDragOver && hasLeftAux && !hasRightAux && (
           <div style={{ width: 32, height: 32 }} className="invisible shrink-0 pointer-events-none" />
         )}
       </div>

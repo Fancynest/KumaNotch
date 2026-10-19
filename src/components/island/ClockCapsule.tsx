@@ -99,6 +99,7 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
   const showEyes =
     (isEligible && isPersonalityIdle) ||
     (isEligible && isFavArtist) ||
+    (isEligible && isMusicPlaying) ||
     (isEligible && isTimerRunning) ||
     (isEligible && freshFileDetected) ||
     (isEligible && deviceConnected) ||

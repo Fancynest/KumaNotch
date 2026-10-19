@@ -66,12 +66,12 @@ const VectorEye: React.FC<VectorEyeProps> = React.memo(
       >
         <svg viewBox="0 0 12 12" className="w-3 h-3 overflow-visible">
           {type === 'arc' && !isBlinking ? (
-            // Smiling arc ^
+            // Smiling crescent arc ^
             <path
-              d="M 1.5 8 C 3 2.5, 9 2.5, 10.5 8"
+              d="M 1.8 7.5 C 3.2 2.8, 8.8 2.8, 10.2 7.5"
               fill="none"
               stroke="#ffffff"
-              strokeWidth="2.2"
+              strokeWidth="2.0"
               strokeLinecap="round"
             />
           ) : type === 'sad' && !isBlinking ? (
@@ -140,39 +140,57 @@ VectorEye.displayName = 'VectorEye'
 // ─── Bear Nose Vector Component ───────────────────────────────────
 interface BearNoseProps {
   opacity: number
+  isHappy?: boolean
 }
 
-const BearNose: React.FC<BearNoseProps> = React.memo(({ opacity }) => {
+const BearNose: React.FC<BearNoseProps> = React.memo(({ opacity, isHappy }) => {
   return (
     <motion.div
       animate={{ opacity }}
       transition={{ duration: 0.25 }}
       className="flex items-center justify-center shrink-0 origin-center"
-      style={{ width: 8, height: 7 }}
+      style={{ width: 10, height: 9 }}
     >
       <svg
-        viewBox="0 0 10 9"
-        className="w-2 h-1.5 overflow-visible"
+        viewBox="0 0 12 11"
+        className="w-2.5 h-2.5 overflow-visible"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
         {/* Soft inverted rounded triangle bear nose (▼) */}
         <path
-          d="M 1.5 2 C 1.5 1.0, 8.5 1.0, 8.5 2 C 8.5 3.6, 6.2 5.8, 5 5.8 C 3.8 5.8, 1.5 3.6, 1.5 2 Z"
+          d="M 2.5 1.8 C 2.5 1.0, 9.5 1.0, 9.5 1.8 C 9.5 3.4, 7.2 5.0, 6 5.0 C 4.8 5.0, 2.5 3.4, 2.5 1.8 Z"
           fill="rgba(255, 255, 255, 0.95)"
         />
         {/* Cute shine highlight on the nose */}
-        <ellipse cx="3.6" cy="2.2" rx="0.9" ry="0.5" fill="#ffffff" />
-        {/* Vertical philtrum seam */}
-        <line
-          x1="5"
-          y1="5.8"
-          x2="5"
-          y2="7.4"
-          stroke="rgba(255, 255, 255, 0.85)"
-          strokeWidth="1.0"
-          strokeLinecap="round"
-        />
+        <ellipse cx="4.6" cy="2.2" rx="0.9" ry="0.5" fill="#ffffff" />
+
+        {isHappy ? (
+          /* Cheerful open kawaii smiling mouth with pink tongue */
+          <g>
+            <path
+              d="M 3.6 5.2 C 3.6 5.2, 3.6 8.4, 6 8.4 C 8.4 8.4, 8.4 5.2, 8.4 5.2 Z"
+              fill="#fb7185"
+              stroke="rgba(255, 255, 255, 0.9)"
+              strokeWidth="0.8"
+            />
+            <path
+              d="M 4.4 7.2 C 5.0 6.6, 7.0 6.6, 7.6 7.2 C 7.2 8.1, 4.8 8.1, 4.4 7.2 Z"
+              fill="#fda4af"
+            />
+          </g>
+        ) : (
+          /* Vertical philtrum seam */
+          <line
+            x1="6"
+            y1="5.0"
+            x2="6"
+            y2="6.6"
+            stroke="rgba(255, 255, 255, 0.85)"
+            strokeWidth="1.0"
+            strokeLinecap="round"
+          />
+        )}
       </svg>
     </motion.div>
   )
@@ -432,14 +450,14 @@ export const MataKuma: React.FC<MataKumaProps> = ({
           left: { type: 'arc' as const, scaleX: 1.15, scaleY: 1.1, offsetY: -0.5 },
           right: { type: 'arc' as const, scaleX: 1.15, scaleY: 1.1, offsetY: -0.5 },
           blush: true,
-          noseOpacity: 0.45,
+          noseOpacity: 0.95,
         }
       case 'wink':
         return {
           left: { type: 'arc' as const, scaleX: 1.1, scaleY: 1.0, offsetY: -0.5 },
           right: { type: 'round' as const, scaleX: 1.05, scaleY: 1.05, offsetX: gazeOffset },
           blush: true,
-          noseOpacity: 0.4,
+          noseOpacity: 0.9,
         }
       case 'sleepy':
         return {
@@ -517,45 +535,25 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     ? '0 0 7px rgba(192, 132, 252, 0.85)'
     : '0 0 6px rgba(244, 63, 94, 0.7)'
 
+  const isHappyMood = currentEmotion === 'happy' || isOlivia || currentEmotion === 'wink'
+
   return (
     <div className="relative flex items-center justify-center select-none py-1">
-      {/* Favorite Artist Floating Music / Heart Charm */}
-      {isOlivia && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0, y: 4 }}
-          animate={{
-            opacity: [0.85, 1, 0.85],
-            scale: [1.0, 1.25, 1.0],
-            y: [-7, -11, -7],
-            rotate: [-8, 8, -8],
-          }}
-          transition={{
-            duration: 1.2,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-          className="absolute -top-3.5 flex items-center gap-1 text-[10px] pointer-events-none"
-        >
-          <span className="text-purple-400 font-bold drop-shadow-[0_0_8px_rgba(192,132,252,0.9)] animate-pulse">💜</span>
-          <span className="text-pink-300 font-mono text-[9px] font-bold">♪</span>
-        </motion.div>
-      )}
-
-      {/* Thinking Floating Thought Charm */}
+      {/* Thinking Floating Thought Charm - positioned inside bounds */}
       {currentEmotion === 'thinking' && !isOlivia && (
         <motion.div
-          initial={{ opacity: 0, scale: 0, y: 3 }}
+          initial={{ opacity: 0, scale: 0 }}
           animate={{
             opacity: [0.7, 1, 0.7],
             scale: [0.95, 1.15, 0.95],
-            y: [-6, -8.5, -6],
+            y: [-1, -3, -1],
           }}
           transition={{
             duration: 1.9,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
-          className="absolute -top-3.5 right-0.5 flex items-center pointer-events-none"
+          className="absolute -top-1.5 right-1 flex items-center pointer-events-none"
         >
           <span className="text-amber-300 font-bold text-[9px] drop-shadow-[0_0_5px_rgba(252,211,77,0.8)]">💭</span>
         </motion.div>
@@ -567,14 +565,14 @@ export const MataKuma: React.FC<MataKumaProps> = ({
         animate={
           isOlivia
             ? {
-                y: [0, -3.2, 0, -2.0, 0],
-                rotate: [-2.5, 2.5, -2.5, 2.5, -2.5],
+                y: [0, -3.0, 0, -1.8, 0],
+                rotate: [-2, 2, -2, 2, -2],
                 scale: [1, 1.05, 1, 1.03, 1],
               }
             : isMusic
             ? {
-                y: [0, -2.2, 0],
-                rotate: [-1.2, 1.2, -1.2],
+                y: [0, -2.0, 0],
+                rotate: [-1, 1, -1],
               }
             : { y: 0 }
         }
@@ -585,17 +583,32 @@ export const MataKuma: React.FC<MataKumaProps> = ({
             ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
             : { duration: 0.3 }
         }
-        className="flex items-center justify-center gap-2 relative px-2"
+        className="flex items-center justify-center gap-1.5 relative px-1"
         title={isOlivia ? '💜 Favorite Artist Mode: Kuma senang banget!' : undefined}
       >
+        {/* Left Side Charm: Dancing Purple Heart for Olivia */}
+        {isOlivia && (
+          <motion.span
+            animate={{
+              y: [0, -2.5, 0],
+              scale: [0.95, 1.25, 0.95],
+              rotate: [-12, 12, -12],
+            }}
+            transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
+            className="text-[10px] text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.9)] pointer-events-none select-none shrink-0"
+          >
+            💜
+          </motion.span>
+        )}
+
         {/* Left Blush */}
         {eyeConfig.blush && (
           <motion.div
             initial={{ opacity: 0, scale: 0.4 }}
-            animate={{ opacity: 0.75, scale: 1 }}
+            animate={{ opacity: 0.85, scale: 1 }}
             exit={{ opacity: 0, scale: 0.4 }}
             transition={{ duration: 0.28 }}
-            className="absolute -left-1 bottom-0.5 rounded-full pointer-events-none"
+            className="absolute left-2.5 bottom-0 rounded-full pointer-events-none"
             style={{
               width: 5.5,
               height: 3,
@@ -615,8 +628,8 @@ export const MataKuma: React.FC<MataKumaProps> = ({
           isBlinking={isBlinking}
         />
 
-        {/* Bear Nose (Teddy Kuma Inverted Triangle Nose with Philtrum) */}
-        <BearNose opacity={eyeConfig.noseOpacity} />
+        {/* Bear Nose with Kawaii Smile Mouth */}
+        <BearNose opacity={eyeConfig.noseOpacity} isHappy={isHappyMood} />
 
         {/* Right Eye */}
         <VectorEye
@@ -632,10 +645,10 @@ export const MataKuma: React.FC<MataKumaProps> = ({
         {eyeConfig.blush && (
           <motion.div
             initial={{ opacity: 0, scale: 0.4 }}
-            animate={{ opacity: 0.75, scale: 1 }}
+            animate={{ opacity: 0.85, scale: 1 }}
             exit={{ opacity: 0, scale: 0.4 }}
             transition={{ duration: 0.28 }}
-            className="absolute -right-1 bottom-0.5 rounded-full pointer-events-none"
+            className="absolute right-2.5 bottom-0 rounded-full pointer-events-none"
             style={{
               width: 5.5,
               height: 3,
@@ -644,6 +657,33 @@ export const MataKuma: React.FC<MataKumaProps> = ({
             }}
           />
         )}
+
+        {/* Right Side Charm: Dancing Note for Olivia or generic Music */}
+        {isOlivia ? (
+          <motion.span
+            animate={{
+              y: [-2.5, 1, -2.5],
+              scale: [1.0, 1.3, 1.0],
+              rotate: [12, -12, 12],
+            }}
+            transition={{ duration: 0.85, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }}
+            className="text-[11px] font-bold text-pink-300 drop-shadow-[0_0_8px_rgba(244,114,182,0.9)] pointer-events-none select-none shrink-0"
+          >
+            ♪
+          </motion.span>
+        ) : isMusic ? (
+          <motion.span
+            animate={{
+              y: [-2, 1, -2],
+              scale: [0.95, 1.2, 0.95],
+              rotate: [8, -8, 8],
+            }}
+            transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
+            className="text-[10px] text-[#1ed760] drop-shadow-[0_0_6px_rgba(30,215,96,0.8)] pointer-events-none select-none shrink-0"
+          >
+            ♪
+          </motion.span>
+        ) : null}
       </motion.div>
     </div>
   )
