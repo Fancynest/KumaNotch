@@ -27,14 +27,9 @@ export const AlertCard: React.FC<AlertCardProps> = ({ timerData, onDismiss }) =>
             <Bell className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-amber-400 block leading-tight">
-                {timerData?.isPomodoro ? `${timerData.label} ${t.completedSuffix}` : t.timeUp}
-              </span>
-              <div className="px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30">
-                <MataKuma emotion="happy" isVisible />
-              </div>
-            </div>
+            <span className="text-xs font-bold text-amber-400 block leading-tight">
+              {timerData?.isPomodoro ? `${timerData.label} ${t.completedSuffix}` : t.timeUp}
+            </span>
             <span className="text-[10px] text-white/50 block leading-tight mt-0.5">
               {timerData?.isPomodoro
                 ? isPomodoroBreak
@@ -44,12 +39,18 @@ export const AlertCard: React.FC<AlertCardProps> = ({ timerData, onDismiss }) =>
             </span>
           </div>
         </div>
-        <button
-          onClick={onDismiss}
-          className="text-white/40 hover:text-white transition-colors p-1"
-        >
-          <ChevronDown className="w-5 h-5" />
-        </button>
+
+        <div className="flex items-center gap-2.5">
+          <div className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30 flex items-center justify-center">
+            <MataKuma emotion="happy" isVisible />
+          </div>
+          <button
+            onClick={onDismiss}
+            className="text-white/40 hover:text-white transition-colors p-1"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       <div className="text-center font-mono font-bold text-2xl text-white tracking-tight py-1">
