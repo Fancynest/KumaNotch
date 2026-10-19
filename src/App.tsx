@@ -646,7 +646,6 @@ export default function App() {
   // Horizontal Draggable Island & Magnetic Center Snap
   const [horizontalOffset, setHorizontalOffset] = useState<number>(() => settings.horizontalOffset ?? 0)
   const [isDragging, setIsDragging] = useState<boolean>(false)
-  const [isMagnetActive, setIsMagnetActive] = useState<boolean>(false)
   const [isMagnetSnapped, setIsMagnetSnapped] = useState<boolean>(false)
   const dragRef = useRef<{ startScreenX: number; startOffset: number; hasMoved: boolean } | null>(null)
 
@@ -688,11 +687,9 @@ export default function App() {
 
     // Magnetic attraction near center: if within snap radius, magnet locks to center (0)
     if (Math.abs(rawCandidate) <= SNAP_RADIUS) {
-      setIsMagnetActive(true)
       setIslandOffset(0)
       if (isBrowserDev) setHorizontalOffset(0)
     } else {
-      setIsMagnetActive(false)
       setIslandOffset(rawCandidate)
       if (isBrowserDev) setHorizontalOffset(rawCandidate)
     }
@@ -717,7 +714,6 @@ export default function App() {
         setHorizontalOffset(0)
         setIslandOffset(0)
         globalSettingsEngine.update({ horizontalOffset: 0 })
-        setIsMagnetActive(false)
 
         // If pulled/snapped into center from outside: TRIGGER SURPRISE REACTION!
         if (Math.abs(startOffset) > 15 || Math.abs(rawCandidate) > 15) {
@@ -728,7 +724,6 @@ export default function App() {
         setHorizontalOffset(rawCandidate)
         setIslandOffset(rawCandidate)
         globalSettingsEngine.update({ horizontalOffset: rawCandidate })
-        setIsMagnetActive(false)
       }
 
       setTimeout(() => setIsDragging(false), 50)
@@ -737,7 +732,6 @@ export default function App() {
 
   const handleShellPointerCancel = (e: React.PointerEvent) => {
     dragRef.current = null
-    setIsMagnetActive(false)
     setIsDragging(false)
     try {
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
@@ -809,22 +803,6 @@ export default function App() {
           }}
         />
       )}
-
-      {/* Magnetic Center Alignment Cue */}
-      <AnimatePresence>
-        {isMagnetActive && (
-          <motion.div
-            key="magnet-guide"
-            initial={{ opacity: 0, scaleY: 0 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            exit={{ opacity: 0, scaleY: 0 }}
-            transition={{ duration: 0.15 }}
-            className="absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-amber-400 shadow-[0_0_10px_#f59e0b] rounded-full pointer-events-none z-50 flex flex-col items-center"
-          >
-            <span className="text-[9px] -mt-1 font-black text-amber-400 drop-shadow-[0_0_6px_#f59e0b]">⚡</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* CENTERED CONTAINER FOR MULTI-BUBBLE 3-TASK ISLAND */}
       <div

@@ -560,26 +560,6 @@ export const MataKuma: React.FC<MataKumaProps> = ({
         </motion.div>
       )}
 
-      {/* Magnetic Snap Shock Charm */}
-      {isMagnetSnapped && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0, y: 2 }}
-          animate={{
-            opacity: [1, 0.75, 1],
-            scale: [1, 1.3, 1],
-            y: [-7, -9.5, -7],
-          }}
-          transition={{
-            duration: 0.45,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-          className="absolute -top-3.5 flex items-center gap-0.5 text-[10px] pointer-events-none"
-        >
-          <span className="text-amber-300 font-black drop-shadow-[0_0_8px_rgba(245,158,11,0.9)]">⚡</span>
-        </motion.div>
-      )}
-
       {/* Main Face Container with Subtle Joyful Bobbing when Olivia / Music is playing */}
       <motion.div
         key={currentEmotion}
