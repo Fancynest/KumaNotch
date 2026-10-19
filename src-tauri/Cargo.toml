@@ -31,3 +31,9 @@ windows = { version = "0.62", features = [
     "Foundation",
 ] }
 base64 = "0.22"
+
+[profile.release]
+strip = false
+opt-level = 3
+lto = "off"
+
