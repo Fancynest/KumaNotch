@@ -26,7 +26,7 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   expandedTimer: { width: 370, height: 220 },
   alert: { width: 370, height: 210 },
   expandedFreshFile: { width: 390, height: 240 },
-  settings: { width: 390, height: 320 },
+  settings: { width: 410, height: 380 },
 }
 
 // Single persistent shell geometry configurations
@@ -109,8 +109,8 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     y: 0,
   },
   settings: {
-    width: 350,
-    height: 280,
+    width: 370,
+    height: 340,
     borderRadius: 36,
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)',
     y: 0,
