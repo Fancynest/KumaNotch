@@ -1,4 +1,5 @@
 mod detector;
+mod fresh_file;
 mod media;
 mod shelf;
 mod tray;
@@ -40,6 +41,11 @@ pub fn run() {
             tray::autostart_is_enabled,
             tray::autostart_set,
             tray::tray_set_personality,
+            fresh_file::fresh_get_recent_files,
+            fresh_file::fresh_get_thumbnail,
+            fresh_file::fresh_dismiss,
+            fresh_file::fresh_get_sources,
+            fresh_file::fresh_set_sources,
         ])
         .setup(|app| {
             let handle = app.handle();
@@ -47,6 +53,7 @@ pub fn run() {
             let _ = tray::create_tray(handle);
             detector::start_detector(handle.clone());
             media::init_media(handle.clone());
+            fresh_file::init_fresh_file_watcher(handle.clone());
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -1,9 +1,17 @@
-export type ActivityKind = 'alert' | 'hud' | 'timer' | 'indicator' | 'media' | 'calendar'
+export type ActivityKind =
+  | 'alert'
+  | 'hud'
+  | 'timer'
+  | 'task'
+  | 'indicator'
+  | 'fresh-file'
+  | 'media'
+  | 'calendar'
 
 export interface Activity {
   id: string
   kind: ActivityKind
-  priority: number // alert: 100, hud: 90, timer: 70, indicator: 60, media: 50, calendar: 40
+  priority: number // alert: 100, hud: 90, timer: 70, task: 65, indicator: 60, fresh-file: 55, media: 50, calendar: 40
   title: string
   updatedAt: number
   expiresAt?: number // for transient hud/alerts
@@ -14,7 +22,9 @@ export const ACTIVITY_PRIORITIES: Record<ActivityKind, number> = {
   alert: 100,
   hud: 90,
   timer: 70,
+  task: 65,
   indicator: 60,
+  'fresh-file': 55,
   media: 50,
   calendar: 40,
 }

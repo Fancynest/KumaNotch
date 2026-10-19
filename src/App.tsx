@@ -34,6 +34,8 @@ import { Droplet } from './components/island/Droplet'
 import { HomePager } from './components/island/HomePager'
 import { TimerCard } from './components/island/TimerCard'
 import { AlertCard } from './components/island/AlertCard'
+import { globalFreshFileEngine, type FreshFileInfo } from './core/freshFile'
+import { FreshFileCard } from './components/island/FreshFileCard'
 
 function formatClockTime(now: Date, mode: 'auto' | '12h' | '24h' = 'auto'): string {
   if (mode === '12h') {
@@ -65,6 +67,7 @@ function getIslandView(
   if (expandedActivity === 'music') return 'expandedMusic'
   if (expandedActivity === 'home') return 'home'
   if (expandedActivity === 'timer') return 'expandedTimer'
+  if (expandedActivity === 'freshFile') return 'expandedFreshFile'
   if (isDragOver) return 'dropTarget'
   if (displayState === 'droplet') return 'droplet'
   return 'idle'
@@ -75,14 +78,16 @@ function getDynamicDimensions(
   isCustom: boolean,
   musicActive: boolean,
   timerActive: boolean,
+  freshFileActive: boolean = false,
 ) {
   const baseShell = { ...SHELL_CONFIGS[view] }
   const baseWin = { ...WINDOW_SIZES[view] }
 
   if (view === 'idle') {
-    if (musicActive && timerActive) {
-      baseWin.width = 260
-    } else if (musicActive || timerActive) {
+    const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
+    if (auxCount >= 2) {
+      baseWin.width = 270
+    } else if (auxCount === 1) {
       baseWin.width = 220
     } else {
       baseWin.width = 170
@@ -147,6 +152,14 @@ export default function App() {
   useEffect(() => {
     return globalMediaEngine.subscribe((data) => {
       setMediaData(data ? { ...data } : null)
+    })
+  }, [])
+
+  // Fresh File Engine subscription (Fase 6a)
+  const [freshFile, setFreshFile] = useState<FreshFileInfo | null>(() => globalFreshFileEngine.getActiveFile())
+  useEffect(() => {
+    return globalFreshFileEngine.subscribe((active) => {
+      setFreshFile(active ? { ...active } : null)
     })
   }, [])
 
@@ -267,13 +280,15 @@ export default function App() {
   // Multi-activity flags
   const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
   const isMediaActive = mediaData !== null && mediaData.isActive
+  const isFreshActive = freshFile !== null && settings.freshFileEnabled
   const isExpanded = expandedActivity !== null || timerData?.status === 'completed'
   const hasMusic = isMediaActive && !isExpanded
   const hasTimer = isTimerActive && !isExpanded
+  const hasFresh = isFreshActive && !isExpanded
 
   // Dynamic dimensions & window synchronization
   const currentView = getIslandView(displayState, expandedActivity, timerData, isDragOver)
-  const dims = getDynamicDimensions(currentView, showCustomInput, hasMusic, hasTimer)
+  const dims = getDynamicDimensions(currentView, showCustomInput, hasMusic, hasTimer, hasFresh)
   const currentWindowSizeRef = useRef<WindowSize>(dims.win)
   const targetWinWidth = dims.win.width
   const targetWinHeight = dims.win.height
@@ -292,7 +307,7 @@ export default function App() {
   const hoverDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const leaveCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handleBubblePointerEnter = (type: 'timer' | 'music') => {
+  const handleBubblePointerEnter = (type: 'timer' | 'music' | 'freshFile') => {
     if (leaveCollapseTimerRef.current) {
       clearTimeout(leaveCollapseTimerRef.current)
       leaveCollapseTimerRef.current = null
@@ -320,7 +335,11 @@ export default function App() {
   }
 
   const handleExpandedPointerLeave = () => {
-    if (expandedActivity === 'timer' || expandedActivity === 'music') {
+    if (
+      expandedActivity === 'timer' ||
+      expandedActivity === 'music' ||
+      expandedActivity === 'freshFile'
+    ) {
       leaveCollapseTimerRef.current = setTimeout(() => {
         setExpandedActivity(null)
       }, 250)
@@ -568,9 +587,76 @@ export default function App() {
         className="pt-2 flex items-center justify-center z-40 gap-2.5"
         onPointerDown={handleBackdropPointerDown}
       >
-        {/* LEFT BUBBLE: MUSIC */}
+        {/* LEFT BUBBLE: FRESH FILE OR MUSIC */}
         <AnimatePresence>
-          {isMediaActive && !isExpanded && (
+          {isFreshActive && !isExpanded && (!isMediaActive || isTimerActive) ? (
+            <motion.div
+              key="bubble-fresh"
+              initial={{
+                x: 38,
+                scaleX: 1.55,
+                scaleY: 0.6,
+                scale: 0.35,
+                opacity: 0,
+              }}
+              animate={{
+                x: 0,
+                scaleX: 1,
+                scaleY: 1,
+                scale: 1,
+                opacity: 1,
+              }}
+              exit={{
+                x: 38,
+                scaleX: 1.4,
+                scaleY: 0.6,
+                scale: 0.2,
+                opacity: 0,
+                transition: { duration: 0.22, ease: 'easeIn' },
+              }}
+              transition={{
+                type: 'spring',
+                stiffness: 450,
+                damping: 24,
+                mass: 0.7,
+              }}
+              whileHover={{ scale: 1.14 }}
+              whileTap={{ scale: 0.94 }}
+              onPointerEnter={() => handleBubblePointerEnter('freshFile')}
+              onPointerLeave={handleBubblePointerLeave}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleBubblePointerLeave()
+                setExpandedActivity('freshFile')
+              }}
+              style={{
+                width: 32,
+                height: 32,
+                transformOrigin: 'right center',
+              }}
+              className="relative rounded-full bg-black border border-sky-400/60 shadow-[0_2px_12px_rgba(56,189,248,0.35)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+              title={`${freshFile?.name || t.freshFile} • ${t.clickToOpen}`}
+            >
+              {freshFile?.thumbnail ? (
+                <img
+                  src={freshFile.thumbnail}
+                  alt={freshFile.name}
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                <Sparkles className="w-4 h-4 text-sky-400 animate-pulse" />
+              )}
+
+              {hoveredTarget === 'freshFile' && (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
+                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute inset-0 rounded-full border-2 border-sky-400 pointer-events-none"
+                />
+              )}
+            </motion.div>
+          ) : isMediaActive && !isExpanded ? (
             <motion.div
               key="bubble-music"
               initial={{
@@ -641,7 +727,7 @@ export default function App() {
                 />
               )}
             </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
 
         {/* SINGLE PERSISTENT SHELL */}
@@ -701,7 +787,11 @@ export default function App() {
           )}
 
           {currentView === 'droplet' && (
-            <Droplet timerData={timerData} mediaData={mediaData} />
+            <Droplet timerData={timerData} mediaData={mediaData} freshFile={freshFile} />
+          )}
+
+          {currentView === 'expandedFreshFile' && freshFile && (
+            <FreshFileCard file={freshFile} onClose={collapseAll} />
           )}
 
           {currentView === 'expandedMusic' && (
@@ -744,9 +834,9 @@ export default function App() {
           )}
         </Shell>
 
-        {/* RIGHT BUBBLE: TIMER */}
+        {/* RIGHT BUBBLE: TIMER OR FRESH FILE */}
         <AnimatePresence>
-          {isTimerActive && !isExpanded && (
+          {isTimerActive && !isExpanded ? (
             <motion.div
               key="bubble-timer"
               initial={{
@@ -834,7 +924,74 @@ export default function App() {
                 />
               )}
             </motion.div>
-          )}
+          ) : isFreshActive && isMediaActive && !isExpanded ? (
+            <motion.div
+              key="bubble-fresh-right"
+              initial={{
+                x: -38,
+                scaleX: 1.55,
+                scaleY: 0.6,
+                scale: 0.35,
+                opacity: 0,
+              }}
+              animate={{
+                x: 0,
+                scaleX: 1,
+                scaleY: 1,
+                scale: 1,
+                opacity: 1,
+              }}
+              exit={{
+                x: -38,
+                scaleX: 1.4,
+                scaleY: 0.6,
+                scale: 0.2,
+                opacity: 0,
+                transition: { duration: 0.22, ease: 'easeIn' },
+              }}
+              transition={{
+                type: 'spring',
+                stiffness: 450,
+                damping: 24,
+                mass: 0.7,
+              }}
+              whileHover={{ scale: 1.14 }}
+              whileTap={{ scale: 0.94 }}
+              onPointerEnter={() => handleBubblePointerEnter('freshFile')}
+              onPointerLeave={handleBubblePointerLeave}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleBubblePointerLeave()
+                setExpandedActivity('freshFile')
+              }}
+              style={{
+                width: 32,
+                height: 32,
+                transformOrigin: 'left center',
+              }}
+              className="relative rounded-full bg-black border border-sky-400/60 shadow-[0_2px_12px_rgba(56,189,248,0.35)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+              title={`${freshFile?.name || t.freshFile} • ${t.clickToOpen}`}
+            >
+              {freshFile?.thumbnail ? (
+                <img
+                  src={freshFile.thumbnail}
+                  alt={freshFile.name}
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                <Sparkles className="w-4 h-4 text-sky-400 animate-pulse" />
+              )}
+
+              {hoveredTarget === 'freshFile' && (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
+                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute inset-0 rounded-full border-2 border-sky-400 pointer-events-none"
+                />
+              )}
+            </motion.div>
+          ) : null}
         </AnimatePresence>
       </div>
 

@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   GripVertical,
   ChevronDown,
+  Sparkles,
+  Plus,
 } from 'lucide-react'
 import { Reorder, useDragControls } from 'framer-motion'
 import {
@@ -27,6 +29,7 @@ import {
   getFileCategory,
   type ShelfItem,
 } from '../../core/shelf'
+import { globalFreshFileEngine, type FreshFileInfo } from '../../core/freshFile'
 import { getT } from '../../core/i18n'
 
 interface FileShelfProps {
@@ -279,12 +282,21 @@ function ShelfItemRow({
 export function FileShelf({ isDragOver = false, onClose }: FileShelfProps) {
   const t = getT()
   const [items, setItems] = useState<ShelfItem[]>(() => globalShelfEngine.getItems())
+  const [recentFresh, setRecentFresh] = useState<FreshFileInfo[]>(() =>
+    globalFreshFileEngine.getRecentFiles(),
+  )
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [isFullWarning, setIsFullWarning] = useState<boolean>(false)
 
   useEffect(() => {
     return globalShelfEngine.subscribe((newItems) => {
       setItems(newItems)
+    })
+  }, [])
+
+  useEffect(() => {
+    return globalFreshFileEngine.subscribe((_active, recent) => {
+      setRecentFresh([...recent])
     })
   }, [])
 
@@ -351,6 +363,59 @@ export function FileShelf({ isDragOver = false, onClose }: FileShelfProps) {
           )}
         </div>
       </div>
+
+      {/* Session Recent Strip "Baru" (Spec Fase 6a: 5 file terakhir sesi ini di atas shelf) */}
+      {recentFresh.length > 0 && !isDragOver && (
+        <div className="flex flex-col gap-1 shrink-0 px-0.5 py-1 rounded-lg bg-sky-500/[0.07] border border-sky-500/15">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[9px] font-semibold text-sky-300 uppercase tracking-wider flex items-center gap-1">
+              <Sparkles className="w-2.5 h-2.5 text-sky-400" />
+              {t.recentFiles}
+            </span>
+            <span className="text-[8px] text-white/30 font-mono">
+              {recentFresh.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 overflow-x-auto px-0.5 scrollbar-none">
+            {recentFresh.map((rf) => (
+              <div
+                key={rf.id}
+                onClick={() => globalFreshFileEngine.openFile(rf.path)}
+                draggable="true"
+                onDragStart={(e) => {
+                  e.preventDefault()
+                  globalFreshFileEngine.startDrag(rf.path)
+                }}
+                className="group flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/80 shrink-0 cursor-grab active:cursor-grabbing text-[10px] select-none transition-all"
+                title={`${rf.name} • ${t.clickToOpenOrDrag}`}
+              >
+                {rf.thumbnail ? (
+                  <img
+                    src={rf.thumbnail}
+                    alt={rf.name}
+                    className="w-3.5 h-3.5 object-cover rounded shrink-0"
+                  />
+                ) : (
+                  <File className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                )}
+                <span className="truncate max-w-[70px] text-[10px] font-medium leading-none">
+                  {rf.name}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    globalFreshFileEngine.addToShelf(rf.path)
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-sky-400/20 text-sky-300 transition-opacity"
+                  title={t.addToShelf}
+                >
+                  <Plus className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Shelf Full Warning Toast */}
       {isFullWarning && (

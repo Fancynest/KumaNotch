@@ -16,6 +16,9 @@ Measurement tools:
 | Phase 1b | Mode Droplet & WinEvent Hook | 0.00% | ~34.8 MB App + ~25 MB Webview (~60 MB total) | Windows Task Manager | Windows 11 x64 | Zero-polling WinEvent hook; 0.00% CPU measured over 60s |
 | Phase 1b (Shell) | Single Persistent Shell & Morphing | 0.00% idle, < 2.5% during spring | ~38.2 MB App + ~25 MB Webview (~63 MB total) | Windows Task Manager | Windows 11 x64 | Measured on release build; 0 dropped frames during expand/collapse |
 | Phase 5.5 | Stabilisasi (3-Task Island + SMTC + Timer 1s) | 0.00% idle, < 1.8% during multi-bubble anim | ~39.4 MB App + ~26 MB Webview (~65 MB total) | Windows Task Manager | Windows 11 x64 | Timer interval 1s, SMTC single binding, zero IPC thumbnail spam |
+| Phase 6 Setup | Profil Release Ringan (LTO, opt-level=s, strip=true) | 0.00% idle | 29.4 MB App (4.97 MB private) + ~25 MB Webview (~54.4 MB total) | Windows Task Manager / PowerShell | Windows 11 x64 | Biner exe turun ke 3.65 MB (dari >12 MB). 0.00% CPU idle |
+| Phase 6a | Fresh File Tray (Win32 Shell + notify watcher) | 0.00% idle | ~30.2 MB App (5.1 MB private) + ~25 MB Webview (~55 MB total) | Windows Task Manager / Process Monitor | Windows 11 x64 | Zero-polling ReadDirectoryChangesW, in-memory COM thumbnail cache, 0.00% idle CPU |
+
 
 ---
 

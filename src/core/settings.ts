@@ -11,6 +11,12 @@ export interface AppSettings {
   idleBeforeEyesSeconds: number
   timerChimeEnabled: boolean
   timerChimeVolume: number
+  freshFileEnabled: boolean
+  freshFileScreenshots: boolean
+  freshFileDownloads: boolean
+  freshFileDurationSeconds: number
+  freshFileDismissOnDrag: boolean
+  freshFileSound: boolean
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -24,6 +30,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   idleBeforeEyesSeconds: 6,
   timerChimeEnabled: true,
   timerChimeVolume: 80,
+  freshFileEnabled: true,
+  freshFileScreenshots: true,
+  freshFileDownloads: true,
+  freshFileDurationSeconds: 8,
+  freshFileDismissOnDrag: true,
+  freshFileSound: false,
 }
 
 const STORAGE_KEY = 'kumanotch_settings'

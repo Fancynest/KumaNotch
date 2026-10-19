@@ -25,6 +25,7 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   expandedMusic: { width: 400, height: 230 },
   expandedTimer: { width: 370, height: 220 },
   alert: { width: 370, height: 210 },
+  expandedFreshFile: { width: 390, height: 240 },
   settings: { width: 390, height: 320 },
 }
 
@@ -98,6 +99,13 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     height: 165,
     borderRadius: 36,
     boxShadow: '0 4px 25px rgba(255, 149, 0, 0.45)',
+    y: 0,
+  },
+  expandedFreshFile: {
+    width: 350,
+    height: 195,
+    borderRadius: 36,
+    boxShadow: '0 4px 25px rgba(56, 189, 248, 0.35)',
     y: 0,
   },
   settings: {

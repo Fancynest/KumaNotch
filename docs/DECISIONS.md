@@ -131,6 +131,24 @@ This document records architectural choices, deviations from the initial spec, a
      - **Right Bubble (Timer)**: Circular 32px bubble featuring an SVG circular countdown ring and remaining time display.
   2. **Liquid Droplet Separation Animation**: When a timer starts while the main capsule is active, the timer bubble separates from the main capsule using an authentic liquid-droplet spring animation (`scaleX: 1.55, scaleY: 0.6` tapering into `scale: 1`).
   3. **Hover Dwell Expansion (2s)**: Hovering over the timer or music bubble for 2 seconds displays a pulsating aura and smoothly expands that specific activity. Moving the cursor away auto-collapses it after 250ms. Direct click expands instantly.
+## Decision 012: Build Toolchain Architecture & Lightweight LTO Release Profile
+- **Date**: 2026-10-19
+- **Context**: The MinGW GNU linker (`x86_64-w64-mingw32-gcc / collect2.exe`) fails with `exit status 116` when linking Rust proc-macro DLLs (`windows-implement`, `tauri-macros`). Additionally, committing machine-specific `.cargo/config.toml` to the project repository pollutes source control.
+- **Decision**:
+  1. **Clean Repo Policy**: Removed machine-specific `.cargo/config.toml` from the repository root and `src-tauri`. Linker configurations for the local GNU toolchain are placed in the user's global cargo configuration (`%USERPROFILE%\.cargo\config.toml`) specifying `linker = "rust-lld"`.
+  2. **Lightweight Release Optimization**: Standardized `[profile.release]` with `opt-level = "s"`, `lto = true`, `codegen-units = 1`, `panic = "abort"`, and `strip = true`.
+  3. **Measured Impact**: Binary executable size reduced from >12 MB to 3.65 MB (installer NSIS 6.97 MB, MSI 10.14 MB). Private working set dropped to <5 MB, and idle CPU remains firmly at 0.00%.
 
+## Decision 013: Fresh File Tray Architecture & Native Shell Thumbnails (Fase 6a)
+- **Date**: 2026-10-19
+- **Context**: When users take screenshots (Win+PrtScn, Snipping Tool) or finish downloads (Chrome, Edge, Firefox), opening Explorer and finding the file interrupts workflow. A transient notch tray allows instant inspection, opening, and native drag-and-drop into chat or email without file clutter.
+- **Decision**:
+  1. **Win32 Known Folders Discovery**: Uses `SHGetKnownFolderPath` with `FOLDERID_Downloads` and `FOLDERID_Screenshots` (with Pictures\Screenshots fallback). This dynamically handles custom directory paths, drive relocations, and OneDrive redirections without hardcoded assumptions.
+  2. **Zero-Polling Watcher (`notify` / `ReadDirectoryChangesW`)**: Non-recursive filesystem notifications backed by Win32 completion events. Pre-existing files are snapshotted at launch so historical items are never falsely emitted.
+  3. **Download In-Progress Filtering & Readiness Detection**: Temporary download files (`.crdownload`, `.part`, `.tmp`, `.download`, `.opdownload`) are ignored. File readiness is validated by testing size stability ($\ge 800\text{ms}$) and non-locking read access (`std::fs::File::open`), safely accommodating browser "rename on completion" mechanics.
+  4. **Flurry Debounce & Batching**: High-frequency file bursts (e.g. unzipping an archive with 50+ files) within a sliding 2.0-second window are aggregated into a single `"N file baru"` batch item, preventing UI notification flooding.
+  5. **Win32 Shell Thumbnails (`IShellItemImageFactory`)**: Generates high-fidelity 256×256 thumbnails using Windows Shell thumbnail handlers (supporting images, PDFs, Office documents), resized via the `image` crate (Lanczos3), converted to PNG, base64-encoded, and cached in-memory.
+  6. **Transient Activity with Inactivity Countdown & Hover Pause**: Emits as priority 55 `fresh-file` activity. Displays for 8 seconds (customizable 5–15s in Settings), auto-pausing the countdown when hovered, and resuming when the cursor departs.
+  7. **Native Drag-Out & In-Memory Shelf Strip**: Dragging the thumbnail initiates native OS OLE drag (`tauri-plugin-drag`) directly into Windows Explorer, web browsers, or chat apps. The 5 most recent files of the session appear in a dedicated "Baru" strip at the top of the File Shelf.
 
 

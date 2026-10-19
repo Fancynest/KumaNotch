@@ -129,3 +129,58 @@ Create test files in a temporary directory with the following filename patterns:
     - Move cursor out: verify it auto-collapses back into the bubble after 250ms.
 - [ ] **Direct Click**:
   - Click directly on the Music or Timer bubble: verify it expands immediately without waiting for the 2-second dwell timer.
+
+---
+
+## 6. Fresh File Tray & Shell Thumbnails (Fase 6a)
+
+### 6.1 Screenshot Detection (Win + PrtScn & Snipping Tool)
+- [ ] Press `Win + PrtScn` to capture screen to `Pictures\Screenshots`.
+  - **Expected**: Within ~1 second, KumaNotch displays the **Fresh File** notification with image thumbnail.
+- [ ] Hover cursor over the notification:
+  - **Expected**: Expands to Fresh File Card showing image preview, filename, file size, and action buttons.
+- [ ] **Native Drag-Out**:
+  - Click and drag directly from the thumbnail image in the Fresh File Card into:
+    1. A folder in Windows File Explorer.
+    2. A chat window in WhatsApp Web or Discord.
+  - **Expected**: The physical file is transferred via OS drag-and-drop.
+  - If "Dismiss on drag" is enabled in Settings, verify the card dismisses upon drag release.
+
+### 6.2 Browser Download In-Progress Filtering (Chrome, Edge, Firefox)
+- [ ] Start downloading a large file (e.g. 50MB+ ISO/ZIP/installer) in Google Chrome or Microsoft Edge.
+  - **Expected**: During active download, `.crdownload` or `.tmp` file is completely ignored. KumaNotch does NOT trigger prematurely.
+- [ ] Wait for download completion:
+  - **Expected**: The moment the browser finishes and renames the file to its final extension, KumaNotch detects it within ~800ms and displays the thumbnail and metadata.
+
+### 6.3 Flurry & Zip Extraction Debouncing
+- [ ] Download or create a `.zip` archive containing 50+ files.
+- [ ] Extract the archive directly into the `Downloads` directory.
+  - **Expected**: KumaNotch aggregates the burst of 50+ events within 2.0 seconds into a single consolidated item (`"N file baru"`).
+  - Verify the notch does NOT spam 50 individual cards or freeze the UI.
+
+### 6.4 Inactivity Countdown & Hover Pause
+- [ ] Trigger a fresh file (screenshot or download).
+  - **Expected**: The card displays an 8-second animated timer indicator.
+- [ ] Move cursor over the card:
+  - **Expected**: Countdown immediately pauses. The card remains open indefinitely while hovered.
+- [ ] Move cursor out of the card:
+  - **Expected**: Countdown resumes from where it paused and cleanly auto-dismisses upon reaching 0.
+
+### 6.5 Droplet Mode & Fullscreen Game Behavior
+- [ ] In App/Droplet mode: trigger a screenshot with `Win + PrtScn`.
+  - **Expected**: The droplet displays a small cyan indicator dot. It does NOT forcibly expand or steal window focus.
+- [ ] In Fullscreen D3D game: trigger screenshot.
+  - **Expected**: KumaNotch remains completely hidden and non-intrusive.
+
+### 6.6 File Shelf "Baru" Strip
+- [ ] Expand KumaNotch and switch to the **File Shelf** page.
+  - **Expected**: A dedicated horizontal strip titled **Baru** appears at the top, listing up to 5 recently discovered files from this session.
+- [ ] Click **+** (Add to Shelf) on an item in the "Baru" strip:
+  - **Expected**: The item is permanently pinned to the persistent File Shelf.
+
+### 6.7 Zero-Polling & Idle Resource Verification
+- [ ] Open Windows Task Manager or Sysinternals Process Monitor.
+- [ ] Filter to `kumanotch.exe`.
+- [ ] Observe for 60 seconds with no file activity in Downloads or Screenshots.
+  - **Expected**: 0 context switches from polling loops, CPU remains firmly at 0.00%.
+

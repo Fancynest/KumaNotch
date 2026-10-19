@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export type DisplayState = 'capsule' | 'droplet'
-export type ExpandedActivity = 'home' | 'timer' | 'music' | 'settings' | null
+export type ExpandedActivity = 'home' | 'timer' | 'music' | 'settings' | 'freshFile' | null
 export type SystemMode = 'desktop' | 'app' | 'hidden'
 export type IslandView =
   | 'droplet'
@@ -9,6 +9,7 @@ export type IslandView =
   | 'home'
   | 'expandedTimer'
   | 'expandedMusic'
+  | 'expandedFreshFile'
   | 'alert'
   | 'dropTarget'
   | 'settings'
@@ -19,7 +20,7 @@ interface IslandStoreState {
   homePage: number // 0 = Music, 1 = Clock/Timer, 2 = Shelf
   systemMode: SystemMode
   isDwelling: boolean
-  hoveredTarget: 'timer' | 'music' | null
+  hoveredTarget: 'timer' | 'music' | 'freshFile' | null
   isDragOver: boolean
   showCustomInput: boolean
 
@@ -28,7 +29,7 @@ interface IslandStoreState {
   setHomePage: (page: number) => void
   setSystemMode: (mode: SystemMode) => void
   setIsDwelling: (dwelling: boolean) => void
-  setHoveredTarget: (target: 'timer' | 'music' | null) => void
+  setHoveredTarget: (target: 'timer' | 'music' | 'freshFile' | null) => void
   setIsDragOver: (isDragOver: boolean) => void
   setShowCustomInput: (show: boolean) => void
   collapseAll: () => void

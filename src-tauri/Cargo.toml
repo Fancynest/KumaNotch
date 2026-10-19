@@ -31,6 +31,8 @@ windows = { version = "0.62", features = [
     "Foundation",
 ] }
 base64 = "0.22"
+notify = "8"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 
 [profile.release]
 opt-level = "s"

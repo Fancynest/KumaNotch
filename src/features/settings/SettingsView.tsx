@@ -14,7 +14,7 @@ interface SettingsViewProps {
   onClose: () => void
 }
 
-type SettingsTab = 'general' | 'notch' | 'personality'
+type SettingsTab = 'general' | 'notch' | 'personality' | 'freshFile'
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<AppSettings>(() => globalSettingsEngine.getSettings())
@@ -82,6 +82,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
             }`}
           >
             {t.tabPersonality}
+          </button>
+          <button
+            onClick={() => setActiveTab('freshFile')}
+            className={`px-2 py-0.5 rounded-md transition-all font-medium ${
+              activeTab === 'freshFile'
+                ? 'bg-white/20 text-white font-semibold'
+                : 'text-white/50 hover:text-white/80'
+            }`}
+          >
+            {t.tabFreshFile}
           </button>
         </div>
 
@@ -368,6 +378,123 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
                   className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
                 />
               </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: FRESH FILE TRAY (FASE 6A) */}
+        {activeTab === 'freshFile' && (
+          <div className="space-y-3">
+            {/* Master Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="max-w-[210px]">
+                <span className="text-xs font-medium text-white block">{t.freshFile}</span>
+                <span className="text-[10px] text-white/40 block leading-tight">{t.freshFileDesc}</span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.freshFileEnabled}
+                onClick={() => updateSetting('freshFileEnabled', !settings.freshFileEnabled)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  settings.freshFileEnabled ? 'bg-sky-500' : 'bg-white/20'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    settings.freshFileEnabled ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {settings.freshFileEnabled && (
+              <>
+                {/* Watch Screenshots Toggle */}
+                <div className="flex items-center justify-between pt-1 border-t border-white/10">
+                  <div>
+                    <span className="text-xs font-medium text-white block">{t.watchScreenshots}</span>
+                    <span className="text-[10px] text-white/40 block">Pictures\Screenshots</span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.freshFileScreenshots}
+                    onClick={() => updateSetting('freshFileScreenshots', !settings.freshFileScreenshots)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.freshFileScreenshots ? 'bg-sky-500' : 'bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        settings.freshFileScreenshots ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Watch Downloads Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-medium text-white block">{t.watchDownloads}</span>
+                    <span className="text-[10px] text-white/40 block">User\Downloads</span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.freshFileDownloads}
+                    onClick={() => updateSetting('freshFileDownloads', !settings.freshFileDownloads)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.freshFileDownloads ? 'bg-sky-500' : 'bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        settings.freshFileDownloads ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Display Duration Slider */}
+                <div className="space-y-1 pt-1 border-t border-white/10">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-white/80">{t.displayDuration}</span>
+                    <span className="font-mono text-sky-400 font-semibold">{settings.freshFileDurationSeconds} {t.secondsUnit}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="15"
+                    step="1"
+                    value={settings.freshFileDurationSeconds}
+                    onChange={(e) => updateSetting('freshFileDurationSeconds', parseInt(e.target.value, 10))}
+                    className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-sky-400"
+                  />
+                </div>
+
+                {/* Dismiss on drag */}
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <span className="text-xs font-medium text-white block">{t.dismissOnDrag}</span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.freshFileDismissOnDrag}
+                    onClick={() => updateSetting('freshFileDismissOnDrag', !settings.freshFileDismissOnDrag)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.freshFileDismissOnDrag ? 'bg-sky-500' : 'bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        settings.freshFileDismissOnDrag ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </>
             )}
           </div>
         )}
