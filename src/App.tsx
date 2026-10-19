@@ -88,6 +88,7 @@ function getDynamicDimensions(
   musicActive: boolean,
   timerActive: boolean,
   freshFileActive: boolean = false,
+  hasPostAction: boolean = false,
 ) {
   const baseShell = { ...SHELL_CONFIGS[view] }
   const baseWin = { ...WINDOW_SIZES[view] }
@@ -105,7 +106,10 @@ function getDynamicDimensions(
 
   if (view === 'deviceNotification' || view === 'processAlert') {
     const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
-    if (auxCount >= 2) {
+    if (view === 'processAlert' && hasPostAction) {
+      baseShell.width = 340
+      baseWin.width = 370
+    } else if (auxCount >= 2) {
       baseWin.width = 380
     } else if (auxCount === 1) {
       baseWin.width = 340
@@ -340,7 +344,14 @@ export default function App() {
     deviceNotification,
     processAlert,
   )
-  const dims = getDynamicDimensions(currentView, showCustomInput, hasMusic, hasTimer, hasFresh)
+  const dims = getDynamicDimensions(
+    currentView,
+    showCustomInput,
+    hasMusic,
+    hasTimer,
+    hasFresh,
+    Boolean(processAlert?.post_action),
+  )
   const currentWindowSizeRef = useRef<WindowSize>(dims.win)
   const targetWinWidth = dims.win.width
   const targetWinHeight = dims.win.height
@@ -1381,6 +1392,22 @@ export default function App() {
             title="Simulate kuma process error"
           >
             ❌ kuma err
+          </button>
+          <button
+            onClick={() =>
+              globalProcessWatcherEngine.handleEvent({
+                id: `mock-post-${Date.now()}`,
+                command: 'kuma run --post-action sleep train.py',
+                status: 'success',
+                exit_code: 0,
+                duration_ms: 12450,
+                post_action: 'sleep',
+              })
+            }
+            className="px-1.5 py-0.5 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-400/60 text-cyan-300 font-medium font-mono text-[10px]"
+            title="Simulate process with post-action countdown"
+          >
+            💤 post-act
           </button>
           <button
             onClick={() => {

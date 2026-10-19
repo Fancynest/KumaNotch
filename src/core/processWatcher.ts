@@ -1,5 +1,4 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { invoke } from '@tauri-apps/api/core'
 
 export interface ProcessEvent {
   id: string
@@ -8,6 +7,7 @@ export interface ProcessEvent {
   exit_code?: number | null
   duration_ms: number
   message?: string | null
+  post_action?: string | null
 }
 
 type ProcessListener = (state: {
@@ -55,11 +55,12 @@ class ProcessWatcherEngine {
 
       this.notify()
 
-      // Auto-dismiss finished alert after 4.5s
+      // Auto-dismiss finished alert after 4.5s (or 33s if post-action countdown is active)
+      const dismissDelay = event.post_action ? 33000 : 4500
       this.alertTimer = setTimeout(() => {
         this.latestAlert = null
         this.notify()
-      }, 4500)
+      }, dismissDelay)
     }
   }
 
@@ -81,28 +82,25 @@ class ProcessWatcherEngine {
   }
 
   public async runCommand(command: string): Promise<void> {
-    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-      await invoke('kuma_run_command', { command })
-    } else {
-      // Mock simulation for browser dev
-      const id = `mock-${Date.now()}`
+    // In accordance with security constraints, KumaNotch never executes commands directly.
+    // This method is strictly a mock simulator for dev and UI testing.
+    const id = `mock-${Date.now()}`
+    this.handleEvent({
+      id,
+      command,
+      status: 'running',
+      duration_ms: 0,
+    })
+
+    setTimeout(() => {
       this.handleEvent({
         id,
         command,
-        status: 'running',
-        duration_ms: 0,
+        status: 'success',
+        exit_code: 0,
+        duration_ms: 2450,
       })
-
-      setTimeout(() => {
-        this.handleEvent({
-          id,
-          command,
-          status: 'success',
-          exit_code: 0,
-          duration_ms: 2450,
-        })
-      }, 2500)
-    }
+    }, 2500)
   }
 
   public subscribe(listener: ProcessListener): () => void {

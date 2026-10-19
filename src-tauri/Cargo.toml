@@ -39,11 +39,27 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Pipes",
+    "Win32_System_Power",
+    "Win32_System_Threading",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Memory",
+    "Win32_System_IO",
 ] }
 windows-core = "0.62"
 base64 = "0.22"
 notify = "8"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+
+[[bin]]
+name = "kuma"
+path = "src/bin/kuma.rs"
+
+[[bin]]
+name = "security_tests"
+path = "src/bin/security_tests.rs"
 
 [profile.release]
 opt-level = "s"

@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, Terminal, XCircle } from 'lucide-react'
+import { CheckCircle2, Terminal, XCircle, Clock, X } from 'lucide-react'
 import type { ProcessEvent } from '../../core/processWatcher'
 import { MataKuma } from './MataKuma'
 
@@ -16,12 +16,50 @@ export const ProcessNotificationCard: React.FC<ProcessNotificationCardProps> = (
   const isRunning = event.status === 'running'
   const isSuccess = event.status === 'success'
 
+  const [countdown, setCountdown] = useState<number>(30)
+  const [isCancelled, setIsCancelled] = useState<boolean>(false)
+  const hasPostAction = Boolean(event.post_action && !isRunning)
+
+  useEffect(() => {
+    if (!hasPostAction || isCancelled) return
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [hasPostAction, isCancelled])
+
+  const handleCancel = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsCancelled(true)
+  }
+
   const durationStr =
     event.duration_ms > 0
       ? event.duration_ms >= 1000
         ? `${(event.duration_ms / 1000).toFixed(1)}s`
         : `${event.duration_ms}ms`
       : null
+
+  const getActionLabel = (action: string) => {
+    switch (action.toLowerCase()) {
+      case 'sleep':
+        return 'Tidur'
+      case 'lock':
+        return 'Kunci'
+      case 'chime':
+        return 'Chime'
+      default:
+        return action
+    }
+  }
 
   return (
     <motion.div
@@ -30,10 +68,10 @@ export const ProcessNotificationCard: React.FC<ProcessNotificationCardProps> = (
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
       onClick={onDismiss}
-      className="absolute inset-0 px-3.5 flex items-center justify-between text-white overflow-hidden cursor-pointer select-none"
+      className="absolute inset-0 px-3 flex items-center justify-between text-white overflow-hidden cursor-pointer select-none"
     >
       {/* Left: Process Icon & Info */}
-      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+      <div className="flex items-center gap-2 min-w-0 pr-1.5">
         <div
           className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
             isRunning
@@ -54,12 +92,12 @@ export const ProcessNotificationCard: React.FC<ProcessNotificationCardProps> = (
 
         <div className="flex flex-col min-w-0 justify-center">
           <div className="flex items-center gap-1.5 leading-none">
-            <span className="text-xs font-semibold text-white/95 truncate font-mono tracking-tight">
+            <span className="text-xs font-semibold text-white/95 truncate font-mono tracking-tight max-w-[130px]">
               {event.command}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 mt-1 leading-none">
+          <div className="flex items-center gap-1 mt-1 leading-none">
             <span
               className={`text-[10px] font-medium tracking-tight ${
                 isRunning
@@ -84,12 +122,45 @@ export const ProcessNotificationCard: React.FC<ProcessNotificationCardProps> = (
                 </span>
               </>
             )}
+
+            {/* Post-action status countdown */}
+            {hasPostAction && (
+              <>
+                <span className="text-[10px] text-white/30">•</span>
+                {isCancelled ? (
+                  <span className="text-[10px] font-medium text-amber-300/90">
+                    Aksi dibatalkan
+                  </span>
+                ) : countdown > 0 ? (
+                  <span className="text-[10px] font-mono font-medium text-cyan-300 flex items-center gap-0.5">
+                    <Clock className="w-2.5 h-2.5" />
+                    {getActionLabel(event.post_action!)} {countdown}s
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-medium text-emerald-300">
+                    Aksi dijalankan
+                  </span>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Right: Mata Kuma reacting directly */}
-      <div className="shrink-0 flex items-center gap-2.5 pl-1">
+      {/* Right: Batal Button & Mata Kuma */}
+      <div className="shrink-0 flex items-center gap-2 pl-1">
+        {hasPostAction && !isCancelled && countdown > 0 && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="px-2 py-0.5 text-[10px] font-semibold tracking-wide bg-rose-500/25 hover:bg-rose-500/40 text-rose-200 hover:text-white border border-rose-500/40 hover:border-rose-400/60 rounded-full transition-all flex items-center gap-0.5 shadow-sm active:scale-95 cursor-pointer"
+            title="Batalkan aksi setelah selesai"
+          >
+            <X className="w-2.5 h-2.5" />
+            <span>Batal</span>
+          </button>
+        )}
+
         <div
           className={`w-1.5 h-1.5 rounded-full shrink-0 ${
             isRunning

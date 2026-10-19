@@ -343,3 +343,35 @@ This document records architectural choices, deviations from the initial spec, a
   4. **Surprised Reaction (`kaget`) on Magnetic Snap**:
      - Snapping to center from outside triggers `isMagnetSnapped = true` for 2.6 seconds.
      - Mata Kuma awakens immediately in `ClockCapsule` and expresses `surprised` emotion with enlarged wide round eyes (`type="wide"`), raised brows, and a pulsing shock spark `⚡`.
+
+## Decision 024: Process Watcher Security Hardening, SID-Protected Named Pipe, Rust `kuma.exe` CLI, Mode A & Keep-Awake
+- **Date**: 2026-10-19
+- **Context**: Security review of the prototype process watcher identified vulnerabilities in local TCP daemon design: KumaNotch must never execute processes on behalf of incoming payloads, cross-origin web requests could reach `127.0.0.1:45454`, and script injection was possible via shell string interpolation in `kuma.cmd`. Additionally, remaining Fase 6b specifications (kernel-driven Mode A PID watcher, 30-second post-action countdown with Cancel, and thread-level keep-awake) needed full completion.
+- **Decision**:
+  1. **Security Purge**:
+     - Completely removed route `POST /run`, command handler `kuma_run_command`, and header `Access-Control-Allow-Origin`. KumaNotch acts strictly as a passive listener/observer and cannot execute arbitrary processes.
+  2. **SID-Restricted Windows Named Pipe (`\\.\pipe\kumanotch`)**:
+     - Replaced TCP server `127.0.0.1:45454` with a local Windows Named Pipe `\\.\pipe\kumanotch`.
+     - Built with a protected DACL (`D:P(A;;GA;;;USER_SID)`) extracted from `OpenProcessToken` and `TokenUser`. `P` (protected) blocks inherited permissions, granting `GENERIC_ALL` strictly to the current user token. Connections from other local users, Everyone, Network, Guest, or unprivileged sandboxes are rejected with `ERROR_ACCESS_DENIED` at the kernel level.
+     - Payload bounded strictly to 4 KB max (`MAX_PAYLOAD_SIZE = 4096`).
+     - Strings bounded: `command` <= 256 chars, `message` <= 512 chars, `post_action` <= 64 chars. Corrupted or oversize payloads are discarded without panics.
+     - Process IDs generated via atomic counter (`proc-{elapsed_millis}-{counter}`).
+     - Status strictly normalized to `"running" | "success" | "error"`.
+  3. **Native Rust CLI `kuma.exe` (Replacing `kuma.cmd`)**:
+     - Built native Rust binary target `[[bin]] name = "kuma" path = "src/bin/kuma.rs"`.
+     - `kuma run <cmd...>` executes commands with inherited stdio (`stdin/stdout/stderr`) directly via `std::process::Command`, zero shell string interpolation, preserving interactive prompts and ANSI escapes.
+     - Reports start (`running`) and completion (`success` or `error` + duration + exit code) via named pipe.
+     - `kuma notify <title> [msg]` sends status notification only.
+     - `kuma watch <pid> [name]` tracks external processes.
+     - `kuma status` checks daemon availability.
+  4. **Mode A: Kernel-Driven PID Monitoring (Zero Polling)**:
+     - Implemented `watch_process_pid` using `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE)` and `WaitForSingleObject(h_process, INFINITE)`.
+     - Event-driven kernel blocking without interval polling (0.00% CPU overhead). Emits running and completion events.
+  5. **Post-Action Countdown (30s) & Prominent Cancel Button**:
+     - When `post_action` is specified (e.g. `kuma run --post-action sleep <cmd>`), `ProcessNotificationCard` initiates an active 30-second countdown (e.g. "Tidur dalam 30s") with a prominent "Batal" (Cancel) button.
+     - Clicking "Batal" aborts the countdown immediately, changes label to "Aksi dibatalkan", and prevents trigger.
+  6. **Keep-Awake Dedicated Thread**:
+     - Dedicated background thread (`kumanotch-keep-awake`) manages `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED)` during active executions, releasing cleanly on completion.
+  7. **Automated Security Verification**:
+     - Added automated security test suite (`src/bin/security_tests.rs`) covering oversize payloads (> 4 KB), corrupted JSON, user-only SDDL/DACL validation, text truncation, and status normalization.
+

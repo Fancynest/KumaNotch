@@ -2,7 +2,7 @@ mod audio_device;
 mod detector;
 mod fresh_file;
 mod media;
-mod process_watcher;
+pub mod process_watcher;
 mod shelf;
 mod tray;
 mod window;
@@ -64,7 +64,6 @@ pub fn run() {
             fresh_file::fresh_dismiss,
             fresh_file::fresh_get_sources,
             fresh_file::fresh_set_sources,
-            process_watcher::kuma_run_command,
         ])
         .setup(|app| {
             let handle = app.handle();

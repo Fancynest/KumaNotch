@@ -309,25 +309,48 @@ Create test files in a temporary directory with the following filename patterns:
 
 ---
 
-## 8. Fase 6b: Process Watcher, CLI Runner & Expressive Emotions
+## 8. Fase 6b: Process Watcher, Security Hardening & Rust CLI (`kuma.exe`)
 
-### 8.1 Local TCP Daemon & CLI Runner (`kuma.cmd`)
-- [ ] **Daemon Port Binding**:
-  - Launch KumaNotch desktop app.
-  - Run in terminal: `curl -s http://127.0.0.1:45454/status`.
-  - **Expected**: JSON response `{"status":"ok","app":"kumanotch","version":"0.1.0"}`.
-- [ ] **CLI Notification (`kuma notify`)**:
-  - Run: `.\kuma.cmd notify "Build Selesai" "Semua aset terkompilasi"`.
+### 8.1 Named Pipe Daemon (`\\.\pipe\kumanotch`) & Rust `kuma.exe` Runner
+- [x] **Automated Security & Isolation Test Suite**:
+  - Run in `src-tauri`: `cargo run --bin security_tests`.
   - **Expected**:
-    1. KumaNotch morphs to `processAlert` card (300×64px).
+    1. `test_oversize_payload_rejected`: > 4 KB rejected immediately.
+    2. `test_corrupted_json_handled_gracefully`: Malformed JSON safely discarded.
+    3. `test_status_normalization`: Normalized strictly to `running`, `success`, or `error`.
+    4. `test_text_truncation_bounds`: Text clamped to 256/512/64 chars.
+    5. `test_security_descriptor_user_only_dacl`: Protected DACL `D:P(A;;GA;;;USER_SID)` verified; Everyone (`WD`), Authenticated Users (`AU`), Network (`NU`), and Anonymous (`AN`) strictly rejected.
+- [ ] **Daemon Availability (`kuma status`)**:
+  - Launch KumaNotch desktop app.
+  - Run in terminal: `.\kuma.exe status`.
+  - **Expected**: Output `KumaNotch daemon is online (Named Pipe \\.\pipe\kumanotch)`.
+- [ ] **CLI Notification (`kuma notify`)**:
+  - Run: `.\kuma.exe notify "Build Selesai" "Semua aset terkompilasi"`.
+  - **Expected**:
+    1. KumaNotch morphs to `processAlert` card.
     2. Shows checkmark icon, title, and message.
     3. Auto-dismisses after 4.5 seconds.
 - [ ] **CLI Process Execution (`kuma run`)**:
-  - Run: `.\kuma.cmd run npm --version`.
+  - Run: `.\kuma.exe run npm --version`.
   - **Expected**:
     1. During run: KumaNotch displays `focus` emotion in `ClockCapsule`.
     2. On exit 0: Island expands with `ProcessNotificationCard`, displays execution duration (e.g. `120ms`), green checkmark, and Mata Kuma smiling (`happy`).
-    3. Auto-dismisses after 4.5 seconds.
+    3. Stdio passes through directly without string interpolation or PowerShell wrapping.
+    4. Auto-dismisses after 4.5 seconds.
+- [ ] **Post-Action 30s Countdown & Batal**:
+  - Run: `.\kuma.exe run --post-action sleep echo "Done"`.
+  - **Expected**:
+    1. Command runs in console and prints "Done".
+    2. Island displays `Tidur 30s` countdown badge with glowing cyan clock icon.
+    3. Prominent red pill button **Batal** appears next to Mata Kuma.
+    4. Clicking **Batal** aborts the countdown immediately, updates status to "Aksi dibatalkan", and prevents post-action trigger.
+- [ ] **Mode A: Kernel-Driven PID Monitoring (`kuma watch`)**:
+  - Start an external process (e.g. Notepad, build script) and note PID.
+  - Run: `.\kuma.exe watch <PID> "My Task"`.
+  - **Expected**:
+    1. KumaNotch displays running task card with `focus` emotion.
+    2. Task monitor blocks via kernel `WaitForSingleObject` at 0.00% CPU overhead.
+    3. Upon PID exit, KumaNotch displays completion card and exit code.
 - [ ] **Command Failure & Sad Emotion**:
   - Run a failing command or click **❌ kuma err** in Dev Mode.
   - **Expected**:
