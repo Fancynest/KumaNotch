@@ -20,6 +20,7 @@ export interface AppSettings {
   freshFileDismissOnDrag: boolean
   freshFileSound: boolean
   favoriteArtist: string
+  horizontalOffset: number
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -42,6 +43,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   freshFileDismissOnDrag: true,
   freshFileSound: false,
   favoriteArtist: '',
+  horizontalOffset: 0,
 }
 
 const STORAGE_KEY = 'kumanotch_settings'
@@ -116,6 +118,10 @@ class SettingsEngine {
     this.settings = { ...this.settings, ...patch }
     this.save()
     this.notify()
+  }
+
+  public updateSettings(patch: Partial<AppSettings>): void {
+    this.update(patch)
   }
 
   public subscribe(fn: (settings: AppSettings) => void): () => void {

@@ -21,6 +21,7 @@ export interface MataKumaContext {
   freshFileDetected?: boolean
   deviceConnected?: boolean
   isProcessRunning?: boolean
+  isMagnetSnapped?: boolean
   idleDurationMs?: number
   isOliviaRodrigo?: boolean
   isHovered?: boolean
@@ -199,10 +200,11 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   const isFresh = Boolean(context?.freshFileDetected)
   const isDeviceConnected = Boolean(context?.deviceConnected)
   const isProcessRunning = Boolean(context?.isProcessRunning)
+  const isMagnetSnapped = Boolean(context?.isMagnetSnapped)
   const isHovered = Boolean(context?.isHovered)
   const isDeepSleepy = Boolean(context?.idleDurationMs && context.idleDurationMs > 35000)
 
-  // Only run spontaneous mood cycles when idle (no active music/timer/device/process)
+  // Only run spontaneous mood cycles when idle (no active music/timer/device/process/magnet)
   const isBusy =
     isOlivia ||
     isMusic ||
@@ -210,12 +212,14 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     isTimerDone ||
     isFresh ||
     isDeviceConnected ||
-    isProcessRunning
+    isProcessRunning ||
+    isMagnetSnapped
   const idleSpontaneousEmotion = isBusy ? null : rawSpontaneousEmotion
 
   // 2. Derive base context emotion
-  // Precedence: Olivia > Process Running (Focus) > Device Connect > Timer Done > Fresh File > Timer Running (Thinking) > Hovered > Music > Sleepy > Spontaneous
+  // Precedence: Magnet Snap (Surprised) > Olivia > Process Running (Focus) > Device Connect > Timer Done > Fresh File > Timer Running (Thinking) > Hovered > Music > Sleepy > Spontaneous
   const contextualEmotion = useMemo<KumaEmotion>(() => {
+    if (isMagnetSnapped) return 'surprised'
     if (isOlivia) return 'happy'
     if (isProcessRunning) return 'focus'
     if (isDeviceConnected) return 'surprised'
@@ -227,6 +231,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     if (isDeepSleepy) return 'sleepy'
     return idleSpontaneousEmotion || 'neutral'
   }, [
+    isMagnetSnapped,
     isOlivia,
     isProcessRunning,
     isDeviceConnected,
@@ -552,6 +557,26 @@ export const MataKuma: React.FC<MataKumaProps> = ({
           className="absolute -top-3.5 right-0.5 flex items-center pointer-events-none"
         >
           <span className="text-amber-300 font-bold text-[9px] drop-shadow-[0_0_5px_rgba(252,211,77,0.8)]">💭</span>
+        </motion.div>
+      )}
+
+      {/* Magnetic Snap Shock Charm */}
+      {isMagnetSnapped && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0, y: 2 }}
+          animate={{
+            opacity: [1, 0.75, 1],
+            scale: [1, 1.3, 1],
+            y: [-7, -9.5, -7],
+          }}
+          transition={{
+            duration: 0.45,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+          className="absolute -top-3.5 flex items-center gap-0.5 text-[10px] pointer-events-none"
+        >
+          <span className="text-amber-300 font-black drop-shadow-[0_0_8px_rgba(245,158,11,0.9)]">⚡</span>
         </motion.div>
       )}
 

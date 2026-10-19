@@ -320,3 +320,26 @@ This document records architectural choices, deviations from the initial spec, a
      - Added `kuma_run_command` Tauri command for zero-latency direct process execution.
      - Built `ProcessNotificationCard.tsx` rendering terminal status, execution duration, and embedded Mata Kuma.
      - Mata Kuma expresses `focus` while a process is actively running, `happy` on exit code 0, and `sad` on exit code failure.
+
+
+## Decision 023: Horizontal Draggable Island with Magnetic Center Snap & Surprised Reaction
+- **Date**: 2026-10-19
+- **Context**: As an overlay widget always on top of the screen, staying strictly locked in the center can obstruct central UI elements (such as browser tabs, centered webcams, or title bars). The user requested the ability to slide KumaNotch horizontally along the top edge, constrained to the monitor bounds, with a magnetic pull back into center when dragged within a proximity radius, triggering a wide-eyed surprised reaction (`kaget`) when snapped.
+- **Decision**:
+  1. **Win32 Clamped Horizontal Positioning & State (`CURRENT_OFFSET_X`)**:
+     - Added atomic `CURRENT_OFFSET_X` in `src-tauri/src/window.rs` and commands `set_island_offset` and `get_island_offset`.
+     - `calculate_clamped_x` keeps the notch strictly on-screen between `[monitor.x + 8px, monitor.x + monitor.width - target_width - 8px]`, so it can never be pushed off-screen.
+     - Preserves the offset across all dynamic resizes (capsule, droplet, expanded cards, alert) without jitter or coordinate jumps.
+  2. **Horizontal-Only Pointer Drag Physics**:
+     - Attached pointer drag listeners (`onPointerDown`, `onPointerMove`, `onPointerUp`) to `Shell`.
+     - Uses global `e.screenX` coordinates to prevent coordinate feedback loops when the OS window moves beneath the cursor.
+     - Ignores interactive clicks on child buttons, inputs, and sliders. Distinguishes drag from click via a 5px threshold.
+  3. **Magnetic Attraction & Center Snap Zone**:
+     - Defined `SNAP_RADIUS = 85px`.
+     - When dragging within `[-85px, +85px]` from center, the magnet pulls the notch to center (`0px`) and reveals a glowing vertical magnetic alignment pin (`⚡`).
+     - When released inside the snap radius, the notch locks to center (`0px`) and persists `horizontalOffset: 0` in `AppSettings`.
+     - When dragged and released outside the snap radius, it remains at the user's preferred horizontal position.
+     - Double-clicking the capsule resets position back to center immediately.
+  4. **Surprised Reaction (`kaget`) on Magnetic Snap**:
+     - Snapping to center from outside triggers `isMagnetSnapped = true` for 2.6 seconds.
+     - Mata Kuma awakens immediately in `ClockCapsule` and expresses `surprised` emotion with enlarged wide round eyes (`type="wide"`), raised brows, and a pulsing shock spark `⚡`.

@@ -39,6 +39,8 @@ pub fn run() {
         }))
         .invoke_handler(tauri::generate_handler![
             window::resize_island,
+            window::set_island_offset,
+            window::get_island_offset,
             window::get_system_time_format,
             detector::get_app_mode,
             shelf::shelf_get_metadata,

@@ -351,3 +351,41 @@ Create test files in a temporary directory with the following filename patterns:
   - **Expected**: Mata Kuma triggers celebration mode (happy eyes, vibrant purple blush aura, floating musical note/heart charms).
   - Play an unmatching song: Kuma stays in normal listening mood.
   - Clear the input field: Default empty setting disables artist celebration mode.
+
+
+---
+
+## 9. Horizontal Draggable Island & Magnetic Center Snap
+
+### 9.1 Horizontal Sliding along Screen Top
+- [ ] **Drag Gesture Initiation**:
+  - Click and hold on the ClockCapsule in idle mode.
+  - Move mouse horizontally left or right by > 5px.
+  - **Expected**: Cursor changes to `grabbing`, and KumaNotch slides smoothly along the top screen edge following the mouse.
+- [ ] **Vertical Axis Lockdown**:
+  - Drag cursor downward towards the middle of the screen.
+  - **Expected**: KumaNotch remains strictly pinned to the top margin (`y = 8px`), only translating along the horizontal axis.
+- [ ] **Boundary Clamping**:
+  - Drag KumaNotch all the way to the far left or far right edge of the monitor.
+  - **Expected**: The notch stops cleanly with an 8px safety margin from the screen edge and cannot be dragged off-screen.
+
+### 9.2 Magnetic Snap to Center & Surprised Reaction
+- [ ] **Magnetic Attraction Zone**:
+  - Drag the notch from an offset position towards the center.
+  - As the notch crosses into within 85px of the center:
+  - **Expected**:
+    1. A glowing vertical amber magnetic alignment line `⚡` appears at the top center.
+    2. The notch magnetically snaps to center `(0px)`.
+- [ ] **Surprised Reaction (`kaget`) on Snap**:
+  - Release the mouse within the magnetic snap zone.
+  - **Expected**:
+    1. The notch locks into center.
+    2. Mata Kuma immediately awakens and reacts with wide open `surprised` eyes (`type="wide"`).
+    3. An animated spark charm `⚡` pulses above Kuma's head for 2.6 seconds.
+- [ ] **Double Click to Snap**:
+  - With the notch shifted off-center, double-click on the capsule.
+  - **Expected**: Snaps directly to center with the same surprised reaction.
+- [ ] **Persisted Offset**:
+  - Drag the notch to an offset position (e.g. +200px to the right) and release.
+  - Expand to HomePager or play a song on Spotify.
+  - **Expected**: The island expands at the new horizontal offset without jumping back to center.

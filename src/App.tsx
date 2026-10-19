@@ -8,6 +8,7 @@ import {
   WINDOW_SIZES,
   SHELL_CONFIGS,
   resizeWindow,
+  setIslandOffset,
   type WindowSize,
 } from './core/windowSizing'
 import {
@@ -642,7 +643,119 @@ export default function App() {
     collapseAll,
   ])
 
+  // Horizontal Draggable Island & Magnetic Center Snap
+  const [horizontalOffset, setHorizontalOffset] = useState<number>(() => settings.horizontalOffset ?? 0)
+  const [isDragging, setIsDragging] = useState<boolean>(false)
+  const [isMagnetActive, setIsMagnetActive] = useState<boolean>(false)
+  const [isMagnetSnapped, setIsMagnetSnapped] = useState<boolean>(false)
+  const dragRef = useRef<{ startScreenX: number; startOffset: number; hasMoved: boolean } | null>(null)
+
+  useEffect(() => {
+    if (settings.horizontalOffset !== undefined && settings.horizontalOffset !== 0) {
+      setIslandOffset(settings.horizontalOffset)
+    }
+  }, [settings.horizontalOffset])
+
+  const handleShellPointerDown = (e: React.PointerEvent) => {
+    const target = e.target as HTMLElement
+    if (target.closest('button, input, select, textarea, [data-no-drag]')) {
+      return
+    }
+    dragRef.current = {
+      startScreenX: e.screenX,
+      startOffset: horizontalOffset,
+      hasMoved: false,
+    }
+    try {
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    } catch {}
+  }
+
+  const handleShellPointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return
+    const deltaX = e.screenX - dragRef.current.startScreenX
+    if (!dragRef.current.hasMoved) {
+      if (Math.abs(deltaX) >= 5) {
+        dragRef.current.hasMoved = true
+        setIsDragging(true)
+      } else {
+        return
+      }
+    }
+
+    const rawCandidate = dragRef.current.startOffset + deltaX
+    const SNAP_RADIUS = 85
+
+    // Magnetic attraction near center: if within snap radius, magnet locks to center (0)
+    if (Math.abs(rawCandidate) <= SNAP_RADIUS) {
+      setIsMagnetActive(true)
+      setIslandOffset(0)
+      if (isBrowserDev) setHorizontalOffset(0)
+    } else {
+      setIsMagnetActive(false)
+      setIslandOffset(rawCandidate)
+      if (isBrowserDev) setHorizontalOffset(rawCandidate)
+    }
+  }
+
+  const handleShellPointerUp = (e: React.PointerEvent) => {
+    if (!dragRef.current) return
+    const deltaX = e.screenX - dragRef.current.startScreenX
+    const hadMoved = dragRef.current.hasMoved
+    const startOffset = dragRef.current.startOffset
+    dragRef.current = null
+
+    try {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch {}
+
+    if (hadMoved) {
+      const rawCandidate = startOffset + deltaX
+      const SNAP_RADIUS = 85
+
+      if (Math.abs(rawCandidate) <= SNAP_RADIUS) {
+        setHorizontalOffset(0)
+        setIslandOffset(0)
+        globalSettingsEngine.update({ horizontalOffset: 0 })
+        setIsMagnetActive(false)
+
+        // If pulled/snapped into center from outside: TRIGGER SURPRISE REACTION!
+        if (Math.abs(startOffset) > 15 || Math.abs(rawCandidate) > 15) {
+          setIsMagnetSnapped(true)
+          setTimeout(() => setIsMagnetSnapped(false), 2600)
+        }
+      } else {
+        setHorizontalOffset(rawCandidate)
+        setIslandOffset(rawCandidate)
+        globalSettingsEngine.update({ horizontalOffset: rawCandidate })
+        setIsMagnetActive(false)
+      }
+
+      setTimeout(() => setIsDragging(false), 50)
+    }
+  }
+
+  const handleShellPointerCancel = (e: React.PointerEvent) => {
+    dragRef.current = null
+    setIsMagnetActive(false)
+    setIsDragging(false)
+    try {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch {}
+  }
+
+  const handleShellDoubleClick = () => {
+    if (horizontalOffset !== 0) {
+      setHorizontalOffset(0)
+      setIslandOffset(0)
+      globalSettingsEngine.update({ horizontalOffset: 0 })
+      setIsMagnetSnapped(true)
+      setTimeout(() => setIsMagnetSnapped(false), 2600)
+    }
+  }
+
   const handleShellClick = () => {
+    if (isDragging || dragRef.current?.hasMoved) return
     openedViaHoverRef.current = false
     if (currentView === 'idle') {
       setExpandedActivity('home')
@@ -697,11 +810,30 @@ export default function App() {
         />
       )}
 
+      {/* Magnetic Center Alignment Cue */}
+      <AnimatePresence>
+        {isMagnetActive && (
+          <motion.div
+            key="magnet-guide"
+            initial={{ opacity: 0, scaleY: 0 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-amber-400 shadow-[0_0_10px_#f59e0b] rounded-full pointer-events-none z-50 flex flex-col items-center"
+          >
+            <span className="text-[9px] -mt-1 font-black text-amber-400 drop-shadow-[0_0_6px_#f59e0b]">⚡</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* CENTERED CONTAINER FOR MULTI-BUBBLE 3-TASK ISLAND */}
       <div
-        className={`pt-2 flex items-center justify-center z-40 ${
+        className={`pt-2 flex items-center justify-center z-40 transition-transform ${
           isDroplet ? 'gap-0' : 'gap-2.5'
         }`}
+        style={{
+          transform: isBrowserDev && horizontalOffset !== 0 ? `translateX(${horizontalOffset}px)` : undefined,
+        }}
         onPointerDown={handleBackdropPointerDown}
       >
         {/* LEFT BUBBLE: MUSIC (PRIMARY) OR FRESH FILE (WHEN TIMER IS OCCUPYING RIGHT) */}
@@ -855,7 +987,13 @@ export default function App() {
           currentView={currentView}
           growing={isGrowing}
           nudge={nudge}
+          isDragging={isDragging}
           onClick={handleShellClick}
+          onDoubleClick={handleShellDoubleClick}
+          onPointerDown={handleShellPointerDown}
+          onPointerMove={handleShellPointerMove}
+          onPointerUp={handleShellPointerUp}
+          onPointerCancel={handleShellPointerCancel}
           onMouseEnter={() => {
             if (currentView === 'droplet') setIsDwelling(true)
             handleExpandedPointerEnter()
@@ -957,6 +1095,7 @@ export default function App() {
               freshFileDetected={isFreshActive}
               deviceConnected={deviceNotification?.event_type === 'connected'}
               isProcessRunning={activeProcess !== null}
+              isMagnetSnapped={isMagnetSnapped}
               mediaData={mediaData}
             />
           )}
@@ -1264,6 +1403,28 @@ export default function App() {
             title="Simulate kuma process error"
           >
             ❌ kuma err
+          </button>
+          <button
+            onClick={() => {
+              setHorizontalOffset(120)
+              setIslandOffset(120)
+            }}
+            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-cyan-300 font-mono text-[10px]"
+            title="Shift island +120px right"
+          >
+            ➡️ +120
+          </button>
+          <button
+            onClick={() => {
+              setHorizontalOffset(0)
+              setIslandOffset(0)
+              setIsMagnetSnapped(true)
+              setTimeout(() => setIsMagnetSnapped(false), 2600)
+            }}
+            className="px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 font-mono text-[10px] font-bold"
+            title="Snap to center with surprised reaction"
+          >
+            🧲 Snap
           </button>
           <button
             onClick={() => setShowDevControls(false)}

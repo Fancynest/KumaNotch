@@ -29,7 +29,13 @@ interface ShellProps {
   currentView: IslandView
   growing?: boolean
   nudge?: boolean
+  isDragging?: boolean
   onClick?: () => void
+  onDoubleClick?: () => void
+  onPointerDown?: (e: React.PointerEvent) => void
+  onPointerMove?: (e: React.PointerEvent) => void
+  onPointerUp?: (e: React.PointerEvent) => void
+  onPointerCancel?: (e: React.PointerEvent) => void
   onMouseEnter?: () => void
   onMouseLeave?: () => void
   children: React.ReactNode
@@ -40,7 +46,13 @@ export const Shell: React.FC<ShellProps> = ({
   currentView,
   growing = false,
   nudge = false,
+  isDragging = false,
   onClick,
+  onDoubleClick,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
   onMouseEnter,
   onMouseLeave,
   children,
@@ -57,6 +69,11 @@ export const Shell: React.FC<ShellProps> = ({
       }}
       transition={activeSpring}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onScroll={(e) => {
@@ -66,7 +83,11 @@ export const Shell: React.FC<ShellProps> = ({
       style={{
         boxShadow: shellConfig.boxShadow,
       }}
-      className={`bg-black border overflow-hidden cursor-pointer relative shrink-0 ${
+      className={`bg-black border overflow-hidden select-none relative shrink-0 ${
+        isDragging
+          ? 'cursor-grabbing ring-1 ring-amber-400/40'
+          : 'cursor-grab'
+      } ${
         currentView === 'alert'
           ? 'border-amber-500/50'
           : currentView === 'dropTarget'

@@ -140,3 +140,20 @@ export async function resizeWindow(width: number, height: number): Promise<void>
     console.debug('resize_island dev fallback:', err)
   }
 }
+
+export async function setIslandOffset(offsetX: number): Promise<void> {
+  try {
+    await invoke('set_island_offset', { offsetX })
+  } catch (err) {
+    console.debug('set_island_offset dev fallback:', err)
+  }
+}
+
+export async function getIslandOffset(): Promise<number> {
+  try {
+    return await invoke<number>('get_island_offset')
+  } catch (err) {
+    console.debug('get_island_offset dev fallback:', err)
+    return 0
+  }
+}

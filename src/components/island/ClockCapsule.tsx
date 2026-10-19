@@ -19,6 +19,7 @@ interface ClockCapsuleProps {
   freshFileDetected?: boolean
   deviceConnected?: boolean
   isProcessRunning?: boolean
+  isMagnetSnapped?: boolean
   mediaData?: MediaData | null
 }
 
@@ -35,6 +36,7 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
   freshFileDetected,
   deviceConnected,
   isProcessRunning,
+  isMagnetSnapped,
   mediaData,
 }) => {
   const [isPersonalityIdle, setIsPersonalityIdle] = useState(false)
@@ -92,7 +94,8 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
   // 4. OR Fresh file detected (Kuma curious side-glance!)
   // 5. OR Device connected (Kuma surprised eyes!)
   // 6. OR Process running (Kuma focus mode!)
-  // 7. OR user is hovering over the droplet/capsule
+  // 7. OR Magnet snapped to center (Kuma surprised mode!)
+  // 8. OR user is hovering over the droplet/capsule
   const showEyes =
     (isEligible && isPersonalityIdle) ||
     (isEligible && isFavArtist) ||
@@ -100,6 +103,7 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
     (isEligible && freshFileDetected) ||
     (isEligible && deviceConnected) ||
     (isEligible && isProcessRunning) ||
+    (isEligible && isMagnetSnapped) ||
     (isEligible && isHovered)
 
   return (
@@ -128,6 +132,7 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
                 freshFileDetected,
                 deviceConnected,
                 isProcessRunning,
+                isMagnetSnapped,
                 idleDurationMs,
                 isOliviaRodrigo: isFavArtist,
                 isHovered,
