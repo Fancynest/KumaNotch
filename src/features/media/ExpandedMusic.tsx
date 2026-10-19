@@ -44,23 +44,20 @@ export function ExpandedMusic({
 
   // Smooth interpolated position update loop (every 250ms when playing)
   useEffect(() => {
-    if (media?.playbackStatus !== 'playing') {
-      setCurrentPosMs(media?.positionMs ?? 0)
+    if (media?.playbackStatus !== 'playing' || isSeeking) {
       return
     }
 
     const interval = setInterval(() => {
-      if (!isSeeking) {
-        setCurrentPosMs(globalMediaEngine.getInterpolatedPositionMs())
-      }
+      setCurrentPosMs(globalMediaEngine.getInterpolatedPositionMs())
     }, 250)
 
     return () => clearInterval(interval)
-  }, [media?.playbackStatus, media?.lastUpdated, media?.positionMs, isSeeking])
+  }, [media?.playbackStatus, media?.lastUpdated, isSeeking])
 
   const isPlaying = media?.playbackStatus === 'playing'
   const durationMs = media?.durationMs ?? 0
-  const effectivePosMs = isSeeking ? seekPosMs : currentPosMs
+  const effectivePosMs = isSeeking ? seekPosMs : (isPlaying ? currentPosMs : (media?.positionMs ?? 0))
   const progressRatio = durationMs > 0 ? Math.min(1, Math.max(0, effectivePosMs / durationMs)) : 0
 
   const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {

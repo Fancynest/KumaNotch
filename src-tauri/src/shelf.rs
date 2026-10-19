@@ -69,19 +69,55 @@ pub fn shelf_check_exists(paths: Vec<String>) -> HashMap<String, bool> {
     map
 }
 
+#[cfg(windows)]
+unsafe extern "system" {
+    fn ShellExecuteW(
+        hwnd: isize,
+        lpoperation: *const u16,
+        lpfile: *const u16,
+        lpparameters: *const u16,
+        lpdirectory: *const u16,
+        nshowcmd: i32,
+    ) -> isize;
+
+    fn OpenClipboard(hwnd: isize) -> i32;
+    fn CloseClipboard() -> i32;
+    fn EmptyClipboard() -> i32;
+    fn SetClipboardData(uformat: u32, hmem: isize) -> isize;
+    fn GlobalAlloc(uflags: u32, dwbytes: usize) -> isize;
+    fn GlobalLock(hmem: isize) -> *mut std::ffi::c_void;
+    fn GlobalUnlock(hmem: isize) -> i32;
+}
+
+#[cfg(windows)]
+const CF_UNICODETEXT: u32 = 13;
+#[cfg(windows)]
+const GMEM_MOVEABLE: u32 = 0x0002;
+
 #[tauri::command]
 pub fn shelf_open_path(path: String) -> Result<(), String> {
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
         let clean_path = path.replace('/', "\\");
-        std::process::Command::new("cmd")
-            .args(["/c", "start", "", &clean_path])
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        Ok(())
+        let wide_file: Vec<u16> = clean_path.encode_utf16().chain(std::iter::once(0)).collect();
+        let wide_op: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+
+        let res = unsafe {
+            ShellExecuteW(
+                0,
+                wide_op.as_ptr(),
+                wide_file.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                1, // SW_SHOWNORMAL
+            )
+        };
+
+        if res > 32 {
+            Ok(())
+        } else {
+            Err(format!("ShellExecuteW failed with error code: {}", res))
+        }
     }
     #[cfg(not(windows))]
     {
@@ -118,20 +154,37 @@ pub fn shelf_show_in_folder(path: String) -> Result<(), String> {
 pub fn shelf_copy_path(path: String) -> Result<(), String> {
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        let mut child = std::process::Command::new("clip.exe")
-            .stdin(std::process::Stdio::piped())
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+        let size_bytes = wide.len() * std::mem::size_of::<u16>();
 
-        if let Some(mut stdin) = child.stdin.take() {
-            use std::io::Write;
-            let _ = stdin.write_all(path.as_bytes());
-            drop(stdin);
+        unsafe {
+            if OpenClipboard(0) == 0 {
+                return Err("Failed to open clipboard".to_string());
+            }
+            EmptyClipboard();
+
+            let hmem = GlobalAlloc(GMEM_MOVEABLE, size_bytes);
+            if hmem == 0 {
+                CloseClipboard();
+                return Err("Failed to allocate global memory for clipboard".to_string());
+            }
+
+            let ptr = GlobalLock(hmem);
+            if ptr.is_null() {
+                CloseClipboard();
+                return Err("Failed to lock global memory for clipboard".to_string());
+            }
+
+            std::ptr::copy_nonoverlapping(wide.as_ptr() as *const std::ffi::c_void, ptr, size_bytes);
+            GlobalUnlock(hmem);
+
+            if SetClipboardData(CF_UNICODETEXT, hmem) == 0 {
+                CloseClipboard();
+                return Err("Failed to set clipboard data".to_string());
+            }
+
+            CloseClipboard();
         }
-        let _ = child.wait();
         Ok(())
     }
     #[cfg(not(windows))]

@@ -35,6 +35,13 @@ class SettingsEngine {
   constructor() {
     this.settings = this.load()
     this.syncAutostartFromSystem()
+    this.syncTrayPersonality()
+  }
+
+  private syncTrayPersonality() {
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      invoke('tray_set_personality', { checked: this.settings.personalityEnabled }).catch(() => {})
+    }
   }
 
   private async syncAutostartFromSystem() {
@@ -81,6 +88,11 @@ class SettingsEngine {
     if (patch.autostart !== undefined && patch.autostart !== this.settings.autostart) {
       if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
         invoke('autostart_set', { enable: patch.autostart }).catch(() => {})
+      }
+    }
+    if (patch.personalityEnabled !== undefined && patch.personalityEnabled !== this.settings.personalityEnabled) {
+      if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+        invoke('tray_set_personality', { checked: patch.personalityEnabled }).catch(() => {})
       }
     }
     this.settings = { ...this.settings, ...patch }

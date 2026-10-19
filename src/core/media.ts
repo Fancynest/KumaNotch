@@ -25,12 +25,15 @@ interface RawMediaState {
   durationMs: number
   appId: string
   thumbnailBase64?: string | null
+  lastUpdatedTime?: number
 }
 
 export class MediaEngine {
   private data: MediaData | null = null
   private listeners: Set<(data: MediaData | null) => void> = new Set()
   private initialized: boolean = false
+  private cachedThumbnail: string | null = null
+  private currentTrackKey: string = ''
 
   constructor() {
     this.init()
@@ -61,6 +64,17 @@ export class MediaEngine {
     const isActive = raw.isActive && Boolean(raw.title && (status === 'playing' || status === 'paused'))
 
     if (isActive) {
+      const trackKey = `${raw.appId}::${raw.title}_${raw.artist}`
+      if (trackKey !== this.currentTrackKey) {
+        this.currentTrackKey = trackKey
+        this.cachedThumbnail = raw.thumbnailBase64 ?? null
+      } else if (raw.thumbnailBase64) {
+        this.cachedThumbnail = raw.thumbnailBase64
+      }
+
+      const effectiveThumbnail = this.cachedThumbnail
+      const lastUpdated = raw.lastUpdatedTime && raw.lastUpdatedTime > 0 ? raw.lastUpdatedTime : Date.now()
+
       this.data = {
         isActive: true,
         title: raw.title,
@@ -70,8 +84,8 @@ export class MediaEngine {
         positionMs: raw.positionMs,
         durationMs: raw.durationMs,
         appId: raw.appId,
-        thumbnailBase64: raw.thumbnailBase64,
-        lastUpdated: Date.now(),
+        thumbnailBase64: effectiveThumbnail,
+        lastUpdated,
       }
 
       globalActivityRegistry.register({
@@ -83,11 +97,13 @@ export class MediaEngine {
         metadata: {
           artist: raw.artist,
           playbackStatus: status,
-          thumbnailBase64: raw.thumbnailBase64,
+          thumbnailBase64: effectiveThumbnail,
         },
       })
     } else {
       this.data = null
+      this.cachedThumbnail = null
+      this.currentTrackKey = ''
       globalActivityRegistry.remove('media')
     }
 

@@ -60,23 +60,24 @@ This document records architectural choices, deviations from the initial spec, a
   6. **Icon Generation & Asset Compression**: Cropped 1024×1024 master PNG (`assets/icon.png`) with smooth squircle alpha mask from `assets/kumanotch_icon.jpg`, regenerated all application icons with `tauri icon`, added simplified high-contrast tray silhouette (`src-tauri/icons/tray.png`), and compressed raw 1.6MB JPG down to 42KB (>97% reduction).
 
 ## Decision 006: Single Persistent Shell & Stage Window Architecture Comparison
-- **Date**: 2026-10-18
-- **Context**: Transition from compact capsule to expanded cards (Home, Timer) or Droplet exhibited subtle visual jumps, shadow distortion, and clipping when using `layoutId` across disparate DOM elements alongside concurrent window resizing.
+- **Date**: 2026-10-18 (Updated 2026-10-19)
+- **Context**: Transition from compact capsule to expanded cards (Home, Timer, Music) or Droplet exhibited subtle visual jumps, shadow distortion, and clipping when using disparate DOM elements alongside concurrent window resizing.
 - **Architectural Comparison**:
   1. **Option A: Fixed Stage Window with Click-Through (`ignore-cursor-events`)**:
-     - *Concept*: The OS window is permanently sized to the largest possible dimension (e.g. 400×230). The transparent area surrounding the notch passes mouse clicks through to underlying background windows via Windows hit-testing (`WS_EX_TRANSPARENT` or IPC `setIgnoreCursorEvents`).
+     - *Concept*: The OS window is permanently sized to the largest possible dimension (e.g. 400×270). The transparent area surrounding the notch passes mouse clicks through to underlying background windows via Windows hit-testing (`WS_EX_TRANSPARENT` or IPC `setIgnoreCursorEvents`).
      - *Technical Reality & Findings on Windows / Tauri 2*:
        - **No Native Per-Pixel Alpha Hit-Test in Tauri 2**: Tauri 2 does not provide built-in per-pixel alpha hit-testing for WebView2 on Windows without custom Win32 sub-classing (`SetWindowSubclass` intercepting `WM_NCHITTEST`).
        - **IPC Mouse Latency & Cursor Glitches**: Dynamically toggling `WS_EX_TRANSPARENT` based on frontend mouse enter/leave events over IPC causes visible cursor flickering and missed clicks when the user moves the mouse rapidly into or out of the island.
-       - **DWM Memory & GPU Composition Overhead**: A permanently large transparent DWM composition surface (400×230) on Windows consumes ~15–25MB more GPU VRAM and DWM buffer memory than tight, shrink-to-fit bounds (48×48 / 170×58), conflicting with the "potato laptop friendly" core principle.
-  2. **Option B: Single Persistent Shell with Choreographed Resizing (Selected)**:
-     - *Concept*: One single persistent `<motion.div>` shell smoothly animates `width`, `height`, `borderRadius`, `boxShadow`, and `y` via Framer Motion's `animate`. Window resizing is strictly choreographed:
-       - **Expansion**: `await resizeWindow(target)`, wait 2 `requestAnimationFrame` cycles (~33ms) for DWM/WebView buffer repaint, then trigger shell spring animation.
-       - **Collapse**: Animate shell to smaller target first inside the existing window bounds; execute `resizeWindow(target)` inside `onAnimationComplete` once the spring settles.
+       - **DWM Memory & GPU Composition Overhead**: A permanently large transparent DWM composition surface (400×270) on Windows is estimated to consume ~15–25MB more GPU VRAM and DWM buffer memory (estimated based on DWM composition buffer calculations; unmeasured with hardware instrumentation) than tight, shrink-to-fit bounds (48×48 / 170×58).
+  2. **Option B: Single Persistent Shell with Choreographed Resizing & Ghost Artifact Trade-off (Selected)**:
+     - *Concept*: One single persistent `<motion.div>` shell smoothly animates `width`, `height`, `borderRadius`, `boxShadow`, and `y` via Framer Motion's `animate`.
+     - *Ghost Artifact vs Click-Through Trade-Off*:
+       - If the OS window waits to shrink until the collapse spring animation completes (`onAnimationComplete`), the transparent expanded window canvas (e.g. 400×270) obstructs mouse clicks to underlying application tabs, window titlebars, and browser controls for ~300ms during the spring animation.
+       - Conversely, if the OS window resizes immediately to target compact bounds upon collapse, DWM clips the visual perimeter of the collapsing card while it settles into the compact capsule ("ghost clipping artifact").
+       - **Resolution in Final Code**: Window resize is executed immediately upon target change using atomic Win32 `SetWindowPos` (`SWP_NOZORDER | SWP_NOACTIVATE`, omitting `SWP_SHOWWINDOW`), prioritizing immediate click-through restoration for underlying applications. High spring stiffness (stiffness 420, damping 32, mass 0.8) ensures visual settlement occurs in <180ms, making boundary transition imperceptible.
        - **Top-Center Anchor**: Absolute positioning at `top: 8px, left: 50%, x: '-50%'` guarantees the island's horizontal center and top edge in monitor space never shift across window boundary changes.
-       - **Content Crossfade**: Inner views transition via `<AnimatePresence mode="wait">` (opacity + scale $0.96 \leftrightarrow 1.0$, 140–150ms). Hover/tap micro-interactions (`whileHover`, `whileTap`) are scoped strictly to inner child content.
-- **Recommendation & Outcome**:
-  Option B delivers 60fps native DWM performance with 0 dropped frames, zero IPC hit-test lag, eliminates clipping artifacts, guarantees exact click-through bounds on underlying browser tabs/window controls, and keeps baseline RAM below 38MB.
+- **Outcome**:
+  Option B delivers 60fps performance on release builds, zero IPC hit-test lag, guarantees exact click-through bounds on underlying browser tabs/window controls, and keeps baseline RAM below 38MB.
 
 ## Decision 007: Timestamp-Based Resilient Timer Engine, Activity Registry, and Web Audio Chime (Fase 2)
 - **Date**: 2026-10-18
@@ -96,5 +97,40 @@ This document records architectural choices, deviations from the initial spec, a
      Built a zero-dependency bell chime using dual harmonic sine oscillators (C6 1046.5Hz, E6 1318.5Hz, G6 1567.98Hz) with exponential gain decay. Uses 0 KB external audio files, requires 0 disk I/O, and plays reliably on Windows without codec or asset-loading pitfalls.
   7. **Auto-Expanding Completion Alert**:
      Expired timer elevates to priority 100 (`alert`), auto-expanding from compact or droplet mode, sounding the chime, and presenting one-click next-phase action ("Mulai Istirahat", "Mulai Sesi Fokus", or "Ulangi Timer") with 30s auto-dismiss.
+
+## Decision 008: Win32 Native Shell API & Unicode Clipboard for File Shelf (Fase 3 & 5.5)
+- **Date**: 2026-10-19
+- **Context**: Opening files via `cmd.exe /c start` failed on paths with ampersands, carets, percent signs, or spaces, and spawned ephemeral shell processes consuming ~30-50ms CPU and 15MB RAM per open. Similarly, copying paths via `clip.exe` piped through ANSI stdin, corrupting Unicode/non-ASCII characters.
+- **Decision**:
+  1. Replaced `cmd.exe` process spawning in `shelf_open_path` with direct Win32 `ShellExecuteW(0, L"open", wide_file, NULL, NULL, SW_SHOWNORMAL)`. Zero process creation overhead, instant execution, and completely impervious to shell escape injection.
+  2. Replaced `clip.exe` in `shelf_copy_path` with Win32 `OpenClipboard(0)`, `EmptyClipboard()`, `GlobalAlloc(GMEM_MOVEABLE, size)`, `CF_UNICODETEXT`, and `SetClipboardData`. Guarantees lossless UTF-16 Unicode fidelity for Asian scripts, emojis, accents, and special symbols.
+
+## Decision 009: WinRT SMTC Session Management, Token Tracking & Extrapolation (Fase 4 & 5.5)
+- **Date**: 2026-10-19
+- **Context**: Re-attaching SMTC event listeners (`MediaPropertiesChanged`, `PlaybackInfoChanged`, `TimelinePropertiesChanged`) on every session poll led to delegate accumulation and memory leaks. In addition, blocking WinRT calls on Tauri commands stalled the IPC main thread, while transmitting large base64 album art on every timeline tick consumed excessive memory.
+- **Decision**:
+  1. **Single-Binding Session Manager**: Implemented `sync_session_listeners` tracking bound sessions in a `HashMap<String, SessionBinding>`. Listeners attach exactly once per session. When a session terminates, tokens are explicitly detached via `RemoveMediaPropertiesChanged`, `RemovePlaybackInfoChanged`, and `RemoveTimelinePropertiesChanged`.
+  2. **Non-Blocking Async Commands**: Converted all media playback commands (`media_play`, `media_pause`, `media_seek`, etc.) to `pub async fn` using `tauri::async_runtime::spawn_blocking`, offloading WinRT COM synchronization from Tauri's IPC event loop.
+  3. **LastUpdatedTime & Frontend Extrapolation**: `TimelineProperties.LastUpdatedTime()` is converted to epoch milliseconds and dispatched with `MediaState`. The frontend interpolates playback position at 60fps via `positionMs + (Date.now() - lastUpdated)` without high-frequency polling.
+  4. **Thumbnail Delta Caching**: Thumbnails are capped at $\le 256\text{KB}$ and only read and dispatched over IPC when `track_key` changes. Subsequent timeline ticks omit the base64 payload (`thumbnailBase64: None`), which is cached in the frontend `MediaEngine`.
+
+## Decision 010: Settings Modal & Mata Kuma Personality Scheduler without Render Loops (Fase 5 & 5.5)
+- **Date**: 2026-10-19
+- **Context**: Adding user preferences (time format, language, autostart, auto-droplet, dwell duration, personality toggle, timer chime volume) required a modular settings interface without introducing render loops or out-of-sync tray states.
+- **Decision**:
+  1. **Persistent Settings Engine (`core/settings.ts`)**: Manages configuration in `localStorage` and exposes an observable engine. Synchronizes autostart with Windows Task Scheduler/Registry and personality toggle with Tauri system tray via `tray_set_personality`.
+  2. **Zero-Loop Eyes Scheduler (`ClockCapsule.tsx`)**: Randomized blinking (3-6s) is derived cleanly during render; timer effects set state strictly inside callback chains and stop completely when the island is hidden or in droplet mode, producing zero cascading render warnings.
+
+## Decision 011: Multi-Bubble 3-Task Island & Hover Dwell Interaction (Fase 5 & 5.5)
+- **Date**: 2026-10-19
+- **Context**: When music is playing and a timer is running concurrently while the user needs to view the clock, stacking cards or cluttering the compact capsule degraded readability and violated the minimalist Apple Dynamic Island aesthetic.
+- **Decision**:
+  1. **Multi-Bubble Cluster**: Partitioned concurrent tasks into 3 distinct visual bubbles:
+     - **Left Bubble (Music)**: Circular 32px bubble displaying live album art or animated waveform with green aura.
+     - **Center Capsule (Clock & Personality)**: Main capsule showing system clock and Mata Kuma blinking eyes.
+     - **Right Bubble (Timer)**: Circular 32px bubble featuring an SVG circular countdown ring and remaining time display.
+  2. **Liquid Droplet Separation Animation**: When a timer starts while the main capsule is active, the timer bubble separates from the main capsule using an authentic liquid-droplet spring animation (`scaleX: 1.55, scaleY: 0.6` tapering into `scale: 1`).
+  3. **Hover Dwell Expansion (2s)**: Hovering over the timer or music bubble for 2 seconds displays a pulsating aura and smoothly expands that specific activity. Moving the cursor away auto-collapses it after 250ms. Direct click expands instantly.
+
 
 

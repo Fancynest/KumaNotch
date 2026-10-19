@@ -1,9 +1,12 @@
+use std::sync::OnceLock;
 use tauri::{
-    menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
+    menu::{CheckMenuItem, CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Emitter,
+    AppHandle, Emitter, Wry,
 };
 use tauri_plugin_autostart::ManagerExt;
+
+static PERSONALITY_ITEM: OnceLock<CheckMenuItem<Wry>> = OnceLock::new();
 
 #[cfg(windows)]
 unsafe extern "system" {
@@ -33,6 +36,7 @@ pub fn create_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let personality_item = CheckMenuItemBuilder::with_id("personality", personality_label)
         .checked(true)
         .build(app)?;
+    let _ = PERSONALITY_ITEM.set(personality_item.clone());
     let autolaunch_enabled = app.autolaunch().is_enabled().unwrap_or(false);
     let autostart_item = CheckMenuItemBuilder::with_id("autostart", autostart_label)
         .checked(autolaunch_enabled)
@@ -52,7 +56,7 @@ pub fn create_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 
     let icon = tauri::include_image!("icons/tray.png");
 
-    let _tray = TrayIconBuilder::new()
+    let _tray = TrayIconBuilder::with_id("main")
         .icon(icon)
         .tooltip("KumaNotch")
         .menu(&menu)
@@ -102,3 +106,12 @@ pub fn autostart_set(app: AppHandle, enable: bool) -> Result<bool, String> {
     let _ = app.emit("autostart_changed", enable);
     Ok(enable)
 }
+
+#[tauri::command]
+pub fn tray_set_personality(checked: bool) -> Result<(), String> {
+    if let Some(item) = PERSONALITY_ITEM.get() {
+        item.set_checked(checked).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+

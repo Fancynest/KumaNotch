@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -24,6 +25,7 @@ pub struct MediaState {
     pub duration_ms: u64,
     pub app_id: String,
     pub thumbnail_base64: Option<String>,
+    pub last_updated_time: u64, // epoch ms
 }
 
 impl Default for MediaState {
@@ -38,8 +40,16 @@ impl Default for MediaState {
             duration_ms: 0,
             app_id: String::new(),
             thumbnail_base64: None,
+            last_updated_time: 0,
         }
     }
+}
+
+struct SessionBinding {
+    session: GlobalSystemMediaTransportControlsSession,
+    props_token: i64,
+    playback_token: i64,
+    timeline_token: i64,
 }
 
 pub struct MediaManager {
@@ -49,8 +59,9 @@ pub struct MediaManager {
     current_state: Arc<Mutex<MediaState>>,
     #[allow(dead_code)]
     last_thumbnail_key: Arc<Mutex<String>>,
-    #[allow(dead_code)]
     cached_thumbnail: Arc<Mutex<Option<String>>>,
+    #[allow(dead_code)]
+    bound_sessions: Arc<Mutex<HashMap<String, SessionBinding>>>,
 }
 
 static MEDIA_MANAGER: OnceLock<Arc<Mutex<Option<MediaManager>>>> = OnceLock::new();
@@ -59,6 +70,7 @@ pub fn init_media(app_handle: AppHandle) {
     let current_state = Arc::new(Mutex::new(MediaState::default()));
     let last_thumbnail_key = Arc::new(Mutex::new(String::new()));
     let cached_thumbnail = Arc::new(Mutex::new(None));
+    let bound_sessions: Arc<Mutex<HashMap<String, SessionBinding>>> = Arc::new(Mutex::new(HashMap::new()));
 
     let mgr_holder = Arc::new(Mutex::new(None));
     let _ = MEDIA_MANAGER.set(mgr_holder.clone());
@@ -67,10 +79,10 @@ pub fn init_media(app_handle: AppHandle) {
     let current_state_clone = current_state.clone();
     let last_thumb_clone = last_thumbnail_key.clone();
     let cached_thumb_clone = cached_thumbnail.clone();
+    let bound_sessions_clone = bound_sessions.clone();
 
-    // Spawn a dedicated thread for COM / WinRT SMTC session management
+    // Dedicated thread for WinRT SMTC session management
     thread::spawn(move || {
-        // Request session manager
         let session_manager_res = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
             .and_then(|op| op.join());
 
@@ -88,6 +100,7 @@ pub fn init_media(app_handle: AppHandle) {
             current_state: current_state_clone.clone(),
             last_thumbnail_key: last_thumb_clone.clone(),
             cached_thumbnail: cached_thumb_clone.clone(),
+            bound_sessions: bound_sessions_clone.clone(),
         };
 
         {
@@ -95,20 +108,29 @@ pub fn init_media(app_handle: AppHandle) {
             *lock = Some(media_mgr);
         }
 
-        // Initial refresh
+        // Initial sync of sessions and listeners
+        sync_session_listeners(
+            &session_manager,
+            &app_handle_clone,
+            &current_state_clone,
+            &last_thumb_clone,
+            &cached_thumb_clone,
+            &bound_sessions_clone,
+        );
         refresh_sessions(&session_manager, &app_handle_clone, &current_state_clone, &last_thumb_clone, &cached_thumb_clone);
 
-        // Subscribe to SessionsChanged and CurrentSessionChanged events
+        // Subscribe to SessionsChanged and CurrentSessionChanged
         let sm_for_sessions = session_manager.clone();
         let app_handle_s = app_handle_clone.clone();
         let state_s = current_state_clone.clone();
         let thumb_key_s = last_thumb_clone.clone();
         let cached_thumb_s = cached_thumb_clone.clone();
+        let bound_s = bound_sessions_clone.clone();
 
         let _ = session_manager.SessionsChanged(&TypedEventHandler::new(
             move |_, _| {
+                sync_session_listeners(&sm_for_sessions, &app_handle_s, &state_s, &thumb_key_s, &cached_thumb_s, &bound_s);
                 refresh_sessions(&sm_for_sessions, &app_handle_s, &state_s, &thumb_key_s, &cached_thumb_s);
-                bind_session_listeners(&sm_for_sessions, &app_handle_s, &state_s, &thumb_key_s, &cached_thumb_s);
                 Ok(())
             },
         ));
@@ -125,16 +147,12 @@ pub fn init_media(app_handle: AppHandle) {
                 Ok(())
             },
         ));
-
-        // Setup session event listeners
-        bind_session_listeners(&session_manager, &app_handle_clone, &current_state_clone, &last_thumb_clone, &cached_thumb_clone);
     });
 }
 
 fn select_best_session(
     manager: &GlobalSystemMediaTransportControlsSessionManager,
 ) -> Option<GlobalSystemMediaTransportControlsSession> {
-    // 1. Check all sessions, prioritize any currently playing session
     if let Ok(sessions) = manager.GetSessions() {
         let count = sessions.Size().unwrap_or(0);
         let mut best_paused = None;
@@ -158,59 +176,97 @@ fn select_best_session(
         }
     }
 
-    // 2. Fall back to current session
     manager.GetCurrentSession().ok()
 }
 
-fn bind_session_listeners(
+fn sync_session_listeners(
     manager: &GlobalSystemMediaTransportControlsSessionManager,
     app_handle: &AppHandle,
     state: &Arc<Mutex<MediaState>>,
     thumb_key: &Arc<Mutex<String>>,
     cached_thumb: &Arc<Mutex<Option<String>>>,
+    bound_sessions: &Arc<Mutex<HashMap<String, SessionBinding>>>,
 ) {
+    let mut current_ids = Vec::new();
     if let Ok(sessions) = manager.GetSessions() {
         let count = sessions.Size().unwrap_or(0);
         for i in 0..count {
             if let Ok(session) = sessions.GetAt(i) {
-                let mgr_clone1 = manager.clone();
-                let app1 = app_handle.clone();
-                let st1 = state.clone();
-                let tk1 = thumb_key.clone();
-                let ct1 = cached_thumb.clone();
-                let _ = session.MediaPropertiesChanged(&TypedEventHandler::new(
-                    move |_, _| {
-                        refresh_sessions(&mgr_clone1, &app1, &st1, &tk1, &ct1);
-                        Ok(())
-                    },
-                ));
+                let id = session
+                    .SourceAppUserModelId()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+                let key = if id.is_empty() { format!("session_{}", i) } else { id.clone() };
+                current_ids.push(key.clone());
 
-                let mgr_clone2 = manager.clone();
-                let app2 = app_handle.clone();
-                let st2 = state.clone();
-                let tk2 = thumb_key.clone();
-                let ct2 = cached_thumb.clone();
-                let _ = session.PlaybackInfoChanged(&TypedEventHandler::new(
-                    move |_, _| {
-                        refresh_sessions(&mgr_clone2, &app2, &st2, &tk2, &ct2);
-                        Ok(())
-                    },
-                ));
+                let mut bounds = bound_sessions.lock().unwrap();
+                if !bounds.contains_key(&key) {
+                    let mgr_clone1 = manager.clone();
+                    let app1 = app_handle.clone();
+                    let st1 = state.clone();
+                    let tk1 = thumb_key.clone();
+                    let ct1 = cached_thumb.clone();
+                    let props_res = session.MediaPropertiesChanged(&TypedEventHandler::new(
+                        move |_, _| {
+                            refresh_sessions(&mgr_clone1, &app1, &st1, &tk1, &ct1);
+                            Ok(())
+                        },
+                    ));
 
-                let mgr_clone3 = manager.clone();
-                let app3 = app_handle.clone();
-                let st3 = state.clone();
-                let tk3 = thumb_key.clone();
-                let ct3 = cached_thumb.clone();
-                let _ = session.TimelinePropertiesChanged(&TypedEventHandler::new(
-                    move |_, _| {
-                        refresh_sessions(&mgr_clone3, &app3, &st3, &tk3, &ct3);
-                        Ok(())
-                    },
-                ));
+                    let mgr_clone2 = manager.clone();
+                    let app2 = app_handle.clone();
+                    let st2 = state.clone();
+                    let tk2 = thumb_key.clone();
+                    let ct2 = cached_thumb.clone();
+                    let playback_res = session.PlaybackInfoChanged(&TypedEventHandler::new(
+                        move |_, _| {
+                            refresh_sessions(&mgr_clone2, &app2, &st2, &tk2, &ct2);
+                            Ok(())
+                        },
+                    ));
+
+                    let mgr_clone3 = manager.clone();
+                    let app3 = app_handle.clone();
+                    let st3 = state.clone();
+                    let tk3 = thumb_key.clone();
+                    let ct3 = cached_thumb.clone();
+                    let timeline_res = session.TimelinePropertiesChanged(&TypedEventHandler::new(
+                        move |_, _| {
+                            refresh_sessions(&mgr_clone3, &app3, &st3, &tk3, &ct3);
+                            Ok(())
+                        },
+                    ));
+
+                    if let (Ok(props_token), Ok(playback_token), Ok(timeline_token)) =
+                        (props_res, playback_res, timeline_res)
+                    {
+                        bounds.insert(
+                            key,
+                            SessionBinding {
+                                session,
+                                props_token,
+                                playback_token,
+                                timeline_token,
+                            },
+                        );
+                    }
+                }
             }
         }
     }
+
+    // Unbind listeners from sessions that are no longer active
+    let mut bounds = bound_sessions.lock().unwrap();
+    bounds.retain(|key, binding| {
+        if !current_ids.contains(key) {
+            let _ = binding.session.RemoveMediaPropertiesChanged(binding.props_token);
+            let _ = binding.session.RemovePlaybackInfoChanged(binding.playback_token);
+            let _ = binding.session.RemoveTimelinePropertiesChanged(binding.timeline_token);
+            false
+        } else {
+            true
+        }
+    });
 }
 
 fn refresh_sessions(
@@ -255,22 +311,27 @@ fn refresh_sessions(
                     let mut key_lock = thumb_key.lock().unwrap();
                     let mut cache_lock = cached_thumb.lock().unwrap();
 
-                    if *key_lock == track_key && cache_lock.is_some() {
-                        thumbnail_b64 = cache_lock.clone();
-                    } else if !title.is_empty() {
-                        if let Ok(thumb_ref) = props.Thumbnail() {
-                            if let Ok(stream_op) = thumb_ref.OpenReadAsync() {
-                                if let Ok(stream) = stream_op.join() {
-                                    if let Ok(size) = stream.Size() {
-                                        if size > 0 && size < 5 * 1024 * 1024 {
-                                            if let Ok(reader) = DataReader::CreateDataReader(&stream) {
-                                                if reader.LoadAsync(size as u32).and_then(|op| op.join()).is_ok() {
-                                                    let mut buf = vec![0u8; size as usize];
-                                                    if reader.ReadBytes(&mut buf).is_ok() {
-                                                        let encoded = format!("data:image/jpeg;base64,{}", BASE64_STANDARD.encode(&buf));
-                                                        *key_lock = track_key;
-                                                        *cache_lock = Some(encoded.clone());
-                                                        thumbnail_b64 = Some(encoded);
+                    let track_changed = *key_lock != track_key;
+
+                    if !title.is_empty() {
+                        if track_changed {
+                            *key_lock = track_key;
+                            *cache_lock = None;
+
+                            if let Ok(thumb_ref) = props.Thumbnail() {
+                                if let Ok(stream_op) = thumb_ref.OpenReadAsync() {
+                                    if let Ok(stream) = stream_op.join() {
+                                        if let Ok(size) = stream.Size() {
+                                            // Max 256KB to keep memory light and avoid large IPC transfer
+                                            if size > 0 && size <= 256 * 1024 {
+                                                if let Ok(reader) = DataReader::CreateDataReader(&stream) {
+                                                    if reader.LoadAsync(size as u32).and_then(|op| op.join()).is_ok() {
+                                                        let mut buf = vec![0u8; size as usize];
+                                                        if reader.ReadBytes(&mut buf).is_ok() {
+                                                            let encoded = format!("data:image/jpeg;base64,{}", BASE64_STANDARD.encode(&buf));
+                                                            *cache_lock = Some(encoded.clone());
+                                                            thumbnail_b64 = Some(encoded);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -278,6 +339,10 @@ fn refresh_sessions(
                                     }
                                 }
                             }
+                        } else {
+                            // Track has not changed; React already caches the thumbnail.
+                            // Omit payload over IPC to save memory and CPU on timeline updates.
+                            thumbnail_b64 = None;
                         }
                     }
                 }
@@ -285,6 +350,10 @@ fn refresh_sessions(
 
             let mut position_ms = 0u64;
             let mut duration_ms = 0u64;
+            let mut last_updated_time = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
 
             if let Ok(timeline) = session.GetTimelineProperties() {
                 if let Ok(pos) = timeline.Position() {
@@ -293,6 +362,13 @@ fn refresh_sessions(
                 }
                 if let Ok(end) = timeline.EndTime() {
                     duration_ms = (end.Duration / 10_000).max(0) as u64;
+                }
+                if let Ok(dt) = timeline.LastUpdatedTime() {
+                    let win_ticks = dt.UniversalTime;
+                    // 116,444,736,000,000,000 is 100-ns ticks from 1601 to 1970
+                    if win_ticks > 116_444_736_000_000_000 {
+                        last_updated_time = ((win_ticks - 116_444_736_000_000_000) / 10_000) as u64;
+                    }
                 }
             }
 
@@ -308,6 +384,7 @@ fn refresh_sessions(
                 duration_ms,
                 app_id,
                 thumbnail_base64: thumbnail_b64,
+                last_updated_time,
             }
         }
         None => MediaState::default(),
@@ -327,8 +404,13 @@ pub fn media_get_state() -> MediaState {
     if let Some(holder) = MEDIA_MANAGER.get() {
         if let Ok(lock) = holder.lock() {
             if let Some(ref mgr) = *lock {
-                if let Ok(st) = mgr.current_state.lock() {
-                    return st.clone();
+                if let Ok(mut st) = mgr.current_state.lock().map(|s| s.clone()) {
+                    if st.thumbnail_base64.is_none() {
+                        if let Ok(cached) = mgr.cached_thumbnail.lock() {
+                            st.thumbnail_base64 = cached.clone();
+                        }
+                    }
+                    return st;
                 }
             }
         }
@@ -337,47 +419,58 @@ pub fn media_get_state() -> MediaState {
 }
 
 #[tauri::command]
-pub fn media_play() -> bool {
-    with_session(|session| {
-        session.TryPlayAsync().and_then(|op| op.join()).unwrap_or(false)
-    }).unwrap_or(false)
+pub async fn media_play() -> bool {
+    tauri::async_runtime::spawn_blocking(|| {
+        with_session(|session| {
+            session.TryPlayAsync().and_then(|op| op.join()).unwrap_or(false)
+        }).unwrap_or(false)
+    }).await.unwrap_or(false)
 }
 
 #[tauri::command]
-pub fn media_pause() -> bool {
-    with_session(|session| {
-        session.TryPauseAsync().and_then(|op| op.join()).unwrap_or(false)
-    }).unwrap_or(false)
+pub async fn media_pause() -> bool {
+    tauri::async_runtime::spawn_blocking(|| {
+        with_session(|session| {
+            session.TryPauseAsync().and_then(|op| op.join()).unwrap_or(false)
+        }).unwrap_or(false)
+    }).await.unwrap_or(false)
 }
 
 #[tauri::command]
-pub fn media_toggle_play_pause() -> bool {
-    with_session(|session| {
-        session.TryTogglePlayPauseAsync().and_then(|op| op.join()).unwrap_or(false)
-    }).unwrap_or(false)
+pub async fn media_toggle_play_pause() -> bool {
+    tauri::async_runtime::spawn_blocking(|| {
+        with_session(|session| {
+            session.TryTogglePlayPauseAsync().and_then(|op| op.join()).unwrap_or(false)
+        }).unwrap_or(false)
+    }).await.unwrap_or(false)
 }
 
 #[tauri::command]
-pub fn media_next() -> bool {
-    with_session(|session| {
-        session.TrySkipNextAsync().and_then(|op| op.join()).unwrap_or(false)
-    }).unwrap_or(false)
+pub async fn media_next() -> bool {
+    tauri::async_runtime::spawn_blocking(|| {
+        with_session(|session| {
+            session.TrySkipNextAsync().and_then(|op| op.join()).unwrap_or(false)
+        }).unwrap_or(false)
+    }).await.unwrap_or(false)
 }
 
 #[tauri::command]
-pub fn media_prev() -> bool {
-    with_session(|session| {
-        session.TrySkipPreviousAsync().and_then(|op| op.join()).unwrap_or(false)
-    }).unwrap_or(false)
+pub async fn media_prev() -> bool {
+    tauri::async_runtime::spawn_blocking(|| {
+        with_session(|session| {
+            session.TrySkipPreviousAsync().and_then(|op| op.join()).unwrap_or(false)
+        }).unwrap_or(false)
+    }).await.unwrap_or(false)
 }
 
 #[tauri::command]
-pub fn media_seek(position_ms: u64) -> bool {
-    with_session(|session| {
-        // Convert ms to 100-nanosecond units
-        let units = (position_ms as i64) * 10_000;
-        session.TryChangePlaybackPositionAsync(units).and_then(|op| op.join()).unwrap_or(false)
-    }).unwrap_or(false)
+pub async fn media_seek(position_ms: u64) -> bool {
+    tauri::async_runtime::spawn_blocking(move || {
+        with_session(|session| {
+            let units = (position_ms as i64) * 10_000;
+            session.TryChangePlaybackPositionAsync(units).and_then(|op| op.join()).unwrap_or(false)
+        }).unwrap_or(false)
+    }).await.unwrap_or(false)
 }
 
 fn with_session<F, R>(f: F) -> Option<R>

@@ -266,7 +266,7 @@ export class TimerEngine {
       } else {
         this.notify()
       }
-    }, 250)
+    }, 1000)
   }
 
   private stopTick(): void {

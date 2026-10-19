@@ -39,6 +39,7 @@ pub fn run() {
             media::media_seek,
             tray::autostart_is_enabled,
             tray::autostart_set,
+            tray::tray_set_personality,
         ])
         .setup(|app| {
             let handle = app.handle();
