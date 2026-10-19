@@ -174,10 +174,22 @@ pub fn classify_device(name: &str, is_bluetooth: bool) -> String {
         }
     }
 
-    // 6. Smartphones & Tablets
+    // 6. Game Controllers / Gamepads
+    const CONTROLLER_KEYWORDS: &[&str] = &[
+        "controller", "gamepad", "xbox", "dualsense", "dualshock",
+        "pro controller", "joy-con", "8bitdo", "wireless controller"
+    ];
+    for kw in CONTROLLER_KEYWORDS {
+        if lower.contains(kw) {
+            return "controller".to_string();
+        }
+    }
+
+    // 7. Smartphones & Tablets
     const PHONE_KEYWORDS: &[&str] = &[
-        "iphone", "ipad", "android", "galaxy s", "galaxy note", "galaxy tab",
-        "pixel 6", "pixel 7", "pixel 8", "pixel 9", "jisoo"
+        "iphone", "ipad", "android", "galaxy", "pixel", "xiaomi", "redmi",
+        "oppo", "vivo", "realme", "oneplus", "huawei", "honor", "poco",
+        "phone", "smartphone", "handphone", "hp", "jisoo", "samsung", "tab"
     ];
     for kw in PHONE_KEYWORDS {
         if lower.contains(kw) {
@@ -185,12 +197,116 @@ pub fn classify_device(name: &str, is_bluetooth: bool) -> String {
         }
     }
 
-    // 7. Fallback
+    // 8. Fallback
     if is_bluetooth {
         "bluetooth".to_string()
     } else {
         "audio".to_string()
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct DeviceStateRecord {
+    pub current_state: String, // "connected" | "disconnected"
+    pub last_state_change: Instant,
+    pub flap_count: u32,
+    pub cooldown_until: Option<Instant>,
+}
+
+pub type DeviceTrackerMap = Arc<Mutex<HashMap<String, DeviceStateRecord>>>;
+
+pub fn is_notifiable_device(dev_type: &str) -> bool {
+    // Only user-facing peripherals (audio endpoints and physical input controllers)
+    // should pop up connection alerts.
+    // Smartphones, tablets, and background BLE sensors are deliberately suppressed because
+    // they flap connections periodically in the background for Phone Link, notifications, and telemetry.
+    matches!(
+        dev_type,
+        "tws" | "headphones" | "speaker" | "speakers" | "keyboard" | "mouse" | "audio" | "controller"
+    )
+}
+
+fn should_emit_device_event(
+    tracker: &DeviceTrackerMap,
+    device_name: &str,
+    dev_type: &str,
+    event_type: &str,
+) -> bool {
+    // 1. Filter out non-notifiable devices (phones, background BLE beacons)
+    if !is_notifiable_device(dev_type) {
+        log::debug!(
+            "DeviceWatcher: Suppressing notification for non-peripheral '{}' ({})",
+            device_name,
+            dev_type
+        );
+        return false;
+    }
+
+    let now = Instant::now();
+    let mut map = tracker.lock().unwrap();
+    let record = map.entry(device_name.to_string()).or_insert_with(|| DeviceStateRecord {
+        current_state: String::new(),
+        last_state_change: now,
+        flap_count: 0,
+        cooldown_until: None,
+    });
+
+    // 2. Check if device is in anti-flapping cooldown
+    if let Some(cooldown) = record.cooldown_until {
+        if now < cooldown {
+            log::debug!(
+                "DeviceWatcher: Device '{}' in anti-flapping cooldown, suppressing {}",
+                device_name,
+                event_type
+            );
+            return false;
+        } else {
+            record.cooldown_until = None;
+            record.flap_count = 0;
+        }
+    }
+
+    // 3. Prevent duplicate same-state events
+    if record.current_state == event_type {
+        return false;
+    }
+
+    let elapsed = now.duration_since(record.last_state_change);
+
+    // 4. Anti-flapping detection:
+    // If a device disconnected and reconnected in < 3.5 seconds, or vice-versa
+    if elapsed < std::time::Duration::from_millis(3500) {
+        record.flap_count += 1;
+        // If it flapped 2 or more times rapidly, silence it for 20 seconds
+        if record.flap_count >= 2 {
+            log::warn!(
+                "DeviceWatcher: Connection flapping detected on '{}' ({} flips in {:?}), muting for 20s",
+                device_name,
+                record.flap_count,
+                elapsed
+            );
+            record.cooldown_until = Some(now + std::time::Duration::from_secs(20));
+            return false;
+        }
+    } else if elapsed > std::time::Duration::from_secs(10) {
+        record.flap_count = 0;
+    }
+
+    // 5. Suppress ephemeral disconnects if connected for < 2.5 seconds
+    if event_type == "disconnected" && record.current_state == "connected" && elapsed < std::time::Duration::from_millis(2500) {
+        log::debug!(
+            "DeviceWatcher: Suppressing transient disconnect for '{}' (connected for only {:?})",
+            device_name,
+            elapsed
+        );
+        record.current_state = "disconnected".to_string();
+        record.last_state_change = now;
+        return false;
+    }
+
+    record.current_state = event_type.to_string();
+    record.last_state_change = now;
+    true
 }
 
 fn read_device_info(device: &IMMDevice) -> (String, String, bool) {
@@ -233,7 +349,7 @@ struct AudioNotificationClient {
     is_initialized: Arc<AtomicBool>,
     last_device_id: Arc<Mutex<String>>,
     device_cache: Arc<Mutex<HashMap<String, (String, String, bool)>>>,
-    last_emitted: Arc<Mutex<HashMap<String, Instant>>>,
+    tracker: DeviceTrackerMap,
 }
 
 impl IMMNotificationClient_Impl for AudioNotificationClient_Impl {
@@ -271,17 +387,9 @@ impl IMMNotificationClient_Impl for AudioNotificationClient_Impl {
             })
         };
 
-        // Suppress duplicate events within 2.5 seconds
-        let now = Instant::now();
-        {
-            let mut emit_map = self.last_emitted.lock().unwrap();
-            let key = format!("{}:{}", device_name, event_type);
-            if let Some(prev) = emit_map.get(&key) {
-                if now.duration_since(*prev) < std::time::Duration::from_millis(2500) {
-                    return Ok(());
-                }
-            }
-            emit_map.insert(key, now);
+        // Use unified anti-flapping and peripheral filter engine
+        if !should_emit_device_event(&self.tracker, &device_name, &device_type, event_type) {
+            return Ok(());
         }
 
         let payload = AudioDeviceEvent {
@@ -312,16 +420,8 @@ impl IMMNotificationClient_Impl for AudioNotificationClient_Impl {
 
         self.device_cache.lock().unwrap().insert(dev_id_str, (device_name.clone(), device_type.clone(), is_bluetooth));
 
-        let now = Instant::now();
-        {
-            let mut emit_map = self.last_emitted.lock().unwrap();
-            let key = format!("{}:connected", device_name);
-            if let Some(prev) = emit_map.get(&key) {
-                if now.duration_since(*prev) < std::time::Duration::from_millis(2500) {
-                    return Ok(());
-                }
-            }
-            emit_map.insert(key, now);
+        if !should_emit_device_event(&self.tracker, &device_name, &device_type, "connected") {
+            return Ok(());
         }
 
         let payload = AudioDeviceEvent {
@@ -372,16 +472,8 @@ impl IMMNotificationClient_Impl for AudioNotificationClient_Impl {
             }
         };
 
-        let now = Instant::now();
-        {
-            let mut emit_map = self.last_emitted.lock().unwrap();
-            let key = format!("{}:connected", device_name);
-            if let Some(prev) = emit_map.get(&key) {
-                if now.duration_since(*prev) < std::time::Duration::from_millis(2500) {
-                    return Ok(());
-                }
-            }
-            emit_map.insert(key, now);
+        if !should_emit_device_event(&self.tracker, &device_name, &device_type, "connected") {
+            return Ok(());
         }
 
         let payload = AudioDeviceEvent {
@@ -406,11 +498,11 @@ impl IMMNotificationClient_Impl for AudioNotificationClient_Impl {
 }
 
 pub fn start_audio_device_watcher(app_handle: AppHandle) {
-    let global_last_emitted = Arc::new(Mutex::new(HashMap::<String, Instant>::new()));
+    let global_tracker: DeviceTrackerMap = Arc::new(Mutex::new(HashMap::new()));
 
     // 1. Windows Core Audio Watcher (Endpoints, TWS, Headsets, Speakers, 3.5mm jack)
     let app_handle_audio = app_handle.clone();
-    let audio_emitted = global_last_emitted.clone();
+    let audio_tracker = global_tracker.clone();
     thread::spawn(move || {
         unsafe {
             if CoInitializeEx(None, COINIT_MULTITHREADED).is_err() {
@@ -451,7 +543,7 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
                 is_initialized: is_initialized.clone(),
                 last_device_id: last_device_id.clone(),
                 device_cache: device_cache.clone(),
-                last_emitted: audio_emitted,
+                tracker: audio_tracker,
             }
             .into();
 
@@ -474,9 +566,9 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
         }
     });
 
-    // 2. WinRT Bluetooth Device Watcher (Keyboards, Mice, BLE Peripherals, Phones)
+    // 2. WinRT Bluetooth Device Watcher (Keyboards, Mice, Gamepads, Bluetooth Audio)
     let app_handle_bt = app_handle.clone();
-    let bt_emitted = global_last_emitted;
+    let bt_tracker = global_tracker;
     thread::spawn(move || {
         let is_initialized = Arc::new(AtomicBool::new(false));
         let known_devices = Arc::new(Mutex::new(HashMap::<String, (String, String)>::new()));
@@ -486,7 +578,7 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
             let is_init = is_initialized.clone();
             let app = app_handle_bt.clone();
             let devs = known_devices.clone();
-            let emitted = bt_emitted.clone();
+            let tracker = bt_tracker.clone();
 
             watcher.EnumerationCompleted(&TypedEventHandler::new({
                 let is_init = is_init.clone();
@@ -500,7 +592,7 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
                 let is_init = is_init.clone();
                 let app = app.clone();
                 let devs = devs.clone();
-                let emitted = emitted.clone();
+                let tracker = tracker.clone();
                 move |_, info: windows_core::Ref<'_, DeviceInformation>| {
                     if let Some(info) = info.as_ref() {
                         let id = info.Id().map(|h| h.to_string()).unwrap_or_default();
@@ -519,16 +611,8 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
                             return Ok(());
                         }
 
-                        let now = Instant::now();
-                        {
-                            let mut emit_map = emitted.lock().unwrap();
-                            let key = format!("{}:connected", clean_name);
-                            if let Some(prev) = emit_map.get(&key) {
-                                if now.duration_since(*prev) < std::time::Duration::from_millis(2500) {
-                                    return Ok(());
-                                }
-                            }
-                            emit_map.insert(key, now);
+                        if !should_emit_device_event(&tracker, &clean_name, &dev_type, "connected") {
+                            return Ok(());
                         }
 
                         let payload = AudioDeviceEvent {
@@ -548,7 +632,7 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
                 let is_init = is_init.clone();
                 let app = app.clone();
                 let devs = devs.clone();
-                let emitted = emitted.clone();
+                let tracker = tracker.clone();
                 move |_, update: windows_core::Ref<'_, DeviceInformationUpdate>| {
                     if !is_init.load(Ordering::Relaxed) {
                         return Ok(());
@@ -562,16 +646,8 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
                             })
                         };
 
-                        let now = Instant::now();
-                        {
-                            let mut emit_map = emitted.lock().unwrap();
-                            let key = format!("{}:disconnected", name);
-                            if let Some(prev) = emit_map.get(&key) {
-                                if now.duration_since(*prev) < std::time::Duration::from_millis(2500) {
-                                    return Ok(());
-                                }
-                            }
-                            emit_map.insert(key, now);
+                        if !should_emit_device_event(&tracker, &name, &dev_type, "disconnected") {
+                            return Ok(());
                         }
 
                         let payload = AudioDeviceEvent {

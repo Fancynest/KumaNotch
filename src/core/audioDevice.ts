@@ -51,6 +51,14 @@ class AudioDeviceEngine {
   }
 
   private handleEvent(event: AudioDeviceEvent) {
+    // Suppress background phone link sync handshakes and non-peripheral devices
+    if (
+      event.device_type === 'phone' ||
+      event.device_name.toLowerCase().includes('jisoo')
+    ) {
+      return
+    }
+
     if (this.dismissTimer) {
       clearTimeout(this.dismissTimer)
       this.dismissTimer = null

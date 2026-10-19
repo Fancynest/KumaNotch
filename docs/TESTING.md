@@ -287,3 +287,21 @@ Create test files in a temporary directory with the following filename patterns:
     2. In the card header, Mata Kuma is prominently rendered with `happy` smiling arcs `^_^` and celebratory rosy cheeks, celebrating the completed session.
 
 
+
+### 7.5 Bluetooth Anti-Flapping & Companion Phone Sync Suppression
+- [ ] **Companion Smartphone Background Sync (Phone Link / Nearby Share)**:
+  - Keep a paired smartphone (e.g. named "Jisoo", "Galaxy", "iPhone") nearby with Bluetooth and Windows Phone Link enabled.
+  - As Windows polls the phone for notifications/battery in the background:
+  - **Expected**: KumaNotch remains completely silent; NO popup HUD alerts or capsule expansions are triggered for companion smartphones.
+- [ ] **Anti-Flapping Cooldown Verification**:
+  - Rapidly power cycle a Bluetooth headset or mouse on and off (within 3 seconds multiple times).
+  - **Expected**:
+    1. KumaNotch logs connection state changes cleanly.
+    2. Rapid flapping (>= 2 flips in < 3.5s) triggers the 20-second mute cooldown.
+    3. Prevents notification spamming and UI jumping.
+- [ ] **Horizontally Aligned Status & Indicator Clearance**:
+  - Connect a peripheral (e.g. TWS, headphone, or simulated device).
+  - Inspect the notification capsule visually:
+  - **Expected**:
+    1. Status text is laid out on a single horizontal line (`Device Name • Connected` / `Device Name • Terhubung`).
+    2. Connection indicator dot has a generous gap (`gap-3`) from Kuma's right cheek blush and does not overlap.

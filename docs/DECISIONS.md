@@ -260,3 +260,21 @@ This document records architectural choices, deviations from the initial spec, a
   6. **Authentic Bear Nose Vector Component (`BearNose`)**:
      - Replaced the flat pill with an authentic teddy bear nose: an inverted rounded triangle (`▼`), glossy shine highlight, and soft vertical philtrum seam.
 
+
+## Decision 021: Bluetooth Anti-Flapping Engine, Companion Phone Background Sync Suppression, and Horizontally Aligned HUD
+- **Date**: 2026-10-19
+- **Context**: The user observed their smartphone named "Jisoo" repeatedly connecting and disconnecting every few minutes. Investigation revealed that paired Windows companion smartphones (Windows Phone Link / Link to Windows / BLE beaconing / Nearby Share) negotiate ephemeral 1–3 second RFCOMM/GATT background handshakes to sync battery, notifications, and clipboard, then disconnect to conserve power. KumaNotch was treating these background syncs as hardware peripheral connection events. Additionally, alternating connect/disconnect events bypassed the old key-based debounce, and the connection status light dot was placed too close to Kuma's right cheek blush.
+- **Decision**:
+  1. **Companion Phone & Non-Peripheral Event Suppression**:
+     - Created `is_notifiable_device(dev_type)` in Rust: restricts popup HUD alerts strictly to active audio gear and input peripherals (`tws`, `headphones`, `speaker`, `keyboard`, `mouse`, `audio`, `controller`). Background companion smartphones (`phone`) and ambient BLE sensors are quietly suppressed.
+     - Expanded `PHONE_KEYWORDS` in `classify_device` to capture brand names and common mobile nomenclature ("iphone", "ipad", "android", "galaxy", "pixel", "xiaomi", "redmi", "oppo", "vivo", "realme", "oneplus", "huawei", "honor", "poco", "phone", "smartphone", "handphone", "hp", "jisoo", "samsung", "tab").
+     - Dual-layer frontend guard in `src/core/audioDevice.ts` to silently filter out any background phone sync events.
+  2. **Unified Anti-Flapping State Machine Engine (`should_emit_device_event`)**:
+     - Introduced `DeviceStateRecord` tracking `current_state`, `last_state_change`, `flap_count`, and `cooldown_until` stored in a shared `DeviceTrackerMap` across both Windows Core Audio and WinRT Bluetooth watchers.
+     - Discards redundant duplicate state changes (`current_state == event_type`).
+     - Suppresses transient blips where a device disconnects in less than 2.5 seconds after connecting (typical BLE ping behavior).
+     - Anti-flapping hysteresis: if a device flips state twice in under 3.5 seconds, it is automatically muted into a 20-second quiet cooldown, preventing notification spam.
+  3. **Visual Layout & Clearance Refinement**:
+     - Formatted status badge horizontally inline (`Realtek Audio • Connected` or `OPPO Enco Buds3 • Terhubung`).
+     - Spaced connection indicator light dot (`gap-3`, `ml-3`, `pr-0.5`) to eliminate visual overlap with Mata Kuma's right cheek blush.
+     - Adjusted notification capsule width and window bounds to prevent text truncation while maintaining a compact footprint.
