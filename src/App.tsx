@@ -668,6 +668,21 @@ export default function App() {
     }
   }, [settings.horizontalOffset])
 
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (dragRef.current) {
+        dragRef.current = null
+      }
+      setIsDragging(false)
+    }
+    window.addEventListener('pointerup', handleGlobalPointerUp)
+    window.addEventListener('pointercancel', handleGlobalPointerUp)
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerUp)
+      window.removeEventListener('pointercancel', handleGlobalPointerUp)
+    }
+  }, [])
+
   const rafIdRef = useRef<number | null>(null)
   const pendingOffsetRef = useRef<number | null>(null)
 
@@ -694,7 +709,7 @@ export default function App() {
     if (currentView !== 'idle' || !dragRef.current) return
     const deltaX = e.screenX - dragRef.current.startScreenX
     if (!dragRef.current.hasMoved) {
-      if (Math.abs(deltaX) >= 5) {
+      if (Math.abs(deltaX) >= 14) {
         dragRef.current.hasMoved = true
         setIsDragging(true)
       } else {
@@ -724,7 +739,10 @@ export default function App() {
       cancelAnimationFrame(rafIdRef.current)
       rafIdRef.current = null
     }
-    if (!dragRef.current) return
+    if (!dragRef.current) {
+      setIsDragging(false)
+      return
+    }
     const deltaX = e.screenX - dragRef.current.startScreenX
     const hadMoved = dragRef.current.hasMoved
     const startOffset = dragRef.current.startOffset
@@ -755,6 +773,8 @@ export default function App() {
       }
 
       setTimeout(() => setIsDragging(false), 50)
+    } else {
+      setIsDragging(false)
     }
   }
 
@@ -782,7 +802,7 @@ export default function App() {
   }
 
   const handleShellClick = () => {
-    if (isDragging || dragRef.current?.hasMoved) return
+    if (isDragging) return
     openedViaHoverRef.current = false
     if (currentView === 'idle') {
       setExpandedActivity('home')

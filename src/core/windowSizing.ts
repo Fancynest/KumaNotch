@@ -16,7 +16,7 @@ export interface ShellConfig {
 // Window sizes include tight padding for lighter shadow without clipping
 export const WINDOW_SIZES: Record<string, WindowSize> = {
   idle: { width: 130, height: 58 },
-  droplet: { width: 48, height: 48 },
+  droplet: { width: 68, height: 48 },
   singleTimer: { width: 180, height: 58 },
   singleMusic: { width: 280, height: 58 },
   split: { width: 220, height: 58 },
@@ -34,11 +34,11 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
 // Single persistent shell geometry configurations
 export const SHELL_CONFIGS: Record<string, ShellConfig> = {
   droplet: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.8)',
-    y: 8, // vertical center anchored at y = 24px (8 + 8 + 8)
+    width: 44,
+    height: 20,
+    borderRadius: 10,
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.75)',
+    y: 6, // vertical center anchored at y = 24px (8 + 6 + 10)
   },
   dropTarget: {
     width: 220,

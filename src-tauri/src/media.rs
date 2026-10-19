@@ -322,8 +322,8 @@ fn refresh_sessions(
                                 if let Ok(stream_op) = thumb_ref.OpenReadAsync() {
                                     if let Ok(stream) = stream_op.join() {
                                         if let Ok(size) = stream.Size() {
-                                            // Max 256KB to keep memory light and avoid large IPC transfer
-                                            if size > 0 && size <= 256 * 1024 {
+                                            // Max 5MB to handle high-resolution album covers without dropping
+                                            if size > 0 && size <= 5 * 1024 * 1024 {
                                                 if let Ok(reader) = DataReader::CreateDataReader(&stream) {
                                                     if reader.LoadAsync(size as u32).and_then(|op| op.join()).is_ok() {
                                                         let mut buf = vec![0u8; size as usize];
@@ -340,9 +340,8 @@ fn refresh_sessions(
                                 }
                             }
                         } else {
-                            // Track has not changed; React already caches the thumbnail.
-                            // Omit payload over IPC to save memory and CPU on timeline updates.
-                            thumbnail_b64 = None;
+                            // Track has not changed; preserve cached thumbnail so frontend always has it
+                            thumbnail_b64 = cache_lock.clone();
                         }
                     }
                 }

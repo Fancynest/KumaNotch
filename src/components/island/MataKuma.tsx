@@ -519,24 +519,25 @@ export const MataKuma: React.FC<MataKumaProps> = ({
 
   return (
     <div className="relative flex items-center justify-center select-none py-1">
-      {/* Olivia Rodrigo Floating Music / Heart Charm */}
+      {/* Favorite Artist Floating Music / Heart Charm */}
       {isOlivia && (
         <motion.div
           initial={{ opacity: 0, scale: 0, y: 4 }}
           animate={{
-            opacity: [0.75, 1, 0.75],
-            scale: [0.95, 1.1, 0.95],
-            y: [-6, -9, -6],
+            opacity: [0.85, 1, 0.85],
+            scale: [1.0, 1.25, 1.0],
+            y: [-7, -11, -7],
+            rotate: [-8, 8, -8],
           }}
           transition={{
-            duration: 1.8,
+            duration: 1.2,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
-          className="absolute -top-3.5 flex items-center gap-0.5 text-[9px] pointer-events-none"
+          className="absolute -top-3.5 flex items-center gap-1 text-[10px] pointer-events-none"
         >
-          <span className="text-purple-400 font-bold drop-shadow-[0_0_6px_rgba(192,132,252,0.8)]">💜</span>
-          <span className="text-pink-300 font-mono text-[8px] animate-pulse">♪</span>
+          <span className="text-purple-400 font-bold drop-shadow-[0_0_8px_rgba(192,132,252,0.9)] animate-pulse">💜</span>
+          <span className="text-pink-300 font-mono text-[9px] font-bold">♪</span>
         </motion.div>
       )}
 
@@ -560,25 +561,32 @@ export const MataKuma: React.FC<MataKumaProps> = ({
         </motion.div>
       )}
 
-      {/* Main Face Container with Subtle Joyful Bobbing when Olivia / Music is playing */}
+      {/* Main Face Container with Vibrant Joyful Bobbing when Favorite Artist / Music is playing */}
       <motion.div
-        key={currentEmotion}
+        key={`${currentEmotion}-${isOlivia}-${isMusic}`}
         animate={
           isOlivia
-            ? { y: [0, -1.8, 0], rotate: [0, -1, 1, 0] }
+            ? {
+                y: [0, -3.2, 0, -2.0, 0],
+                rotate: [-2.5, 2.5, -2.5, 2.5, -2.5],
+                scale: [1, 1.05, 1, 1.03, 1],
+              }
             : isMusic
-            ? { y: [0, -1.0, 0] }
+            ? {
+                y: [0, -2.2, 0],
+                rotate: [-1.2, 1.2, -1.2],
+              }
             : { y: 0 }
         }
         transition={
           isOlivia
-            ? { duration: 0.9, repeat: Infinity, ease: 'easeInOut' }
+            ? { duration: 1.1, repeat: Infinity, ease: 'easeInOut' }
             : isMusic
             ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
             : { duration: 0.3 }
         }
         className="flex items-center justify-center gap-2 relative px-2"
-        title={isOlivia ? '💜 Olivia Rodrigo Mode: Kuma senang banget!' : undefined}
+        title={isOlivia ? '💜 Favorite Artist Mode: Kuma senang banget!' : undefined}
       >
         {/* Left Blush */}
         {eyeConfig.blush && (

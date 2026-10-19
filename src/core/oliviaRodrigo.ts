@@ -13,13 +13,24 @@ export function isFavoriteArtistMedia(
     return false
   }
 
-  const target = (favoriteArtist || '').trim().toLowerCase()
-  if (!target) {
+  const rawTarget = (favoriteArtist || '').trim().toLowerCase()
+  if (!rawTarget) {
     return false
   }
 
+  // Support comma/semicolon-separated artists (e.g. "Olivia Rodrigo, Taylor Swift")
+  const targets = rawTarget
+    .split(/[,;]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+
+  if (targets.length === 0) return false
+
   const artist = (media.artist || '').trim().toLowerCase()
-  return artist.includes(target)
+  const title = (media.title || '').trim().toLowerCase()
+  const album = (media.album || '').trim().toLowerCase()
+
+  return targets.some((t) => artist.includes(t) || title.includes(t) || album.includes(t))
 }
 
 /**
