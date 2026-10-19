@@ -86,10 +86,16 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
   // Show eyes if:
   // 1. Idle threshold reached
   // 2. OR Olivia Rodrigo is playing (immediate VIP reaction!)
-  // 3. OR user is hovering over the droplet/capsule
+  // 3. OR Timer is active (Kuma thinking/concentrating!)
+  // 4. OR Fresh file detected (Kuma curious side-glance!)
+  // 5. OR Device connected (Kuma surprised eyes!)
+  // 6. OR user is hovering over the droplet/capsule
   const showEyes =
     (isEligible && isPersonalityIdle) ||
     (isEligible && isOlivia) ||
+    (isEligible && isTimerRunning) ||
+    (isEligible && freshFileDetected) ||
+    (isEligible && deviceConnected) ||
     (isEligible && isHovered)
 
   return (

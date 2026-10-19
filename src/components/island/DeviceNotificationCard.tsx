@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Bluetooth, Headphones, Keyboard, Mouse, Smartphone, Speaker, Volume2 } from 'lucide-react'
 import type { AudioDeviceNotification, DeviceCategory } from '../../core/audioDevice'
 import { getT, type SupportedLang } from '../../core/i18n'
+import { MataKuma } from './MataKuma'
 
 interface DeviceNotificationCardProps {
   notification: AudioDeviceNotification
@@ -151,16 +152,20 @@ export const DeviceNotificationCard: React.FC<DeviceNotificationCardProps> = ({
         </div>
       </div>
 
-      {/* Right connected indicator pulse */}
-      {isConnected && (
-        <div className="flex items-center gap-1 shrink-0 ml-1">
+      {/* Right: Mata Kuma surprised reaction & connection pulse */}
+      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+        <MataKuma
+          emotion={isConnected ? 'surprised' : 'content'}
+          isVisible
+        />
+        {isConnected && (
           <span
-            className={`w-2 h-2 rounded-full ${
+            className={`w-1.5 h-1.5 rounded-full ${
               isBluetooth ? 'bg-sky-400 shadow-[0_0_6px_#38bdf8] animate-pulse' : 'bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse'
             }`}
           />
-        </div>
-      )}
+        )}
+      </div>
     </motion.div>
   )
 }

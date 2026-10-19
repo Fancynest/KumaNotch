@@ -649,77 +649,9 @@ export default function App() {
         }`}
         onPointerDown={handleBackdropPointerDown}
       >
-        {/* LEFT BUBBLE: FRESH FILE OR MUSIC */}
+        {/* LEFT BUBBLE: MUSIC (PRIMARY) OR FRESH FILE (WHEN TIMER IS OCCUPYING RIGHT) */}
         <AnimatePresence>
-          {!isDroplet && !isExpanded && isFreshActive && (!isMediaActive || isTimerActive) ? (
-            <motion.div
-              key="bubble-fresh"
-              initial={{
-                x: 38,
-                scaleX: 1.55,
-                scaleY: 0.6,
-                scale: 0.35,
-                opacity: 0,
-              }}
-              animate={{
-                x: 0,
-                scaleX: 1,
-                scaleY: 1,
-                scale: 1,
-                opacity: 1,
-              }}
-              exit={{
-                x: 38,
-                scaleX: 1.4,
-                scaleY: 0.6,
-                scale: 0.2,
-                opacity: 0,
-                transition: { duration: 0.22, ease: 'easeIn' },
-              }}
-              transition={{
-                type: 'spring',
-                stiffness: 320,
-                damping: 20,
-                mass: 0.75,
-              }}
-              whileHover={{ scale: 1.14 }}
-              whileTap={{ scale: 0.94 }}
-              onPointerEnter={() => handleBubblePointerEnter('freshFile')}
-              onPointerLeave={handleBubblePointerLeave}
-              onClick={(e) => {
-                e.stopPropagation()
-                openedViaHoverRef.current = false
-                handleBubblePointerLeave()
-                setExpandedActivity('freshFile')
-              }}
-              style={{
-                width: 32,
-                height: 32,
-                transformOrigin: 'right center',
-              }}
-              className="relative rounded-full bg-black border border-sky-400/60 shadow-[0_2px_12px_rgba(56,189,248,0.35)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
-              title={`${freshFile?.name || t.freshFile} • ${t.clickToOpen}`}
-            >
-              {freshFile?.thumbnail ? (
-                <img
-                  src={freshFile.thumbnail}
-                  alt={freshFile.name}
-                  className="w-full h-full object-cover rounded-full"
-                />
-              ) : (
-                <Sparkles className="w-4 h-4 text-sky-400 animate-pulse" />
-              )}
-
-              {hoveredTarget === 'freshFile' && (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
-                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute inset-0 rounded-full border-2 border-sky-400 pointer-events-none"
-                />
-              )}
-            </motion.div>
-          ) : !isDroplet && !isExpanded && isMediaActive ? (
+          {!isDroplet && !isExpanded && isMediaActive ? (
             <motion.div
               key="bubble-music"
               initial={{
@@ -788,6 +720,74 @@ export default function App() {
                   animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
                   transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
                   className="absolute inset-0 rounded-full border-2 border-[#1ed760] pointer-events-none"
+                />
+              )}
+            </motion.div>
+          ) : !isDroplet && !isExpanded && isFreshActive && isTimerActive ? (
+            <motion.div
+              key="bubble-fresh-left"
+              initial={{
+                x: 38,
+                scaleX: 1.55,
+                scaleY: 0.6,
+                scale: 0.35,
+                opacity: 0,
+              }}
+              animate={{
+                x: 0,
+                scaleX: 1,
+                scaleY: 1,
+                scale: 1,
+                opacity: 1,
+              }}
+              exit={{
+                x: 38,
+                scaleX: 1.4,
+                scaleY: 0.6,
+                scale: 0.2,
+                opacity: 0,
+                transition: { duration: 0.22, ease: 'easeIn' },
+              }}
+              transition={{
+                type: 'spring',
+                stiffness: 320,
+                damping: 20,
+                mass: 0.75,
+              }}
+              whileHover={{ scale: 1.14 }}
+              whileTap={{ scale: 0.94 }}
+              onPointerEnter={() => handleBubblePointerEnter('freshFile')}
+              onPointerLeave={handleBubblePointerLeave}
+              onClick={(e) => {
+                e.stopPropagation()
+                openedViaHoverRef.current = false
+                handleBubblePointerLeave()
+                setExpandedActivity('freshFile')
+              }}
+              style={{
+                width: 32,
+                height: 32,
+                transformOrigin: 'right center',
+              }}
+              className="relative rounded-full bg-black border border-sky-400/60 shadow-[0_2px_12px_rgba(56,189,248,0.35)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+              title={`${freshFile?.name || t.freshFile} • ${t.clickToOpen}`}
+            >
+              {freshFile?.thumbnail ? (
+                <img
+                  src={freshFile.thumbnail}
+                  alt={freshFile.name}
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                <Sparkles className="w-4 h-4 text-sky-400 animate-pulse" />
+              )}
+
+              {hoveredTarget === 'freshFile' && (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
+                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute inset-0 rounded-full border-2 border-sky-400 pointer-events-none"
                 />
               )}
             </motion.div>
@@ -1003,7 +1003,7 @@ export default function App() {
                 />
               )}
             </motion.div>
-          ) : !isDroplet && !isExpanded && isFreshActive && isMediaActive ? (
+          ) : !isDroplet && !isExpanded && isFreshActive ? (
             <motion.div
               key="bubble-fresh-right"
               initial={{

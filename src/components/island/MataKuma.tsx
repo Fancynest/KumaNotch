@@ -109,6 +109,49 @@ const VectorEye: React.FC<VectorEyeProps> = React.memo(
 
 VectorEye.displayName = 'VectorEye'
 
+// ─── Bear Nose Vector Component ───────────────────────────────────
+interface BearNoseProps {
+  opacity: number
+}
+
+const BearNose: React.FC<BearNoseProps> = React.memo(({ opacity }) => {
+  return (
+    <motion.div
+      animate={{ opacity }}
+      transition={{ duration: 0.25 }}
+      className="flex items-center justify-center shrink-0 origin-center"
+      style={{ width: 8, height: 7 }}
+    >
+      <svg
+        viewBox="0 0 10 9"
+        className="w-2 h-1.5 overflow-visible"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Soft inverted rounded triangle bear nose (▼) */}
+        <path
+          d="M 1.5 2 C 1.5 1.0, 8.5 1.0, 8.5 2 C 8.5 3.6, 6.2 5.8, 5 5.8 C 3.8 5.8, 1.5 3.6, 1.5 2 Z"
+          fill="rgba(255, 255, 255, 0.95)"
+        />
+        {/* Cute shine highlight on the nose */}
+        <ellipse cx="3.6" cy="2.2" rx="0.9" ry="0.5" fill="#ffffff" />
+        {/* Vertical philtrum seam */}
+        <line
+          x1="5"
+          y1="5.8"
+          x2="5"
+          y2="7.4"
+          stroke="rgba(255, 255, 255, 0.85)"
+          strokeWidth="1.0"
+          strokeLinecap="round"
+        />
+      </svg>
+    </motion.div>
+  )
+})
+
+BearNose.displayName = 'BearNose'
+
 // ─── Main MataKuma Component ──────────────────────────────────────
 export const MataKuma: React.FC<MataKumaProps> = ({
   emotion: externalEmotion,
@@ -131,13 +174,14 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   const isDeepSleepy = Boolean(context?.idleDurationMs && context.idleDurationMs > 35000)
 
   // 2. Derive base context emotion
+  // Precedence: Olivia > Device Connect > Timer Done > Fresh File > Timer Running (Thinking) > Hovered > Music > Sleepy > Spontaneous
   const contextualEmotion = useMemo<KumaEmotion>(() => {
     if (isOlivia) return 'happy'
     if (isDeviceConnected) return 'surprised'
     if (isTimerDone) return 'happy'
     if (isFresh) return 'curious'
-    if (isHovered) return 'happy'
     if (isTimerRunning) return 'thinking'
+    if (isHovered) return 'happy'
     if (isMusic) return 'happy'
     if (isDeepSleepy) return 'sleepy'
     return idleSpontaneousEmotion || 'neutral'
@@ -146,8 +190,8 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     isDeviceConnected,
     isTimerDone,
     isFresh,
-    isHovered,
     isTimerRunning,
+    isHovered,
     isMusic,
     isDeepSleepy,
     idleSpontaneousEmotion,
@@ -156,8 +200,8 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   const currentEmotion: KumaEmotion = externalEmotion ?? contextualEmotion
 
   // ─── Autonomous Organic Mood Cycle During Idle ────────────────────
-  // When no high-priority event is occurring, Kuma periodically cycles through
-  // adorable spontaneous emotions (happy smile, wink, curiosity, content).
+  // When no high-priority event is occurring, Kuma mostly stays calm and neutral.
+  // Periodically shows gentle, subtle expressions without constantly grinning.
   useEffect(() => {
     if (!isVisible) return
     let active = true
@@ -173,28 +217,32 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     const scheduleNextMood = () => {
       if (!active) return
 
-      // Random delay between 8 and 15 seconds
-      const delay = 8000 + Math.random() * 7000
+      // Calm delay between 18 and 32 seconds
+      const delay = 18000 + Math.random() * 14000
 
       const timer = setTimeout(() => {
         if (!active) return
 
         const roll = Math.random()
         let nextMood: KumaEmotion = 'neutral'
-        let duration = 3500
+        let duration = 2400
 
-        if (roll < 0.35) {
+        // Subtle distribution: Mostly calm/content/wink, rarely happy
+        if (roll < 0.08) {
           nextMood = 'happy'
-          duration = 3800
-        } else if (roll < 0.60) {
-          nextMood = 'wink'
           duration = 2600
-        } else if (roll < 0.80) {
+        } else if (roll < 0.22) {
+          nextMood = 'wink'
+          duration = 2000
+        } else if (roll < 0.40) {
           nextMood = 'content'
-          duration = 3600
-        } else {
+          duration = 2600
+        } else if (roll < 0.52) {
           nextMood = 'curious'
-          duration = 3200
+          duration = 2200
+        } else {
+          nextMood = 'neutral'
+          duration = 1000
         }
 
         setIdleSpontaneousEmotion(nextMood)
@@ -393,6 +441,26 @@ export const MataKuma: React.FC<MataKumaProps> = ({
         </motion.div>
       )}
 
+      {/* Thinking Floating Thought Charm */}
+      {currentEmotion === 'thinking' && !isOlivia && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0, y: 3 }}
+          animate={{
+            opacity: [0.7, 1, 0.7],
+            scale: [0.95, 1.15, 0.95],
+            y: [-6, -8.5, -6],
+          }}
+          transition={{
+            duration: 1.9,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+          className="absolute -top-3.5 right-0.5 flex items-center pointer-events-none"
+        >
+          <span className="text-amber-300 font-bold text-[9px] drop-shadow-[0_0_5px_rgba(252,211,77,0.8)]">💭</span>
+        </motion.div>
+      )}
+
       {/* Main Face Container with Subtle Joyful Bobbing when Olivia / Music is playing */}
       <motion.div
         key={currentEmotion}
@@ -440,12 +508,8 @@ export const MataKuma: React.FC<MataKumaProps> = ({
           isBlinking={isBlinking}
         />
 
-        {/* Nose */}
-        <motion.div
-          animate={{ opacity: eyeConfig.noseOpacity }}
-          transition={{ duration: 0.25 }}
-          className="w-1.5 h-0.5 rounded-full bg-white/90 shrink-0"
-        />
+        {/* Bear Nose (Teddy Kuma Inverted Triangle Nose with Philtrum) */}
+        <BearNose opacity={eyeConfig.noseOpacity} />
 
         {/* Right Eye */}
         <VectorEye

@@ -254,10 +254,36 @@ Create test files in a temporary directory with the following filename patterns:
   - **Expected**: Immediately triggers Olivia Rodrigo state; Kuma beams with purple blush and joyful bobbing.
 - [ ] **Autonomous Mood Cycles in Idle**:
   - Leave desktop sitting with Mata Kuma active and no active music or timers.
-  - Observe over a 30–60 second period.
-  - **Expected**: Every 8–15 seconds, Kuma spontaneously expresses a noticeable emotion (warm smiling eyes `^_^`, playful wink `^ _ ~`, relaxed content squint, or curious gaze) for 3–4 seconds before settling back to neutral.
+  - Observe over a 60–90 second period.
+  - **Expected**: Kuma remains mostly calm and serene in neutral (~70% of the time). Every 18–32 seconds, Kuma gently expresses a subtle mood (content squint, subtle wink, or curious glance) without constantly grinning.
 - [ ] **Interactive Hover Receptivity**:
   - Move the cursor directly over the ClockCapsule in idle view.
   - **Expected**: Eyes appear immediately (without waiting for idle timeout) and smile warmly at the user with pink blush.
+
+### 7.4 Expression Visibility, Bear Nose, & HUD Embedded Reactions
+- [ ] **Teddy Bear Nose (Kuma Snout)**:
+  - Inspect Mata Kuma in any state (idle, thinking, curious, surprised).
+  - **Expected**: Center nose renders an authentic cute bear nose (inverted rounded triangle `▼` with glossy shine highlight and vertical philtrum seam), replacing the old flat dash.
+- [ ] **Surprised Reaction on Device Connect HUD**:
+  - Connect any Bluetooth or audio peripheral (e.g. TWS, headphone).
+  - **Expected**: Inside `DeviceNotificationCard` on the right side, Mata Kuma renders wide-eyed `surprised` eyes (`type="wide"` pupils) reacting directly to the new hardware.
+- [ ] **Curious Reaction & Independent Fresh File Bubble**:
+  - Take a screenshot with `Win + PrtScn` or Snipping Tool with Spotify paused.
+  - **Expected**:
+    1. Fresh File watcher detects the new screenshot in `Pictures\Screenshots`.
+    2. Fresh File bubble appears immediately on the right side with thumbnail preview and sky-blue ring.
+    3. Mata Kuma glances inquisitively toward the file (`curious` emotion).
+- [ ] **Thinking Emotion with Floating Thought Charm on Active Timer**:
+  - Start a Quick Timer or Pomodoro session.
+  - **Expected**:
+    1. Mata Kuma awakens immediately in `ClockCapsule`.
+    2. Eyes gaze upward to the right in deep concentration (`thinking` emotion).
+    3. An animated floating thought bubble `💭` pulses gently above Kuma.
+    4. Hovering mouse over Kuma maintains the `thinking` state instead of falsely overriding to `happy`.
+- [ ] **Happy Celebration in Alert Card on Timer Completion**:
+  - Let a timer reach 00:00 (or trigger completed state).
+  - **Expected**:
+    1. `AlertCard` expands to full notification size with bell chime.
+    2. In the card header, Mata Kuma is prominently rendered with `happy` smiling arcs `^_^` and celebratory rosy cheeks, celebrating the completed session.
 
 

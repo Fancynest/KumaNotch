@@ -23,9 +23,9 @@ const FOLDERID_DOWNLOADS: GUID = GUID {
 
 const FOLDERID_SCREENSHOTS: GUID = GUID {
     data1: 0xB7BEDE81,
-    data2: 0x1724,
-    data3: 0x47D5,
-    data4: [0x91, 0x2F, 0xDD, 0x52, 0xE5, 0x8B, 0x6B, 0x7E],
+    data2: 0xDF94,
+    data3: 0x4782,
+    data4: [0xAC, 0x5D, 0x95, 0x25, 0x2C, 0x17, 0xF7, 0x5A],
 };
 
 const FOLDERID_PICTURES: GUID = GUID {
@@ -89,6 +89,26 @@ pub fn get_screenshots_folder() -> Option<PathBuf> {
         if sc.exists() {
             return Some(sc);
         }
+        let sc_id = pictures.join("Tangkapan Layar");
+        if sc_id.exists() {
+            return Some(sc_id);
+        }
+    }
+    if let Some(user) = std::env::var_os("USERPROFILE") {
+        let sc = PathBuf::from(&user).join("Pictures").join("Screenshots");
+        if sc.exists() {
+            return Some(sc);
+        }
+        let sc_id = PathBuf::from(&user).join("Pictures").join("Tangkapan Layar");
+        if sc_id.exists() {
+            return Some(sc_id);
+        }
+    }
+    if let Some(onedrive) = std::env::var_os("OneDrive") {
+        let sc = PathBuf::from(&onedrive).join("Pictures").join("Screenshots");
+        if sc.exists() {
+            return Some(sc);
+        }
     }
     std::env::var_os("USERPROFILE")
         .map(|u| PathBuf::from(u).join("Pictures").join("Screenshots"))
@@ -130,6 +150,7 @@ struct FreshFileState {
     thumbnail_cache: HashMap<String, String>,
     initial_baseline: HashSet<PathBuf>,
     recent_arrivals: Vec<(Instant, PathBuf)>,
+    processing_paths: HashSet<PathBuf>,
 }
 
 static FRESH_STATE: std::sync::OnceLock<Mutex<FreshFileState>> = std::sync::OnceLock::new();
@@ -142,6 +163,7 @@ fn get_state() -> &'static Mutex<FreshFileState> {
             thumbnail_cache: HashMap::new(),
             initial_baseline: HashSet::new(),
             recent_arrivals: Vec::new(),
+            processing_paths: HashSet::new(),
         })
     })
 }
@@ -253,6 +275,8 @@ fn generate_shell_thumbnail_win32(path: &Path) -> Option<String> {
     }
 
     unsafe extern "system" {
+        fn CoInitializeEx(pv_reserved: *mut std::ffi::c_void, dw_co_init: u32) -> i32;
+        fn CoUninitialize();
         fn SHCreateItemFromParsingName(
             pszpath: *const u16,
             pbc: *mut std::ffi::c_void,
@@ -275,6 +299,7 @@ fn generate_shell_thumbnail_win32(path: &Path) -> Option<String> {
     }
 
     unsafe {
+        let co_res = CoInitializeEx(std::ptr::null_mut(), 0);
         let wide_path: Vec<u16> = path
             .to_string_lossy()
             .encode_utf16()
@@ -290,6 +315,9 @@ fn generate_shell_thumbnail_win32(path: &Path) -> Option<String> {
         ) != 0
             || factory_ptr.is_null()
         {
+            if co_res == 0 || co_res == 1 {
+                CoUninitialize();
+            }
             return None;
         }
 
@@ -425,9 +453,18 @@ fn is_temporary_file(path: &Path) -> bool {
     )
 }
 
+struct ProcessingGuard(PathBuf);
+impl Drop for ProcessingGuard {
+    fn drop(&mut self) {
+        let mut state = get_state().lock().unwrap();
+        state.processing_paths.remove(&self.0);
+    }
+}
+
 // Spawns readiness checker: waits until size is stable for 800ms and file can be read
 fn process_candidate_file(app: AppHandle, path: PathBuf) {
     tauri::async_runtime::spawn_blocking(move || {
+        let _guard = ProcessingGuard(path.clone());
         let start = Instant::now();
         let mut last_size: Option<u64> = None;
         let mut stable_since: Option<Instant> = None;
@@ -491,10 +528,17 @@ fn handle_file_ready(app: AppHandle, path: PathBuf) {
     state
         .recent_arrivals
         .retain(|(t, _)| now.duration_since(*t) <= Duration::from_secs(2));
-    state.recent_arrivals.push((now, path.clone()));
 
-    let recent_count = state.recent_arrivals.len();
-    let is_batch = recent_count > 5;
+    if !state.recent_arrivals.iter().any(|(_, p)| p == &path) {
+        state.recent_arrivals.push((now, path.clone()));
+    }
+
+    let mut distinct_paths = HashSet::new();
+    for (_, p) in &state.recent_arrivals {
+        distinct_paths.insert(p.clone());
+    }
+    let recent_count = distinct_paths.len();
+    let is_batch = recent_count > 4;
     let batch_count = recent_count;
 
     let id = format!(
@@ -547,10 +591,26 @@ pub fn init_fresh_file_watcher(app: AppHandle) {
         let mut folders_to_watch: Vec<PathBuf> = Vec::new();
 
         if let Some(dl) = get_downloads_folder() {
-            folders_to_watch.push(dl);
+            if !folders_to_watch.contains(&dl) {
+                folders_to_watch.push(dl);
+            }
         }
         if let Some(sc) = get_screenshots_folder() {
-            folders_to_watch.push(sc);
+            if !folders_to_watch.contains(&sc) {
+                folders_to_watch.push(sc);
+            }
+        }
+        if let Some(user) = std::env::var_os("USERPROFILE") {
+            let direct_sc = PathBuf::from(&user).join("Pictures").join("Screenshots");
+            if direct_sc.exists() && !folders_to_watch.contains(&direct_sc) {
+                folders_to_watch.push(direct_sc);
+            }
+        }
+        if let Some(onedrive) = std::env::var_os("OneDrive") {
+            let od_sc = PathBuf::from(&onedrive).join("Pictures").join("Screenshots");
+            if od_sc.exists() && !folders_to_watch.contains(&od_sc) {
+                folders_to_watch.push(od_sc);
+            }
         }
 
         // Establish initial baseline
@@ -588,6 +648,7 @@ pub fn init_fresh_file_watcher(app: AppHandle) {
                     let is_relevant = match kind {
                         EventKind::Create(_) => true,
                         EventKind::Modify(_) => true,
+                        EventKind::Any => true,
                         _ => false,
                     };
 
@@ -603,7 +664,21 @@ pub fn init_fresh_file_watcher(app: AppHandle) {
                                 state.initial_baseline.contains(&path)
                             };
 
-                            if !is_pre_existing {
+                            if is_pre_existing {
+                                continue;
+                            }
+
+                            let is_already_processing = {
+                                let mut state = get_state().lock().unwrap();
+                                if state.processing_paths.contains(&path) {
+                                    true
+                                } else {
+                                    state.processing_paths.insert(path.clone());
+                                    false
+                                }
+                            };
+
+                            if !is_already_processing {
                                 process_candidate_file(app_clone.clone(), path);
                             }
                         }

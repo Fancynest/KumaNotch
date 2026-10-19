@@ -3,6 +3,7 @@ import { Bell, ChevronDown } from 'lucide-react'
 import { globalTimerEngine, type TimerData } from '../../core/timer'
 import { getT } from '../../core/i18n'
 import { globalSettingsEngine } from '../../core/settings'
+import { MataKuma } from './MataKuma'
 
 interface AlertCardProps {
   timerData: TimerData | null
@@ -21,15 +22,20 @@ export const AlertCard: React.FC<AlertCardProps> = ({ timerData, onDismiss }) =>
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center animate-bounce">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center animate-bounce shrink-0">
             <Bell className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div>
-            <span className="text-xs font-bold text-amber-400 block leading-tight">
-              {timerData?.isPomodoro ? `${timerData.label} ${t.completedSuffix}` : t.timeUp}
-            </span>
-            <span className="text-[10px] text-white/50 block leading-tight">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-amber-400 block leading-tight">
+                {timerData?.isPomodoro ? `${timerData.label} ${t.completedSuffix}` : t.timeUp}
+              </span>
+              <div className="px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30">
+                <MataKuma emotion="happy" isVisible />
+              </div>
+            </div>
+            <span className="text-[10px] text-white/50 block leading-tight mt-0.5">
               {timerData?.isPomodoro
                 ? isPomodoroBreak
                   ? t.timeToRefocus

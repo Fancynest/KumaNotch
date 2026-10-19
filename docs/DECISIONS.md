@@ -230,3 +230,33 @@ This document records architectural choices, deviations from the initial spec, a
        - A floating purple heart `💜` and musical note `♪` bob gently above the eyes.
   4. **Interactive Hover Receptivity**:
      - Moving the mouse cursor over the clock capsule no longer abruptly cancels the eyes. Instead, hovering prompts Kuma to look directly at the user and smile warmly with rosy blush.
+
+## Decision 020: Expression Visibility, Fresh File Screenshot Discovery, Embedded HUD Reactions, and Bear Nose Redesign
+- **Date**: 2026-10-19
+- **Context**: The user identified that several key emotions were hidden or blocked by card transitions, fresh file detection was unresponsive on screenshots, timer thinking emotion was not appearing, idle expressions were grinning too frequently, and the center nose looked like a flat dash rather than an authentic bear nose:
+  1. `surprised` (kaget) was hidden because `DeviceNotificationCard` unmounted `ClockCapsule`.
+  2. `curious` never showed because `FOLDERID_SCREENSHOTS` had an incorrect GUID in Rust and `App.tsx` required `isMediaActive` for the fresh file bubble.
+  3. `happy` on timer completion was covered because `AlertCard` expanded and had no Mata Kuma face.
+  4. `thinking` was overridden by hover or hidden behind clock digits.
+  5. Idle mood cycle was smiling (`happy`) too often, looking unnatural.
+  6. The nose was a flat pill rather than a cute bear snout.
+- **Decision**:
+  1. **Device Connect `surprised` HUD Integration**:
+     - Embedded `MataKuma` with `emotion={isConnected ? 'surprised' : 'content'}` directly on `DeviceNotificationCard` alongside the device badge. The user clearly sees Kuma's astonished round eyes when hardware connects.
+  2. **Fresh File Screenshot Discovery & Independent Bubble**:
+     - Corrected `FOLDERID_SCREENSHOTS` GUID in `fresh_file.rs`: `{B7BEDE81-DF94-4782-AC5D-95252C17F75A}`.
+     - Added fallbacks for `USERPROFILE\Pictures\Screenshots`, `Tangkapan Layar`, and OneDrive synced screenshots folders.
+     - Wrapped COM shell thumbnail extraction in `generate_shell_thumbnail_win32` with RAII `CoInitializeEx` / `CoUninitialize`.
+     - In `App.tsx`, removed `isMediaActive` prerequisite so the Fresh File bubble appears independently on the right when idle, and on the left if a timer is occupying the right.
+     - In `ClockCapsule.tsx`, `freshFileDetected` immediately triggers `showEyes` and `curious` side-glance toward the new file.
+  3. **Timer Completion Celebration in `AlertCard`**:
+     - Embedded `MataKuma` with `emotion="happy"` and celebratory amber badge right in the header of `AlertCard`.
+  4. **Active Timer `thinking` State & Floating Thought Charm**:
+     - In `ClockCapsule.tsx`, `isTimerRunning` immediately reveals Mata Kuma.
+     - In `MataKuma.tsx`, `isTimerRunning` takes precedence over `isHovered`, gazing upward to the right with an animated floating amber thought bubble `💭`.
+  5. **Calm Idle Calibration**:
+     - Extended delay between spontaneous expressions to 18–32 seconds.
+     - Reduced `happy` probability to only ~8%, keeping Kuma peaceful, serene, and calm (~70% neutral, subtle wink/content) during idle.
+  6. **Authentic Bear Nose Vector Component (`BearNose`)**:
+     - Replaced the flat pill with an authentic teddy bear nose: an inverted rounded triangle (`▼`), glossy shine highlight, and soft vertical philtrum seam.
+
