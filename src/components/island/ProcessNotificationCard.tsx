@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, Terminal, XCircle, Clock, X } from 'lucide-react'
-import type { ProcessEvent } from '../../core/processWatcher'
+import type { ProcessEvent, PostActionState } from '../../core/processWatcher'
+import { globalProcessWatcherEngine } from '../../core/processWatcher'
 import { MataKuma } from './MataKuma'
 
 interface ProcessNotificationCardProps {
@@ -16,29 +17,23 @@ export const ProcessNotificationCard: React.FC<ProcessNotificationCardProps> = (
   const isRunning = event.status === 'running'
   const isSuccess = event.status === 'success'
 
-  const [countdown, setCountdown] = useState<number>(30)
-  const [isCancelled, setIsCancelled] = useState<boolean>(false)
-  const hasPostAction = Boolean(event.post_action && !isRunning)
+  const [postActionState, setPostActionState] = useState<PostActionState | null>(
+    () => globalProcessWatcherEngine.getPostAction()
+  )
 
   useEffect(() => {
-    if (!hasPostAction || isCancelled) return
+    return globalProcessWatcherEngine.subscribe(({ postAction }) => {
+      setPostActionState(postAction)
+    })
+  }, [])
 
-    const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [hasPostAction, isCancelled])
+  const hasPostAction = Boolean(event.post_action && !isRunning && isSuccess)
+  const isCancelled = postActionState?.isCancelled ?? false
+  const countdown = postActionState?.countdown ?? 0
 
   const handleCancel = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setIsCancelled(true)
+    globalProcessWatcherEngine.cancelPostAction()
   }
 
   const durationStr =

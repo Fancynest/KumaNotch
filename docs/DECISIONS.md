@@ -375,3 +375,39 @@ This document records architectural choices, deviations from the initial spec, a
   7. **Automated Security Verification**:
      - Added automated security test suite (`src/bin/security_tests.rs`) covering oversize payloads (> 4 KB), corrupted JSON, user-only SDDL/DACL validation, text truncation, and status normalization.
 
+
+## Decision 025: Real Post-Action Execution, Pipe Hardening, Store-Managed Countdown, kuma.exe Bundling & PATH Management, and Mode A Home UI
+- **Date**: 2026-10-19
+- **Context**: Finalizing Fase 6b required executing actual power actions upon countdown expiry, persisting countdown/cancellation in the store so "Batal" works across component unmounts, hardening named pipe creation & reads against idle hangs and remote clients, removing `ES_AWAYMODE_REQUIRED`, resolving Windows 11 24H2 test harness crashes, bundling `kuma.exe` to installer with user PATH integration, and adding Mode A process list UI in Home.
+- **Decision**:
+  1. **Real Post-Action Execution & Validation**:
+     - Added `power_action(action: String)` Tauri command.
+     - Actions validated against enum `ValidatedPowerAction`:
+       - `sleep`: calls native Win32 `SetSuspendState(false, false, false)` without hibernation.
+       - `lock`: calls native Win32 `windows::Win32::System::Shutdown::LockWorkStation()`.
+       - `shutdown`: spawns `shutdown /s /t 0`.
+     - Executed only if `event.status === 'success'` and `(event.exit_code === 0 || event.exit_code == null)`.
+  2. **Store-Managed Countdown & Cancel Resilience**:
+     - Moved countdown (30s) and cancellation tracking out of `ProcessNotificationCard.tsx` into singleton `ProcessWatcherEngine` (`src/core/processWatcher.ts`).
+     - Ticking interval and cancellation state persist across card dismissals, unmounts, or page navigation.
+     - Added active countdown banner with "Batal" button directly into `HomePager.tsx`, allowing cancellation even after the notification card has auto-dismissed or been closed.
+  3. **Named Pipe Hardening**:
+     - Added `PIPE_REJECT_REMOTE_CLIENTS` to pipe mode, rejecting remote cross-machine named pipe calls at kernel level.
+     - Applied `FILE_FLAG_FIRST_PIPE_INSTANCE` on first server instance open mode, ensuring KumaNotch is the authoritative creator and fails fast if an impostor pipe exists.
+     - Added 3-second idle read timeout in client worker threads: polls `PeekNamedPipe` for up to 3 seconds before reading. Drops connections that remain idle to prevent worker thread starvation.
+     - Throttled pipe creation error logging (first 3 attempts, then every 30).
+  4. **Power State Simplification**:
+     - Removed `ES_AWAYMODE_REQUIRED`, retaining only `ES_CONTINUOUS | ES_SYSTEM_REQUIRED` in keep-awake thread.
+  5. **Test Runner Consolidation**:
+     - Migrated security unit tests from standalone `[[bin]]` into standard `cargo test` harness linked through `src/bin/kuma.rs`.
+     - Set `test = false` on `[lib]` in `Cargo.toml` to bypass Windows 11 24H2 `0xc0000139` WebView2Loader loader-shim crash when running test runners lacking Common-Controls manifests. All 6 unit tests pass in 0.00s.
+  6. **kuma.exe Bundling & PATH Management**:
+     - Added `bin/kuma.exe` to `tauri.conf.json` bundle `resources`.
+     - Added `is_kuma_in_path` and `add_kuma_to_path` Tauri commands updating user-level environment PATH (`HKCU\Environment\Path`) and broadcasting OS environment change.
+     - Added "Tambahkan kuma ke PATH" toggle with confirmation dialog in `SettingsView.tsx` (General tab).
+     - Documented `kuma` CLI usage in `README.md`.
+  7. **Mode A Process Monitoring UI in Home**:
+     - Added `get_running_processes` Tauri command using native Win32 `CreateToolhelp32Snapshot` and `PROCESSENTRY32W` (0ms overhead, zero external processes).
+     - Added `watch_process` Tauri command.
+     - Added interactive Process Watcher section in `HomePager.tsx` with search filter, post-action selector, and one-click "Watch" button.
+

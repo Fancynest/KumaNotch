@@ -11,6 +11,8 @@ rust-version = "1.90"
 [lib]
 name = "app_lib"
 crate-type = ["rlib"]
+test = false
+doctest = false
 
 [build-dependencies]
 tauri-build = { version = "2.7.3", features = [] }
@@ -47,6 +49,8 @@ windows = { version = "0.62", features = [
     "Win32_Storage_FileSystem",
     "Win32_System_Memory",
     "Win32_System_IO",
+    "Win32_System_Shutdown",
+    "Win32_System_Diagnostics_ToolHelp",
 ] }
 windows-core = "0.62"
 base64 = "0.22"
@@ -56,10 +60,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 [[bin]]
 name = "kuma"
 path = "src/bin/kuma.rs"
-
-[[bin]]
-name = "security_tests"
-path = "src/bin/security_tests.rs"
+test = true
 
 [profile.release]
 opt-level = "s"

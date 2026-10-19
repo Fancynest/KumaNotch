@@ -284,3 +284,10 @@ fn main() {
         }
     }
 }
+
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../process_watcher.rs"]
+mod process_watcher;
+
+

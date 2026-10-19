@@ -64,6 +64,11 @@ pub fn run() {
             fresh_file::fresh_dismiss,
             fresh_file::fresh_get_sources,
             fresh_file::fresh_set_sources,
+            process_watcher::power_action,
+            process_watcher::get_running_processes,
+            process_watcher::watch_process,
+            process_watcher::is_kuma_in_path,
+            process_watcher::add_kuma_to_path,
         ])
         .setup(|app| {
             let handle = app.handle();

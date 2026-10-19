@@ -41,6 +41,41 @@
 | **Collapse Card** | Press <kbd>Escape</kbd>, click header arrow, or click outside |
 | **Re-emerge from Droplet** | Hover cursor for 2 seconds (dwell), or click droplet |
 | **Drop Files to Shelf** | Drag files or folders directly over the island |
+| **Watch Process (Mode A)** | Click Terminal icon in Home Top Bar or run `kuma watch <PID>` |
+
+---
+
+## ⚡ Kuma CLI (`kuma.exe`)
+
+KumaNotch comes bundled with `kuma.exe`, a native, zero-dependency command line companion communicating securely with the KumaNotch island via restricted Windows Named Pipe (`\\.\pipe\kumanotch`).
+
+### Adding to PATH
+In KumaNotch **Settings** → **General**, toggle **"Tambahkan kuma ke PATH"** to register `kuma.exe` to your user PATH environment variable.
+
+### CLI Usage
+
+```powershell
+# 1. Run command with real-time notification & optional post-action
+kuma run cargo build --release
+kuma run --post-action sleep python train_model.py
+kuma run --post-action lock ffmpeg -i video.mp4 output.mkv
+
+# 2. Mode A: Monitor existing process by PID (kernel-level event-driven, 0% CPU)
+kuma watch 12344 "Compiling Kernel" --post-action lock
+
+# 3. Send custom notification card to island
+kuma notify "Deployment Selesai" "Semua unit test lolos di staging"
+kuma notify "Build Gagal" --error
+
+# 4. Check KumaNotch daemon connection
+kuma status
+```
+
+#### Post-Action Safety
+When `--post-action <sleep|lock|shutdown>` is specified:
+- Post-action is only executed on success (exit code 0).
+- An explicit 30-second countdown is displayed on KumaNotch with an instant **Batal** button.
+- You can cancel the action anytime before the timer expires, even if the card was closed.
 
 ---
 

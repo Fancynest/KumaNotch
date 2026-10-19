@@ -6,7 +6,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::OnceLock;
 use std::thread;
 use std::time::Instant;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[cfg(windows)]
 use windows::core::{PCWSTR, PWSTR};
@@ -24,15 +24,17 @@ use windows::Win32::Security::{
     TOKEN_USER,
 };
 #[cfg(windows)]
-use windows::Win32::Storage::FileSystem::{FlushFileBuffers, ReadFile, PIPE_ACCESS_DUPLEX};
+use windows::Win32::Storage::FileSystem::{
+    FlushFileBuffers, ReadFile, FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX,
+};
 #[cfg(windows)]
 use windows::Win32::System::Pipes::{
     ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PeekNamedPipe, PIPE_READMODE_BYTE,
-    PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
+    PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
 };
 #[cfg(windows)]
 use windows::Win32::System::Power::{
-    SetThreadExecutionState, ES_AWAYMODE_REQUIRED, ES_CONTINUOUS, ES_SYSTEM_REQUIRED,
+    SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED,
 };
 #[cfg(windows)]
 use windows::Win32::System::Threading::{
@@ -85,7 +87,7 @@ pub fn normalize_status(raw: Option<&str>, exit_code: Option<i32>) -> String {
     match raw.unwrap_or_default().to_lowercase().as_str() {
         "running" => "running".to_string(),
         "success" | "ok" | "done" => "success".to_string(),
-        "error" | "fail" | "failed" | "err" => "error".to_string(),
+        "error" | "fail" | "failed" | "err" | "crash" => "error".to_string(),
         _ => {
             if let Some(code) = exit_code {
                 if code == 0 {
@@ -122,10 +124,8 @@ pub fn init_keep_awake_thread() {
                         }
 
                         if active_count > 0 {
-                            // Hold ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED
-                            SetThreadExecutionState(
-                                ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED,
-                            );
+                            // Hold ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+                            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
                             log::debug!("ProcessWatcher: Keep-Awake engaged (active={})", active_count);
                         } else {
                             // Release execution state back to continuous normal
@@ -335,6 +335,229 @@ pub fn handle_client_payload(data: &[u8], app: &AppHandle) -> Result<ProcessEven
     Ok(event)
 }
 
+// ─── Power Action Handling ────────────────────────────────────────
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ValidatedPowerAction {
+    Sleep,
+    Lock,
+    Shutdown,
+}
+
+pub fn parse_power_action(action: &str) -> Result<ValidatedPowerAction, String> {
+    match action.trim().to_lowercase().as_str() {
+        "sleep" => Ok(ValidatedPowerAction::Sleep),
+        "lock" => Ok(ValidatedPowerAction::Lock),
+        "shutdown" => Ok(ValidatedPowerAction::Shutdown),
+        other => Err(format!(
+            "Invalid power action: '{}'. Valid actions: sleep, lock, shutdown",
+            other
+        )),
+    }
+}
+
+#[tauri::command]
+pub fn power_action(action: String) -> Result<(), String> {
+    let validated = parse_power_action(&action)?;
+    match validated {
+        ValidatedPowerAction::Sleep => {
+            #[cfg(windows)]
+            unsafe {
+                windows::Win32::System::Power::SetSuspendState(false.into(), false.into(), false.into());
+            }
+            Ok(())
+        }
+        ValidatedPowerAction::Lock => {
+            #[cfg(windows)]
+            unsafe {
+                let _ = windows::Win32::System::Shutdown::LockWorkStation();
+            }
+            Ok(())
+        }
+        ValidatedPowerAction::Shutdown => {
+            #[cfg(windows)]
+            {
+                let _ = std::process::Command::new("shutdown")
+                    .args(["/s", "/t", "0"])
+                    .spawn()
+                    .map_err(|e| format!("Failed to initiate shutdown: {}", e))?;
+            }
+            Ok(())
+        }
+    }
+}
+
+// ─── Running Processes & Mode A Command ───────────────────────────
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ProcessSummary {
+    pub pid: u32,
+    pub name: String,
+}
+
+#[tauri::command]
+pub fn get_running_processes() -> Result<Vec<ProcessSummary>, String> {
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        };
+
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+            .map_err(|e| format!("Failed to snapshot processes: {}", e))?;
+
+        let mut entry = PROCESSENTRY32W {
+            dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+            ..Default::default()
+        };
+
+        let mut list = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+
+        if Process32FirstW(snapshot, &mut entry).is_ok() {
+            loop {
+                let pid = entry.th32ProcessID;
+                if pid > 4 && seen.insert(pid) {
+                    let len = entry
+                        .szExeFile
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(entry.szExeFile.len());
+                    let name = String::from_utf16_lossy(&entry.szExeFile[..len]);
+                    if !name.is_empty() {
+                        list.push(ProcessSummary { pid, name });
+                    }
+                }
+                if Process32NextW(snapshot, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+
+        let _ = CloseHandle(snapshot);
+        list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        Ok(list)
+    }
+
+    #[cfg(not(windows))]
+    Ok(vec![])
+}
+
+#[tauri::command]
+pub fn watch_process(
+    pid: u32,
+    name: Option<String>,
+    post_action: Option<String>,
+    app: AppHandle,
+) -> Result<(), String> {
+    watch_process_pid(pid, name, post_action, app);
+    Ok(())
+}
+
+// ─── kuma.exe PATH Management ─────────────────────────────────────
+pub fn find_kuma_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
+    // 1. Next to current executable
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(parent) = exe_path.parent() {
+            if parent.join("kuma.exe").exists() {
+                return Some(parent.to_path_buf());
+            }
+            if parent.join("bin").join("kuma.exe").exists() {
+                return Some(parent.join("bin"));
+            }
+        }
+    }
+
+    // 2. Resource directory
+    if let Ok(res_dir) = app.path().resource_dir() {
+        if res_dir.join("bin").join("kuma.exe").exists() {
+            return Some(res_dir.join("bin"));
+        }
+        if res_dir.join("kuma.exe").exists() {
+            return Some(res_dir);
+        }
+    }
+
+    // 3. Dev target directory fallback
+    if let Ok(cwd) = std::env::current_dir() {
+        for sub in &["target/debug", "target/release", "src-tauri/target/debug", "src-tauri/target/release"] {
+            let candidate = cwd.join(sub);
+            if candidate.join("kuma.exe").exists() {
+                return Some(candidate);
+            }
+        }
+    }
+
+    None
+}
+
+#[tauri::command]
+pub fn is_kuma_in_path(app: AppHandle) -> Result<bool, String> {
+    let kuma_dir = match find_kuma_dir(&app) {
+        Some(dir) => dir,
+        None => return Ok(false),
+    };
+    let output = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "[System.Environment]::GetEnvironmentVariable('Path', 'User')",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to read user PATH: {}", e))?;
+
+    let path_val = String::from_utf8_lossy(&output.stdout);
+    let kuma_dir_str = kuma_dir.to_string_lossy().to_lowercase();
+    let in_path = path_val
+        .split(';')
+        .any(|p| p.trim().to_lowercase() == kuma_dir_str);
+    Ok(in_path)
+}
+
+#[tauri::command]
+pub fn add_kuma_to_path(app: AppHandle) -> Result<String, String> {
+    let kuma_dir = find_kuma_dir(&app)
+        .ok_or_else(|| "kuma.exe tidak ditemukan di direktori aplikasi atau target".to_string())?;
+    let kuma_dir_str = kuma_dir.to_string_lossy();
+
+    let check_output = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "[System.Environment]::GetEnvironmentVariable('Path', 'User')",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to query user PATH: {}", e))?;
+
+    let current_path = String::from_utf8_lossy(&check_output.stdout).trim().to_string();
+    let already_present = current_path
+        .split(';')
+        .any(|p| p.trim().eq_ignore_ascii_case(&kuma_dir_str));
+
+    if !already_present {
+        let new_path = if current_path.is_empty() {
+            kuma_dir_str.to_string()
+        } else {
+            format!("{};{}", current_path, kuma_dir_str)
+        };
+
+        let set_script = format!(
+            "[System.Environment]::SetEnvironmentVariable('Path', '{}', 'User')",
+            new_path.replace("'", "''")
+        );
+
+        let set_output = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command", &set_script])
+            .output()
+            .map_err(|e| format!("Failed to update user PATH: {}", e))?;
+
+        if !set_output.status.success() {
+            return Err(String::from_utf8_lossy(&set_output.stderr).to_string());
+        }
+    }
+
+    Ok(kuma_dir_str.to_string())
+}
+
 // ─── Server Daemon via Named Pipe \\.\pipe\kumanotch ───────────────
 pub fn start_process_watcher(app_handle: AppHandle) {
     init_keep_awake_thread();
@@ -351,12 +574,21 @@ pub fn start_process_watcher(app_handle: AppHandle) {
 
         log::info!("ProcessWatcher: Named Pipe active at {}", PIPE_NAME);
 
+        let mut is_first_instance = true;
+        let mut retry_failures: u32 = 0;
+
         loop {
+            let open_mode = if is_first_instance {
+                PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE
+            } else {
+                PIPE_ACCESS_DUPLEX
+            };
+
             let pipe_handle = unsafe {
                 CreateNamedPipeW(
                     PCWSTR(pipe_name.as_ptr()),
-                    PIPE_ACCESS_DUPLEX,
-                    PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+                    open_mode,
+                    PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
                     PIPE_UNLIMITED_INSTANCES,
                     MAX_PAYLOAD_SIZE as u32,
                     MAX_PAYLOAD_SIZE as u32,
@@ -366,10 +598,19 @@ pub fn start_process_watcher(app_handle: AppHandle) {
             };
 
             if pipe_handle.is_invalid() {
-                log::warn!("ProcessWatcher: CreateNamedPipeW failed");
+                retry_failures = retry_failures.saturating_add(1);
+                if retry_failures <= 3 || retry_failures % 30 == 0 {
+                    log::warn!(
+                        "ProcessWatcher: CreateNamedPipeW failed (attempt {})",
+                        retry_failures
+                    );
+                }
                 thread::sleep(std::time::Duration::from_millis(500));
                 continue;
             }
+
+            is_first_instance = false;
+            retry_failures = 0;
 
             let connected = unsafe {
                 ConnectNamedPipe(pipe_handle, None).is_ok()
@@ -382,6 +623,40 @@ pub fn start_process_watcher(app_handle: AppHandle) {
                 let handle_val = pipe_handle.0 as isize;
                 thread::spawn(move || {
                     let pipe_handle = HANDLE(handle_val as *mut _);
+
+                    // Idle read timeout: Wait up to 3 seconds for data arrival before aborting
+                    let start_wait = Instant::now();
+                    let mut data_ready = false;
+                    while start_wait.elapsed() < std::time::Duration::from_secs(3) {
+                        let mut bytes_avail = 0u32;
+                        let peek_ok = unsafe {
+                            PeekNamedPipe(
+                                pipe_handle,
+                                None,
+                                0,
+                                None,
+                                Some(&mut bytes_avail),
+                                None,
+                            )
+                        };
+                        if peek_ok.is_err() {
+                            break;
+                        }
+                        if bytes_avail > 0 {
+                            data_ready = true;
+                            break;
+                        }
+                        thread::sleep(std::time::Duration::from_millis(50));
+                    }
+
+                    if !data_ready {
+                        unsafe {
+                            let _ = DisconnectNamedPipe(pipe_handle);
+                            let _ = CloseHandle(pipe_handle);
+                        }
+                        return;
+                    }
+
                     let mut buffer = [0u8; MAX_PAYLOAD_SIZE];
                     let mut bytes_read = 0u32;
 
@@ -537,5 +812,16 @@ mod tests {
             assert!(!sddl_str.contains(";;;NU)"), "Must reject Network users (NU)");
             assert!(!sddl_str.contains(";;;AN)"), "Must reject Anonymous users (AN)");
         }
+    }
+
+    #[test]
+    fn test_parse_power_action() {
+        assert_eq!(parse_power_action("sleep").unwrap(), ValidatedPowerAction::Sleep);
+        assert_eq!(parse_power_action("SLEEP ").unwrap(), ValidatedPowerAction::Sleep);
+        assert_eq!(parse_power_action("lock").unwrap(), ValidatedPowerAction::Lock);
+        assert_eq!(parse_power_action("shutdown").unwrap(), ValidatedPowerAction::Shutdown);
+        assert!(parse_power_action("reboot").is_err());
+        assert!(parse_power_action("").is_err());
+        assert!(parse_power_action("calc.exe").is_err());
     }
 }
