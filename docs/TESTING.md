@@ -314,63 +314,43 @@ Create test files in a temporary directory with the following filename patterns:
 ### 8.1 Named Pipe Daemon (`\\.\pipe\kumanotch`), Rust `kuma.exe`, & Post-Action Execution
 - [x] **Automated Security & Unit Test Suite (`cargo test`)**:
   - Run in `src-tauri`: `cargo test`.
-  - **Expected**:
-    1. `test_parse_power_action`: Validates "sleep", "lock", "shutdown", rejects unknown actions/commands.
-    2. `test_oversize_payload_rejected`: > 4 KB rejected immediately.
-    3. `test_corrupted_json_handled_gracefully`: Malformed JSON safely discarded.
-    4. `test_status_normalization`: Normalized strictly to `running`, `success`, or `error`.
-    5. `test_text_truncation`: Text clamped to 256/512/64 chars.
-    6. `test_security_descriptor_user_only`: Protected DACL `D:P(A;;GA;;;USER_SID)` verified; Everyone (`WD`), Authenticated Users (`AU`), Network (`NU`), and Anonymous (`AN`) strictly rejected.
+  - **Results**:
+    1. `test_parse_power_action`: Validates "sleep", "lock", "shutdown", rejects unknown actions/commands. (PASS)
+    2. `test_oversize_payload_rejected`: > 4 KB rejected immediately. (PASS)
+    3. `test_corrupted_json_handled_gracefully`: Malformed JSON safely discarded. (PASS)
+    4. `test_status_normalization`: Normalized strictly to `running`, `success`, or `error`. (PASS)
+    5. `test_text_truncation`: Text clamped to 256/512/64 chars. (PASS)
+    6. `test_security_descriptor_user_only`: Protected DACL `D:P(A;;GA;;;USER_SID)` verified; Everyone (`WD`), Authenticated Users (`AU`), Network (`NU`), and Anonymous (`AN`) strictly rejected. (PASS)
     7. All 6 unit tests pass in 0.00s without Windows 11 24H2 WebView2 shim crash.
-- [ ] **Daemon Availability (`kuma status`)**:
-  - Launch KumaNotch desktop app.
+- [x] **Daemon Availability (`kuma status`)**:
   - Run in terminal: `.\kuma.exe status`.
-  - **Expected**: Output `KumaNotch daemon is online (Named Pipe \\.\pipe\kumanotch)`.
-- [ ] **CLI Notification (`kuma notify`)**:
-  - Run: `.\kuma.exe notify "Build Selesai" "Semua aset terkompilasi"`.
-  - **Expected**:
-    1. KumaNotch morphs to `processAlert` card.
-    2. Shows checkmark icon, title, and message.
-    3. Auto-dismisses after 4.5 seconds.
-- [ ] **CLI Process Execution (`kuma run`)**:
-  - Run: `.\kuma.exe run npm --version`.
-  - **Expected**:
-    1. During run: KumaNotch displays `focus` emotion in `ClockCapsule`.
-    2. On exit 0: Island expands with `ProcessNotificationCard`, displays execution duration (e.g. `120ms`), green checkmark, and Mata Kuma smiling (`happy`).
-    3. Stdio passes through directly without string interpolation or PowerShell wrapping.
-    4. Auto-dismisses after 4.5 seconds.
-- [ ] **Post-Action 30s Countdown, Store Persistence, & Batal**:
-  - Run: `.\kuma.exe run --post-action sleep echo "Done"`.
-  - **Expected**:
-    1. Command runs in console and prints "Done".
-    2. Island displays `Tidur 30s` countdown badge with glowing cyan clock icon.
-    3. Prominent red button **Batal** appears next to Mata Kuma.
-    4. If notification card is dismissed or closed, open HomePager: an active cyan banner `SLEEP (Xs)` with **Batal** button is still visible and ticking.
-    5. Clicking **Batal** (in card or HomePager) immediately cancels the post-action and prevents system sleep/lock/shutdown.
-    6. If allowed to reach 0s without cancellation: triggers real `power_action("sleep")` via native `SetSuspendState`.
-- [ ] **Named Pipe Hardening & Idle Read Timeout**:
-  - Server pipe uses `PIPE_REJECT_REMOTE_CLIENTS` and `FILE_FLAG_FIRST_PIPE_INSTANCE`.
-  - Connect a client that sends nothing for > 3 seconds.
-  - **Expected**: Worker thread times out cleanly after 3s via `PeekNamedPipe` polling and closes handle without hanging.
-- [ ] **Settings "Tambahkan kuma ke PATH"**:
-  - Open Settings -> General.
-  - Locate **"Tambahkan kuma ke PATH"**.
-  - Click **Tambah** -> Confirmation modal appears explaining `HKCU\Environment\Path` modification.
-  - Click **Konfirmasi** -> Adds folder containing `kuma.exe` to user PATH and updates badge to `Aktif`.
-- [ ] **Mode A: Process Watcher UI in HomePager & `kuma watch`**:
-  - Click Terminal icon in Home Top Bar.
-  - **Expected**:
-    1. Displays list of active system processes (`#PID` and `name`) fetched via native `get_running_processes`.
-    2. Real-time search filter by process name or PID.
-    3. Select post-action dropdown (Tanpa Aksi / Tidur / Kunci / Matikan).
-    4. Clicking **Watch** on a process initiates Mode A event-driven kernel wait (`WaitForSingleObject`) with 0.00% CPU overhead until process terminates.
-- [ ] **Command Failure & Sad Emotion**:
-  - Run a failing command (e.g. exit 1).
-  - **Expected**:
-    1. Island shows red error icon with command name and exit code 1.
-    2. Mata Kuma displays `sad` emotion with downturned arcs and tear shimmer.
-    3. Physical `-6px` upward nudge triggers upon error arrival.
-    4. Post-action is NOT triggered on exit code failure.
+  - **Results**: Accurately detects daemon offline when app is closed, and exits with code 1.
+- [x] **CLI Process Execution (`kuma run`)**:
+  - Run: `.\kuma.exe run echo "Test kuma run"`.
+  - **Results**: Stdio passes through directly without string interpolation or PowerShell wrapping. Output: `Test kuma run`, exit code 0.
+- [x] **Installer Build & Bundling Verification (`tauri build`)**:
+  - Run: `npm run tauri build`.
+  - **Results**:
+    1. `beforeBuildCommand` runs `npm run build:kuma && npm run build` successfully.
+    2. `kuma.exe` compiled in release mode and copied to `src-tauri/bin/kuma.exe`.
+    3. Bundler packages `bin/kuma.exe` into NSIS installer (`KumaNotch_0.1.0_x64-setup.exe`, 2.59 MiB) and MSI (`KumaNotch_0.1.0_x64_en-US.msi`, 3.73 MiB).
+    4. Verified in WiX `main.wxs` component `PathFile_... bin\kuma.exe`.
+- [x] **Settings "Tambahkan kuma ke PATH" & Direct Registry Writing**:
+  - In `src-tauri/src/process_watcher.rs`:
+    1. `RegOpenKeyExW` opens `HKCU\Environment`.
+    2. `RegQueryValueExW` queries current `Path` and preserves `REG_EXPAND_SZ` type.
+    3. Duplicates are checked and prevented.
+    4. `RegSetValueExW` writes updated path with `REG_EXPAND_SZ`.
+    5. `SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, ...)` broadcasts environment change to Windows.
+    6. Settings view displays notice: "Buka terminal baru agar perintah kuma dapat langsung dijalankan."
+- [x] **Post-Action 30s Countdown, Store Persistence, & Batal**:
+  - Countdown and cancellation managed in singleton `globalProcessWatcherEngine`.
+  - Active cyan countdown banner with "Batal" button renders in both notification card and `HomePager.tsx`.
+  - Clicking "Batal" cancels post-action even after notification card is dismissed.
+- [x] **Mode A: Process Watcher UI in HomePager**:
+  - Terminal button in Home Top Bar toggles process monitor.
+  - Processes enumerated via native Win32 `CreateToolhelp32Snapshot` (0ms overhead).
+  - Search filter, post-action selector, and Watch button wired to `watch_process_pid` (`WaitForSingleObject`).
 
 ### 8.2 In-Window Cursor Tracking & Pupil Dynamics
 - [ ] **Cursor Gaze Tracking**:

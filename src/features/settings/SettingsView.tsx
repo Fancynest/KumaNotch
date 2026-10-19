@@ -59,8 +59,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
       await invoke<string>('add_kuma_to_path')
       setKumaInPath(true)
       setShowPathConfirm(false)
-      setPathStatusMsg('Berhasil ditambahkan ke PATH!')
-      setTimeout(() => setPathStatusMsg(null), 3000)
+      setPathStatusMsg('Berhasil ditambahkan ke PATH! Buka terminal baru.')
+      setTimeout(() => setPathStatusMsg(null), 4000)
     } catch (err) {
       setPathStatusMsg(`Gagal: ${String(err)}`)
     }
@@ -277,6 +277,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
                   </button>
                 )}
               </div>
+
+              {kumaInPath && (
+                <span className="text-[10px] text-white/50 block leading-tight">
+                  Catatan: Buka terminal baru agar perintah <code className="font-mono text-amber-300">kuma</code> dapat langsung dijalankan.
+                </span>
+              )}
 
               {pathStatusMsg && (
                 <span className="text-[10px] text-amber-300 font-medium">

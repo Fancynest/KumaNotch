@@ -2,127 +2,157 @@
 
 > A fluid, ultra-lightweight Apple-style **Dynamic Island** for Windows. Built for smooth multitasking without lagging potato laptops.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Windows](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6.svg)
+[![Release](https://img.shields.io/github/v/release/Fancynest/KumaNotch?color=amber)](https://github.com/Fancynest/KumaNotch/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6.svg)](#system-requirements)
+[![Offline](https://img.shields.io/badge/privacy-100%25%20offline-emerald.svg)](#-privacy--100-offline)
+
+<p align="center">
+  <img src="assets/kumanotch_icon.jpg" alt="KumaNotch Banner" width="220" style="border-radius: 24px;" />
+</p>
 
 ---
 
-## ✨ Features
+## 📥 Download (Rilis v0.1.0)
 
-- **True Dynamic Island Aesthetic**: Jet black capsule with continuous squircle corners, subtle glow, and authentic iOS spring physics (stiffness: 420, damping: 32).
-- **Split Island Multitasking**: When multiple activities run simultaneously (e.g., Music + Timer), the island cleanly splits into detached compact bubbles.
+Unduh versi rilis terbaru langsung dari [**GitHub Releases**](https://github.com/Fancynest/KumaNotch/releases/latest):
+
+| Tipe File | Deskripsi | Tautan |
+|---|---|---|
+| **`KumaNotch_0.1.0_x64-setup.exe`** | **Installer Resmi (Disarankan)** — Setup NSIS otomatis dengan uninstaller dan shortcut start menu | [Unduh .exe](https://github.com/Fancynest/KumaNotch/releases/latest) |
+| **`KumaNotch_0.1.0_x64.msi`** | Paket Windows Installer standar untuk deployment perusahaan atau headless | [Unduh .msi](https://github.com/Fancynest/KumaNotch/releases/latest) |
+| **`kuma.exe`** | Biner CLI mandiri (sudah otomatis dibundel di dalam installer di atas) | [Unduh biner](https://github.com/Fancynest/KumaNotch/releases/latest) |
+
+---
+
+## 🛡️ Panduan Windows SmartScreen
+
+Karena KumaNotch merupakan software open source independen yang belum memiliki sertifikat berbayar (*EV Code Signing*), Windows Defender SmartScreen mungkin menampilkan layar biru pemberitahuan saat pertama kali dijalankan:
+
+1. Pada jendela **"Windows protected your PC"** (*Windows melindungi PC Anda*), klik **"More info"** (*Informasi selengkapnya*).
+2. Klik tombol **"Run anyway"** (*Tetap jalankan*).
+3. KumaNotch akan langsung aktif di bagian atas layar desktop Anda.
+
+---
+
+## 🌐 Catatan Microsoft Edge WebView2
+
+KumaNotch dibangun dengan framework **Tauri 2** yang menggunakan runtime sistem Microsoft Edge WebView2:
+- **Windows 11**: Sudah terpasang secara bawaan di seluruh edisi Windows 11.
+- **Windows 10 (20H2+)**: Secara otomatis sudah terpasang melalui Windows Update bulanan.
+- Jika Anda menggunakan instalasi Windows khusus (seperti Windows 10 LTSC atau edisi Tiny) dan belum memiliki WebView2, Anda dapat mengunduhnya secara gratis via [Microsoft WebView2 Evergreen Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
+
+---
+
+## 🔒 Privasi & 100% Offline
+
+- **Zero Telemetry / Tanpa Pelacakan**: KumaNotch tidak memiliki analitik, pelacakan data, pengenal perangkat, maupun koneksi internet luar.
+- **100% Berjalan Lokal**: Seluruh pemantauan media Spotify/browser (Windows SMTC), koneksi perangkat audio Bluetooth, berkas baru (*Fresh File*), dan timer Pomodoro diolah sepenuhnya di mesin Anda.
+- **Keamanan IPC Terisolasi**: Daemon IPC antarmuka menggunakan Windows Named Pipe (`\\.\pipe\kumanotch`) yang dibatasi oleh kernel Windows DACL (*Discretionary Access Control List*) khusus untuk SID pengguna aktif Anda. Koneksi dari pengguna lain, guest, maupun jaringan remote secara ketat ditolak di level kernel.
+
+---
+
+## ✨ Fitur Utama
+
+- **Estetika Dynamic Island**: Desain kapsul hitam pekat berlekuk squircle halus dengan bayangan lembut dan fisika spring autentik iOS (stiffness: 420, damping: 32).
+- **Split Island Multitasking**: Ketika beberapa aktivitas berjalan bersamaan (misal Musik + Timer Pomodoro), pulau terbelah rapi menjadi kapsul terpisah tanpa tumpang tindih.
 - **Horizontal 3-Page Home Pager**:
-  - **Page 0 (Music Player)**: Windows SMTC integration for Spotify, browsers, and media players with live playback controls, seek bar, and live track art.
-  - **Page 1 (Clock & Quick Timer)**: Real-time clock respecting system 12h/24h format, quick timer presets (5m, 15m, 25m, Focus Session Pomodoro), and custom timer duration picker.
-  - **Page 2 (File Shelf)**: Temporary file tray to drop files or folders. Seamlessly drag items back out into Explorer, Slack, Discord, or web browsers.
+  - **Halaman 0 (Pemutar Musik)**: Integrasi Windows SMTC untuk Spotify, browser, dan pemutar musik lokal dengan kontrol lengkap, bilah durasi lagu, dan sampul album dinamis.
+  - **Halaman 1 (Jam & Timer Cepat)**: Jam real-time format 12j/24j, tombol cepat timer (5m, 15m, 25m, Focus Session Pomodoro), custom durasi picker, dan pintasan Mode A Process Watcher.
+  - **Halaman 2 (File Shelf)**: Rak berkas sementara untuk drop file/folder. Tarik langsung keluar ke Explorer, Slack, Discord, atau browser.
 - **Mata Kuma ("Personality")**:
-  - Displays cute blinking Kuma bear eyes when idle.
-  - Scheduled with randomized intervals (3–6s) to ensure ~0% CPU usage without infinite render loops; automatically pauses when window is hidden.
-- **Bilingual Settings & Customization**:
-  - Full Indonesian and English localization.
-  - Customizable time format (Auto, 12h, 24h), language, Auto-droplet timeout, dwell hover timeout, and personality toggle.
-  - Windows autostart toggle synced with system tray.
-  - Web Audio synthesized alarm chimes with volume control.
+  - Animasi mata beruang Kuma yang hidup, berkedip berkala (interval acak 3–6s), berekspresi senang, fokus, sedih, penasaran, dan kaget.
+  - Pupil mata mengikuti posisi kursor pengguna saat berada di dalam pulau (in-window cursor tracking).
+  - Mode perayaan Artis Favorit: atur artis favorit di Settings dan nikmati animasi riang Mata Kuma saat lagunya diputar.
+- **Dapat Digeser & Magnet ke Tengah**:
+  - Geser pulau ke kiri atau kanan sesuai keinginan untuk menghindari webcam atau tab browser.
+  - Dilengkapi radius magnetik (85px): saat digeser mendekati tengah, KumaNotch akan tertarik ke tengah layar dengan reaksi kaget (*surprised*).
 - **Auto-Droplet Mode**:
-  - Automatically morphs into a tiny droplet when other applications are active.
-  - Dwell hover (2s) or click smoothly springs back to the capsule.
-- **Ultra-Lightweight**: Minimal CPU (~0% idle) and RAM footprint, smooth 60/120fps animations powered by Framer Motion.
-- **Native Windows Integration**: Built on Tauri 2 with Rust backend, system tray controls, and auto-start integration.
+  - Otomatis menciut menjadi tetesan (*droplet*) mungil saat aplikasi lain aktif agar tidak mengganggu layar kerja.
+  - Cukup dekatkan kursor (dwell 2 detik) atau klik untuk mengembang kembali.
 
 ---
 
-## 🎮 Gestures & Shortcuts
+## ⚡ Kuma CLI (`kuma.exe`) & Process Watcher
 
-| Action | Gesture / Shortcut |
-|---|---|
-| **Expand Home Card** | Click idle capsule |
-| **Switch Pages (Music / Clock / Shelf)** | Mouse scroll wheel or horizontal swipe gesture |
-| **Quick Settings** | Click gear icon in Clock header, or Tray menu |
-| **Collapse Card** | Press <kbd>Escape</kbd>, click header arrow, or click outside |
-| **Re-emerge from Droplet** | Hover cursor for 2 seconds (dwell), or click droplet |
-| **Drop Files to Shelf** | Drag files or folders directly over the island |
-| **Watch Process (Mode A)** | Click Terminal icon in Home Top Bar or run `kuma watch <PID>` |
+KumaNotch dilengkapi biner CLI Rust mandiri `kuma.exe` tanpa dependensi eksternal, berkomunikasi langsung dengan pulau KumaNotch via Windows Named Pipe (`\\.\pipe\kumanotch`).
 
----
+### 1. Menambahkan ke PATH
+Buka KumaNotch **Settings** → tab **General**, lalu pada opsi **"Tambahkan kuma ke PATH"** klik **Tambah** dan konfirmasi. Folder instalasi `kuma.exe` akan didaftarkan ke variabel lingkungan PATH pengguna Anda (`HKCU\Environment\Path`) secara aman dengan mempertahankan tipe `REG_EXPAND_SZ`. Buka terminal baru untuk langsung menggunakannya.
 
-## ⚡ Kuma CLI (`kuma.exe`)
-
-KumaNotch comes bundled with `kuma.exe`, a native, zero-dependency command line companion communicating securely with the KumaNotch island via restricted Windows Named Pipe (`\\.\pipe\kumanotch`).
-
-### Adding to PATH
-In KumaNotch **Settings** → **General**, toggle **"Tambahkan kuma ke PATH"** to register `kuma.exe` to your user PATH environment variable.
-
-### CLI Usage
+### 2. Panduan Penggunaan CLI
 
 ```powershell
-# 1. Run command with real-time notification & optional post-action
+# Jalankan perintah terminal, teruskan stdio secara langsung, dan beri notifikasi saat selesai
 kuma run cargo build --release
-kuma run --post-action sleep python train_model.py
-kuma run --post-action lock ffmpeg -i video.mp4 output.mkv
+kuma run npm run build
 
-# 2. Mode A: Monitor existing process by PID (kernel-level event-driven, 0% CPU)
-kuma watch 12344 "Compiling Kernel" --post-action lock
+# Mode A: Pantau proses yang sudah berjalan berdasarkan PID (0% CPU, kernel-driven wait)
+kuma watch 12480 "Training AI Model"
 
-# 3. Send custom notification card to island
-kuma notify "Deployment Selesai" "Semua unit test lolos di staging"
+# Aksi otomatis setelah selesai: sleep, lock, atau shutdown
+kuma run --post-action sleep python heavy_training.py
+kuma run --post-action lock ffmpeg -i movie.mkv -c:v libx265 output.mp4
+
+# Tampilkan kartu notifikasi instan di KumaNotch
+kuma notify "Backup Database Selesai" "Semua berkas tersimpan di NAS"
 kuma notify "Build Gagal" --error
 
-# 4. Check KumaNotch daemon connection
+# Periksa apakah daemon KumaNotch aktif
 kuma status
 ```
 
-#### Post-Action Safety
-When `--post-action <sleep|lock|shutdown>` is specified:
-- Post-action is only executed on success (exit code 0).
-- An explicit 30-second countdown is displayed on KumaNotch with an instant **Batal** button.
-- You can cancel the action anytime before the timer expires, even if the card was closed.
+### 3. Keamanan Aksi Setelah Selesai (Post-Action Safety)
+- Aksi sleep/lock/shutdown hanya dieksekusi bila proses berhasil dengan sukses (exit code 0).
+- Muncul hitungan mundur 30 detik di pulau dengan tombol **Batal**.
+- Anda dapat membatalkan aksi kapan saja langsung dari pulau maupun halaman utama Home, bahkan jika kartu notifikasi sudah ditutup.
 
 ---
 
-## 🚀 Getting Started
+## 🎮 Pintasan & Gestur
 
-### Prerequisites
+| Aksi | Gestur / Pintasan |
+|---|---|
+| **Buka Halaman Utama** | Klik kapsul saat idle |
+| **Pindah Halaman (Musik / Jam / Shelf)** | Scroll roda mouse atau geser (*swipe*) horizontal |
+| **Geser Posisi Pulau** | Klik & tahan lalu geser ke kiri/kanan di atas layar |
+| **Kembalikan ke Tengah** | Dobel-klik kapsul atau seret ke area tengah layar |
+| **Pantau Proses (Mode A)** | Klik ikon Terminal di bilah atas Home |
+| **Buka Pengaturan** | Klik ikon roda gigi di Home, atau klik kanan ikon Tray |
+| **Tutup / Perkecil** | Tekan <kbd>Escape</kbd>, klik panah bawah, atau klik di luar |
+| **Buka Droplet** | Sorot kursor selama 2 detik (*dwell*), atau klik tetesan |
+| **Drop Berkas ke Rak** | Tarik file/folder apa saja langsung ke atas pulau |
 
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- [Rust](https://www.rust-lang.org/) (latest stable)
-- C++ build tools (MSVC or MSYS2 MinGW-w64)
+---
 
-### Installation & Development
+## 🛠️ Kompilasi dari Sumber (Development)
+
+### Prasyarat
+- [Node.js](https://nodejs.org/) (v18+)
+- [Rust](https://www.rust-lang.org/) (stable)
+- Visual Studio C++ Build Tools
 
 ```bash
-# Clone the repository
+# Clone repositori
 git clone https://github.com/Fancynest/KumaNotch.git
 cd KumaNotch
 
-# Install dependencies
+# Pasang dependensi
 npm install
 
-# Run in development mode (with Tauri & Vite HMR)
+# Kompilasi kuma CLI lokal
+npm run build:kuma
+
+# Jalankan dalam mode dev (Vite HMR + Tauri)
 npm run tauri dev
-```
 
-### Build Installer (`.exe` / `.msi`)
-
-```bash
-# Build standalone Windows installer and binary
+# Kompilasi installer produksi (.exe & .msi)
 npm run tauri build
 ```
-The output installers will be generated in `src-tauri/target/release/bundle/`.
 
 ---
 
-## 🛠️ Tech Stack
+## 📄 Lisensi
 
-- **Runtime & Shell**: Tauri 2 (Rust + WebView2)
-- **Frontend**: React 19 + TypeScript + Vite
-- **Styling**: Tailwind CSS v4
-- **Animations**: Framer Motion (Spring Physics)
-- **Audio**: Web Audio API (Synthesized resonant chimes)
-- **Icons**: Lucide React
-
----
-
-## 📄 License
-
-MIT License © 2026 Fancynest
+Didistribusikan di bawah lisensi MIT. Hak Cipta © 2026 Fancynest.
 

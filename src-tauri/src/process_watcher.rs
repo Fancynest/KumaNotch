@@ -490,27 +490,139 @@ pub fn find_kuma_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
     None
 }
 
+#[cfg(windows)]
+unsafe extern "system" {
+    fn RegOpenKeyExW(
+        hkey: isize,
+        sub_key: *const u16,
+        options: u32,
+        sam_desired: u32,
+        phk_result: *mut isize,
+    ) -> i32;
+    fn RegQueryValueExW(
+        hkey: isize,
+        value_name: *const u16,
+        reserved: *const u32,
+        type_: *mut u32,
+        data: *mut u8,
+        cb_data: *mut u32,
+    ) -> i32;
+    fn RegSetValueExW(
+        hkey: isize,
+        value_name: *const u16,
+        reserved: u32,
+        type_: u32,
+        data: *const u8,
+        cb_data: u32,
+    ) -> i32;
+    fn RegCloseKey(hkey: isize) -> i32;
+    fn SendMessageTimeoutW(
+        hwnd: isize,
+        msg: u32,
+        wparam: usize,
+        lparam: *const u16,
+        flags: u32,
+        timeout: u32,
+        result: *mut usize,
+    ) -> isize;
+}
+
+#[cfg(windows)]
+const HKEY_CURRENT_USER: isize = -2147483647; // 0x80000001
+#[cfg(windows)]
+const KEY_QUERY_VALUE: u32 = 0x0001;
+#[cfg(windows)]
+const KEY_SET_VALUE: u32 = 0x0002;
+#[cfg(windows)]
+const REG_SZ: u32 = 1;
+#[cfg(windows)]
+const REG_EXPAND_SZ: u32 = 2;
+#[cfg(windows)]
+const HWND_BROADCAST: isize = 0xffff;
+#[cfg(windows)]
+const WM_SETTINGCHANGE: u32 = 0x001A;
+#[cfg(windows)]
+const SMTO_ABORTIFHUNG: u32 = 0x0002;
+
 #[tauri::command]
 pub fn is_kuma_in_path(app: AppHandle) -> Result<bool, String> {
     let kuma_dir = match find_kuma_dir(&app) {
         Some(dir) => dir,
         None => return Ok(false),
     };
-    let output = std::process::Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "[System.Environment]::GetEnvironmentVariable('Path', 'User')",
-        ])
-        .output()
-        .map_err(|e| format!("Failed to read user PATH: {}", e))?;
 
-    let path_val = String::from_utf8_lossy(&output.stdout);
-    let kuma_dir_str = kuma_dir.to_string_lossy().to_lowercase();
-    let in_path = path_val
-        .split(';')
-        .any(|p| p.trim().to_lowercase() == kuma_dir_str);
-    Ok(in_path)
+    #[cfg(windows)]
+    {
+        let sub_key: Vec<u16> = "Environment\0".encode_utf16().collect();
+        let val_name: Vec<u16> = "Path\0".encode_utf16().collect();
+
+        let mut hkey: isize = 0;
+        let open_res = unsafe {
+            RegOpenKeyExW(
+                HKEY_CURRENT_USER,
+                sub_key.as_ptr(),
+                0,
+                KEY_QUERY_VALUE,
+                &mut hkey,
+            )
+        };
+        if open_res != 0 {
+            return Ok(false);
+        }
+
+        let mut val_type: u32 = 0;
+        let mut cb_data: u32 = 0;
+        unsafe {
+            RegQueryValueExW(
+                hkey,
+                val_name.as_ptr(),
+                std::ptr::null(),
+                &mut val_type,
+                std::ptr::null_mut(),
+                &mut cb_data,
+            );
+        }
+
+        if cb_data == 0 {
+            unsafe { let _ = RegCloseKey(hkey); }
+            return Ok(false);
+        }
+
+        let mut buffer = vec![0u8; cb_data as usize];
+        let query_res = unsafe {
+            RegQueryValueExW(
+                hkey,
+                val_name.as_ptr(),
+                std::ptr::null(),
+                &mut val_type,
+                buffer.as_mut_ptr(),
+                &mut cb_data,
+            )
+        };
+        unsafe { let _ = RegCloseKey(hkey); }
+
+        if query_res != 0 {
+            return Ok(false);
+        }
+
+        let u16_slice = unsafe {
+            std::slice::from_raw_parts(
+                buffer.as_ptr() as *const u16,
+                (cb_data as usize) / std::mem::size_of::<u16>(),
+            )
+        };
+        let len = u16_slice.iter().position(|&c| c == 0).unwrap_or(u16_slice.len());
+        let current_path = String::from_utf16_lossy(&u16_slice[..len]);
+
+        let kuma_dir_str = kuma_dir.to_string_lossy().to_lowercase();
+        let in_path = current_path
+            .split(';')
+            .any(|p| p.trim().to_lowercase() == kuma_dir_str);
+        Ok(in_path)
+    }
+
+    #[cfg(not(windows))]
+    Ok(false)
 }
 
 #[tauri::command]
@@ -519,42 +631,132 @@ pub fn add_kuma_to_path(app: AppHandle) -> Result<String, String> {
         .ok_or_else(|| "kuma.exe tidak ditemukan di direktori aplikasi atau target".to_string())?;
     let kuma_dir_str = kuma_dir.to_string_lossy();
 
-    let check_output = std::process::Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "[System.Environment]::GetEnvironmentVariable('Path', 'User')",
-        ])
-        .output()
-        .map_err(|e| format!("Failed to query user PATH: {}", e))?;
+    #[cfg(windows)]
+    {
+        let sub_key: Vec<u16> = "Environment\0".encode_utf16().collect();
+        let val_name: Vec<u16> = "Path\0".encode_utf16().collect();
 
-    let current_path = String::from_utf8_lossy(&check_output.stdout).trim().to_string();
-    let already_present = current_path
-        .split(';')
-        .any(|p| p.trim().eq_ignore_ascii_case(&kuma_dir_str));
-
-    if !already_present {
-        let new_path = if current_path.is_empty() {
-            kuma_dir_str.to_string()
-        } else {
-            format!("{};{}", current_path, kuma_dir_str)
+        let mut hkey: isize = 0;
+        let open_res = unsafe {
+            RegOpenKeyExW(
+                HKEY_CURRENT_USER,
+                sub_key.as_ptr(),
+                0,
+                KEY_QUERY_VALUE | KEY_SET_VALUE,
+                &mut hkey,
+            )
         };
-
-        let set_script = format!(
-            "[System.Environment]::SetEnvironmentVariable('Path', '{}', 'User')",
-            new_path.replace("'", "''")
-        );
-
-        let set_output = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", &set_script])
-            .output()
-            .map_err(|e| format!("Failed to update user PATH: {}", e))?;
-
-        if !set_output.status.success() {
-            return Err(String::from_utf8_lossy(&set_output.stderr).to_string());
+        if open_res != 0 {
+            return Err(format!("RegOpenKeyExW failed with code {}", open_res));
         }
+
+        // 1. Query current value, length, and maintain REG_EXPAND_SZ type
+        let mut val_type: u32 = REG_EXPAND_SZ;
+        let mut cb_data: u32 = 0;
+        unsafe {
+            RegQueryValueExW(
+                hkey,
+                val_name.as_ptr(),
+                std::ptr::null(),
+                &mut val_type,
+                std::ptr::null_mut(),
+                &mut cb_data,
+            );
+        }
+
+        // Maintain REG_EXPAND_SZ as default / preserved
+        if val_type != REG_SZ && val_type != REG_EXPAND_SZ {
+            val_type = REG_EXPAND_SZ;
+        }
+
+        let mut current_path = String::new();
+        if cb_data > 0 {
+            let mut buffer = vec![0u8; cb_data as usize];
+            let query_res = unsafe {
+                RegQueryValueExW(
+                    hkey,
+                    val_name.as_ptr(),
+                    std::ptr::null(),
+                    &mut val_type,
+                    buffer.as_mut_ptr(),
+                    &mut cb_data,
+                )
+            };
+            if query_res == 0 {
+                let u16_slice = unsafe {
+                    std::slice::from_raw_parts(
+                        buffer.as_ptr() as *const u16,
+                        (cb_data as usize) / std::mem::size_of::<u16>(),
+                    )
+                };
+                let len = u16_slice.iter().position(|&c| c == 0).unwrap_or(u16_slice.len());
+                current_path = String::from_utf16_lossy(&u16_slice[..len]);
+            }
+        }
+
+        // 2. Prevent duplicate entries
+        let target_norm = kuma_dir_str.trim().to_lowercase();
+        let already_present = current_path
+            .split(';')
+            .any(|p| p.trim().to_lowercase() == target_norm);
+
+        if !already_present {
+            let new_path_str = if current_path.trim().is_empty() {
+                kuma_dir_str.to_string()
+            } else {
+                let trimmed = current_path.trim_end_matches(';');
+                format!("{};{}", trimmed, kuma_dir_str)
+            };
+
+            let wide_new_path: Vec<u16> = new_path_str
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+            let bytes_len = (wide_new_path.len() * std::mem::size_of::<u16>()) as u32;
+
+            let set_res = unsafe {
+                RegSetValueExW(
+                    hkey,
+                    val_name.as_ptr(),
+                    0,
+                    val_type,
+                    wide_new_path.as_ptr() as *const u8,
+                    bytes_len,
+                )
+            };
+
+            unsafe {
+                let _ = RegCloseKey(hkey);
+            }
+
+            if set_res != 0 {
+                return Err(format!("RegSetValueExW failed with code {}", set_res));
+            }
+
+            // 3. Broadcast WM_SETTINGCHANGE ("Environment") to all top-level windows
+            let env_param: Vec<u16> = "Environment\0".encode_utf16().collect();
+            let mut msg_result: usize = 0;
+            unsafe {
+                SendMessageTimeoutW(
+                    HWND_BROADCAST,
+                    WM_SETTINGCHANGE,
+                    0,
+                    env_param.as_ptr(),
+                    SMTO_ABORTIFHUNG,
+                    5000,
+                    &mut msg_result,
+                );
+            }
+        } else {
+            unsafe {
+                let _ = RegCloseKey(hkey);
+            }
+        }
+
+        Ok(kuma_dir_str.to_string())
     }
 
+    #[cfg(not(windows))]
     Ok(kuma_dir_str.to_string())
 }
 

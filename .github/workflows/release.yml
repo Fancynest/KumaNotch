@@ -39,6 +39,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build kuma CLI
+        run: |
+          cargo build --release --bin kuma --manifest-path src-tauri/Cargo.toml
+          mkdir -p src-tauri/bin
+          cp src-tauri/target/release/kuma.exe src-tauri/bin/kuma.exe
+        shell: bash
+
       - name: Build and Package with Tauri Action
         uses: tauri-apps/tauri-action@v0
         env:
