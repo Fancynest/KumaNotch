@@ -3,7 +3,6 @@ import {
   X,
   Sliders,
   Volume2,
-  Sparkles,
   Play,
 } from 'lucide-react'
 import { globalSettingsEngine, type AppSettings } from '../../core/settings'
@@ -340,8 +339,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
             {/* Personality Mata Kuma */}
             <div className="flex items-center justify-between">
               <div className="max-w-[210px]">
-                <span className="text-xs font-medium text-white flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-xs font-medium text-white block">
                   {t.personality}
                 </span>
                 <span className="text-[10px] text-white/40 block leading-tight">{t.personalityDesc}</span>
