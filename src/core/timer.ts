@@ -2,6 +2,7 @@ import { globalActivityRegistry, ACTIVITY_PRIORITIES } from './activities'
 import { startAlarmLoop, stopAlarmLoop } from './audio'
 import { getT } from './i18n'
 import { globalSettingsEngine } from './settings'
+import { globalMediaEngine } from './media'
 
 export type TimerStatus = 'idle' | 'running' | 'paused' | 'completed'
 export type PomodoroPhase = 'focus' | 'shortBreak' | 'longBreak'
@@ -244,6 +245,10 @@ export class TimerEngine {
     if (this.data && this.data.status === 'completed') {
       this.reset()
     }
+    // Refresh media state in case audio was ducked or paused during alarm chime
+    setTimeout(() => {
+      globalMediaEngine.poll()
+    }, 150)
   }
 
   private startTick(): void {

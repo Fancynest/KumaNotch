@@ -86,28 +86,31 @@ export const Shell: React.FC<ShellProps> = ({
           : 'cursor-default'
       }`}
     >
-      {/* Left Concave Shoulder Fillet (Outer arc connecting notch to top screen bezel) */}
-      <div
-        className="absolute top-0 pointer-events-none z-30"
-        style={{
-          left: -12,
-          width: 12,
-          height: 12,
-          background:
-            'radial-gradient(circle at 0 100%, transparent 11px, rgba(255, 255, 255, 0.12) 11.5px, #000 12.5px)',
-        }}
-      />
-      {/* Right Concave Shoulder Fillet (Outer arc connecting notch to top screen bezel) */}
-      <div
-        className="absolute top-0 pointer-events-none z-30"
-        style={{
-          right: -12,
-          width: 12,
-          height: 12,
-          background:
-            'radial-gradient(circle at 100% 100%, transparent 11px, rgba(255, 255, 255, 0.12) 11.5px, #000 12.5px)',
-        }}
-      />
+      {/* Concave Shoulder Fillets only for attached idle notch, pure black blending into bezel */}
+      {currentView === 'idle' && (
+        <>
+          <div
+            className="absolute top-0 pointer-events-none z-30"
+            style={{
+              left: -10,
+              width: 10,
+              height: 10,
+              background:
+                'radial-gradient(circle at 0 100%, transparent 9.5px, #000 10px)',
+            }}
+          />
+          <div
+            className="absolute top-0 pointer-events-none z-30"
+            style={{
+              right: -10,
+              width: 10,
+              height: 10,
+              background:
+                'radial-gradient(circle at 100% 100%, transparent 9.5px, #000 10px)',
+            }}
+          />
+        </>
+      )}
 
       {/* Main Body with bottom corner squircle and borderless top edge */}
       <div
@@ -116,7 +119,7 @@ export const Shell: React.FC<ShellProps> = ({
             ? 'border-amber-500/50'
             : currentView === 'dropTarget'
             ? 'border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-            : 'border-white/10'
+            : 'border-transparent'
         }`}
         style={{
           borderBottomLeftRadius: shellConfig.borderRadius,

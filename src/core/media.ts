@@ -123,9 +123,18 @@ export class MediaEngine {
     return this.data.durationMs > 0 ? Math.min(this.data.durationMs, current) : current
   }
 
+  public async poll(): Promise<void> {
+    try {
+      const raw = await invoke<RawMediaState>('media_get_state')
+      this.handleStateUpdate(raw)
+    } catch {}
+  }
+
   public async play(): Promise<boolean> {
     try {
-      return await invoke<boolean>('media_play')
+      const res = await invoke<boolean>('media_play')
+      setTimeout(() => this.poll(), 60)
+      return res
     } catch {
       return false
     }
@@ -133,7 +142,9 @@ export class MediaEngine {
 
   public async pause(): Promise<boolean> {
     try {
-      return await invoke<boolean>('media_pause')
+      const res = await invoke<boolean>('media_pause')
+      setTimeout(() => this.poll(), 60)
+      return res
     } catch {
       return false
     }
@@ -141,7 +152,9 @@ export class MediaEngine {
 
   public async togglePlayPause(): Promise<boolean> {
     try {
-      return await invoke<boolean>('media_toggle_play_pause')
+      const res = await invoke<boolean>('media_toggle_play_pause')
+      setTimeout(() => this.poll(), 60)
+      return res
     } catch {
       return false
     }
@@ -149,7 +162,9 @@ export class MediaEngine {
 
   public async next(): Promise<boolean> {
     try {
-      return await invoke<boolean>('media_next')
+      const res = await invoke<boolean>('media_next')
+      setTimeout(() => this.poll(), 100)
+      return res
     } catch {
       return false
     }
@@ -157,7 +172,9 @@ export class MediaEngine {
 
   public async previous(): Promise<boolean> {
     try {
-      return await invoke<boolean>('media_prev')
+      const res = await invoke<boolean>('media_prev')
+      setTimeout(() => this.poll(), 100)
+      return res
     } catch {
       return false
     }

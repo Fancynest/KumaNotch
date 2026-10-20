@@ -148,6 +148,35 @@ pub fn init_media(app_handle: AppHandle) {
                 Ok(())
             },
         ));
+
+        // Periodic heartbeat to catch missed SMTC events from third-party players (Spotify, Chrome, etc.)
+        let sm_heartbeat = session_manager.clone();
+        let app_heartbeat = app_handle_clone.clone();
+        let state_heartbeat = current_state_clone.clone();
+        let thumb_key_heartbeat = last_thumb_clone.clone();
+        let cached_thumb_heartbeat = cached_thumb_clone.clone();
+        let bound_heartbeat = bound_sessions_clone.clone();
+
+        thread::spawn(move || {
+            loop {
+                thread::sleep(std::time::Duration::from_millis(1500));
+                sync_session_listeners(
+                    &sm_heartbeat,
+                    &app_heartbeat,
+                    &state_heartbeat,
+                    &thumb_key_heartbeat,
+                    &cached_thumb_heartbeat,
+                    &bound_heartbeat,
+                );
+                refresh_sessions(
+                    &sm_heartbeat,
+                    &app_heartbeat,
+                    &state_heartbeat,
+                    &thumb_key_heartbeat,
+                    &cached_thumb_heartbeat,
+                );
+            }
+        });
         }));
     });
 }
@@ -400,6 +429,24 @@ fn refresh_sessions(
 
 // Commands exposed to Tauri frontend
 
+pub fn trigger_refresh() {
+    if let Some(holder) = MEDIA_MANAGER.get() {
+        if let Ok(lock) = holder.lock() {
+            if let Some(ref mgr) = *lock {
+                if let Some(ref sm) = mgr.session_manager {
+                    refresh_sessions(
+                        sm,
+                        &mgr.app_handle,
+                        &mgr.current_state,
+                        &mgr.last_thumbnail_key,
+                        &mgr.cached_thumbnail,
+                    );
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn media_get_state() -> MediaState {
     if let Some(holder) = MEDIA_MANAGER.get() {
@@ -421,29 +468,38 @@ pub fn media_get_state() -> MediaState {
 
 #[tauri::command]
 pub async fn media_play() -> bool {
-    tauri::async_runtime::spawn_blocking(|| {
+    let res = tauri::async_runtime::spawn_blocking(|| {
         with_session(|session| {
             session.TryPlayAsync().and_then(|op| op.join()).unwrap_or(false)
         }).unwrap_or(false)
-    }).await.unwrap_or(false)
+    }).await.unwrap_or(false);
+    thread::sleep(std::time::Duration::from_millis(50));
+    trigger_refresh();
+    res
 }
 
 #[tauri::command]
 pub async fn media_pause() -> bool {
-    tauri::async_runtime::spawn_blocking(|| {
+    let res = tauri::async_runtime::spawn_blocking(|| {
         with_session(|session| {
             session.TryPauseAsync().and_then(|op| op.join()).unwrap_or(false)
         }).unwrap_or(false)
-    }).await.unwrap_or(false)
+    }).await.unwrap_or(false);
+    thread::sleep(std::time::Duration::from_millis(50));
+    trigger_refresh();
+    res
 }
 
 #[tauri::command]
 pub async fn media_toggle_play_pause() -> bool {
-    tauri::async_runtime::spawn_blocking(|| {
+    let res = tauri::async_runtime::spawn_blocking(|| {
         with_session(|session| {
             session.TryTogglePlayPauseAsync().and_then(|op| op.join()).unwrap_or(false)
         }).unwrap_or(false)
-    }).await.unwrap_or(false)
+    }).await.unwrap_or(false);
+    thread::sleep(std::time::Duration::from_millis(50));
+    trigger_refresh();
+    res
 }
 
 #[tauri::command]

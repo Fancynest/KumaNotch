@@ -61,6 +61,8 @@ export default function App() {
       setRemainingSeconds(remaining)
       if (data?.status === 'completed') {
         useIslandStore.getState().setExpandedActivity(null)
+      } else {
+        globalMediaEngine.poll()
       }
     })
   }, [])
