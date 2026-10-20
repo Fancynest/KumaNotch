@@ -40,11 +40,7 @@ jobs:
         run: npm ci
 
       - name: Build kuma CLI
-        run: |
-          cargo build --release --bin kuma --manifest-path src-tauri/Cargo.toml
-          mkdir -p src-tauri/bin
-          cp src-tauri/target/release/kuma.exe src-tauri/bin/kuma.exe
-        shell: bash
+        run: node scripts/build-kuma.js
 
       - name: Build and Package with Tauri Action
         uses: tauri-apps/tauri-action@v0
@@ -57,3 +53,9 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Upload standalone kuma CLI binary to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: gh release upload ${{ github.ref_name }} src-tauri/bin/kuma.exe#kuma.exe --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

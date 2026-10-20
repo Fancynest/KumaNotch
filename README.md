@@ -5,11 +5,20 @@
 [![Release](https://img.shields.io/github/v/release/Fancynest/KumaNotch?color=amber)](https://github.com/Fancynest/KumaNotch/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6.svg)](#system-requirements)
-[![Offline](https://img.shields.io/badge/privacy-100%25%20offline-emerald.svg)](#-privacy--100-offline)
+[![Offline](https://img.shields.io/badge/privacy-100%25%20offline-emerald.svg)](#-privasi--100-offline)
 
 <p align="center">
   <img src="assets/kumanotch_icon.jpg" alt="KumaNotch Banner" width="220" style="border-radius: 24px;" />
 </p>
+
+---
+
+## 💻 Persyaratan Sistem
+<a id="system-requirements"></a>
+
+- **Sistem Operasi**: Windows 10 (versi 20H2 atau lebih baru) / Windows 11 (64-bit).
+- **Runtime**: Microsoft Edge WebView2 (sudah terpasang secara bawaan di Windows 11 dan pembaruan Windows 10).
+- **Arsitektur**: x64 (AMD64 / Intel 64-bit).
 
 ---
 
@@ -20,8 +29,8 @@ Unduh versi rilis terbaru langsung dari [**GitHub Releases**](https://github.com
 | Tipe File | Deskripsi | Tautan |
 |---|---|---|
 | **`KumaNotch_0.1.0_x64-setup.exe`** | **Installer Resmi (Disarankan)** — Setup NSIS otomatis dengan uninstaller dan shortcut start menu | [Unduh .exe](https://github.com/Fancynest/KumaNotch/releases/latest) |
-| **`KumaNotch_0.1.0_x64.msi`** | Paket Windows Installer standar untuk deployment perusahaan atau headless | [Unduh .msi](https://github.com/Fancynest/KumaNotch/releases/latest) |
-| **`kuma.exe`** | Biner CLI mandiri (sudah otomatis dibundel di dalam installer di atas) | [Unduh biner](https://github.com/Fancynest/KumaNotch/releases/latest) |
+| **`KumaNotch_0.1.0_x64_en-US.msi`** | Paket Windows Installer standar untuk deployment perusahaan atau instalasi terkelola | [Unduh .msi](https://github.com/Fancynest/KumaNotch/releases/latest) |
+| **`kuma.exe`** | Biner CLI mandiri — otomatis disertakan di dalam installer di atas (bisa ditambahkan ke PATH lewat Settings KumaNotch) atau diunduh terpisah | [Unduh kuma.exe](https://github.com/Fancynest/KumaNotch/releases/latest) |
 
 ---
 
