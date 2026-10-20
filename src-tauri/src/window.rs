@@ -10,7 +10,47 @@ use windows::Win32::Foundation::HWND;
 #[cfg(windows)]
 use windows::Win32::Graphics::Gdi::{CreateRectRgn, SetWindowRgn};
 #[cfg(windows)]
-use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_EXSTYLE, GWL_STYLE, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_DLGFRAME,
+    WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_EX_STATICEDGE, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX,
+    WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
+};
+
+#[cfg(windows)]
+pub fn strip_window_decorations(hwnd: HWND) {
+    unsafe {
+        let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+        let stripped_style = style
+            & !(WS_CAPTION.0
+                | WS_THICKFRAME.0
+                | WS_MINIMIZEBOX.0
+                | WS_MAXIMIZEBOX.0
+                | WS_SYSMENU.0
+                | WS_BORDER.0
+                | WS_DLGFRAME.0);
+        let new_style = stripped_style | WS_POPUP.0;
+        let _ = SetWindowLongW(hwnd, GWL_STYLE, new_style as i32);
+
+        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        let new_ex_style = ex_style
+            & !(WS_EX_DLGMODALFRAME.0
+                | WS_EX_WINDOWEDGE.0
+                | WS_EX_CLIENTEDGE.0
+                | WS_EX_STATICEDGE.0);
+        let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, new_ex_style as i32);
+
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+        );
+    }
+}
 
 pub fn set_window_bounds(window: &tauri::WebviewWindow, x: i32, y: i32, width: u32, height: u32) {
     #[cfg(windows)]
@@ -234,14 +274,17 @@ pub fn setup_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 
             if let Ok(hwnd) = window.hwnd() {
                 #[cfg(windows)]
-                unsafe {
-                    let phys_left = (init_x * scale_factor).round() as i32;
-                    let phys_top = (init_y * scale_factor).round() as i32;
-                    let phys_right = ((init_x + init_w) * scale_factor).round() as i32;
-                    let phys_bottom = ((init_y + init_h) * scale_factor).round() as i32;
+                {
+                    strip_window_decorations(HWND(hwnd.0 as _));
+                    unsafe {
+                        let phys_left = (init_x * scale_factor).round() as i32;
+                        let phys_top = (init_y * scale_factor).round() as i32;
+                        let phys_right = ((init_x + init_w) * scale_factor).round() as i32;
+                        let phys_bottom = ((init_y + init_h) * scale_factor).round() as i32;
 
-                    let hrgn = CreateRectRgn(phys_left, phys_top, phys_right, phys_bottom);
-                    let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), true);
+                        let hrgn = CreateRectRgn(phys_left, phys_top, phys_right, phys_bottom);
+                        let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), true);
+                    }
                 }
             }
 

@@ -69,10 +69,10 @@ const VectorEye: React.FC<VectorEyeProps> = React.memo(
           {type === 'arc' && !isBlinking ? (
             // Smiling crescent arc ^
             <path
-              d="M 1.8 7.5 C 3.2 2.8, 8.8 2.8, 10.2 7.5"
+              d="M 1.5 7.5 C 3.0 2.2, 9.0 2.2, 10.5 7.5"
               fill="none"
               stroke="#ffffff"
-              strokeWidth="2.0"
+              strokeWidth="2.2"
               strokeLinecap="round"
             />
           ) : type === 'sad' && !isBlinking ? (
@@ -526,11 +526,11 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   const rightCursorX = canFollowCursor(eyeConfig.right.type) ? pupilOffset.x : 0
   const rightCursorY = canFollowCursor(eyeConfig.right.type) ? pupilOffset.y : 0
 
-  // Olivia Rodrigo aesthetic colors: signature lilac/purple (#c084fc) or vibrant rose (#f43f5e)
-  const blushColor = isOlivia ? '#c084fc' : '#f43f5e'
+  // Olivia Rodrigo aesthetic colors: signature lilac/purple (#c084fc) or vibrant rose (#fb7185)
+  const blushColor = isOlivia ? '#c084fc' : '#fb7185'
   const blushGlow = isOlivia
-    ? '0 0 7px rgba(192, 132, 252, 0.85)'
-    : '0 0 6px rgba(244, 63, 94, 0.7)'
+    ? '0 0 5px rgba(192, 132, 252, 0.7)'
+    : '0 0 5px rgba(251, 113, 133, 0.5)'
 
   const isHappyMood = currentEmotion === 'happy' || isOlivia || currentEmotion === 'wink'
 
@@ -539,7 +539,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
       {/* Thinking Floating Thought Charm - positioned inside bounds */}
       {currentEmotion === 'thinking' && !isOlivia && (
         <motion.div
-          initial={{ opacity: 0, scale: 0 }}
+          initial={{ opacity: 0, scale: 0.4 }}
           animate={{
             opacity: [0.7, 1, 0.7],
             scale: [0.95, 1.15, 0.95],
@@ -598,62 +598,62 @@ export const MataKuma: React.FC<MataKumaProps> = ({
           </motion.span>
         )}
 
-        {/* Left Blush */}
-        {eyeConfig.blush && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.4 }}
-            animate={{ opacity: 0.85, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.4 }}
-            transition={{ duration: 0.28 }}
-            className="absolute left-2.5 bottom-0 rounded-full pointer-events-none"
-            style={{
-              width: 5.5,
-              height: 3,
-              backgroundColor: blushColor,
-              boxShadow: blushGlow,
-            }}
+        {/* Left Eye with Outer Cheek Blush */}
+        <div className="relative shrink-0 flex items-center justify-center">
+          {eyeConfig.blush && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.4 }}
+              animate={{ opacity: 0.7, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.4 }}
+              transition={{ duration: 0.28 }}
+              className="absolute -left-2 top-2 rounded-full pointer-events-none"
+              style={{
+                width: 5.5,
+                height: 3,
+                backgroundColor: blushColor,
+                boxShadow: blushGlow,
+              }}
+            />
+          )}
+          <VectorEye
+            type={eyeConfig.left.type}
+            offsetX={(eyeConfig.left.offsetX ?? 0) + leftCursorX}
+            offsetY={(eyeConfig.left.offsetY ?? 0) + leftCursorY}
+            scaleX={eyeConfig.left.scaleX}
+            scaleY={eyeConfig.left.scaleY}
+            isBlinking={isBlinking}
           />
-        )}
-
-        {/* Left Eye */}
-        <VectorEye
-          type={eyeConfig.left.type}
-          offsetX={(eyeConfig.left.offsetX ?? 0) + leftCursorX}
-          offsetY={(eyeConfig.left.offsetY ?? 0) + leftCursorY}
-          scaleX={eyeConfig.left.scaleX}
-          scaleY={eyeConfig.left.scaleY}
-          isBlinking={isBlinking}
-        />
+        </div>
 
         {/* Bear Nose with Kawaii Smile Mouth */}
         <BearNose opacity={eyeConfig.noseOpacity} isHappy={isHappyMood} />
 
-        {/* Right Eye */}
-        <VectorEye
-          type={eyeConfig.right.type}
-          offsetX={(eyeConfig.right.offsetX ?? 0) + rightCursorX}
-          offsetY={(eyeConfig.right.offsetY ?? 0) + rightCursorY}
-          scaleX={eyeConfig.right.scaleX}
-          scaleY={eyeConfig.right.scaleY}
-          isBlinking={isBlinking}
-        />
-
-        {/* Right Blush */}
-        {eyeConfig.blush && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.4 }}
-            animate={{ opacity: 0.85, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.4 }}
-            transition={{ duration: 0.28 }}
-            className="absolute right-2.5 bottom-0 rounded-full pointer-events-none"
-            style={{
-              width: 5.5,
-              height: 3,
-              backgroundColor: blushColor,
-              boxShadow: blushGlow,
-            }}
+        {/* Right Eye with Outer Cheek Blush */}
+        <div className="relative shrink-0 flex items-center justify-center">
+          <VectorEye
+            type={eyeConfig.right.type}
+            offsetX={(eyeConfig.right.offsetX ?? 0) + rightCursorX}
+            offsetY={(eyeConfig.right.offsetY ?? 0) + rightCursorY}
+            scaleX={eyeConfig.right.scaleX}
+            scaleY={eyeConfig.right.scaleY}
+            isBlinking={isBlinking}
           />
-        )}
+          {eyeConfig.blush && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.4 }}
+              animate={{ opacity: 0.7, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.4 }}
+              transition={{ duration: 0.28 }}
+              className="absolute -right-2 top-2 rounded-full pointer-events-none"
+              style={{
+                width: 5.5,
+                height: 3,
+                backgroundColor: blushColor,
+                boxShadow: blushGlow,
+              }}
+            />
+          )}
+        </div>
 
         {/* Right Side Charm: Subtle Dancing Note exclusively for Olivia Rodrigo celebration */}
         {isOlivia ? (
