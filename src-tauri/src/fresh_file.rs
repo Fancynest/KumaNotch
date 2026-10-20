@@ -527,7 +527,8 @@ fn handle_file_ready(app: AppHandle, path: PathBuf) {
 pub fn init_fresh_file_watcher(app: AppHandle) {
     let app_clone = app.clone();
     std::thread::spawn(move || {
-        let mut folders_to_watch: Vec<PathBuf> = Vec::new();
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut folders_to_watch: Vec<PathBuf> = Vec::new();
 
         if let Some(dl) = get_downloads_folder() {
             if !folders_to_watch.contains(&dl) {
@@ -628,6 +629,7 @@ pub fn init_fresh_file_watcher(app: AppHandle) {
                 }
             }
         }
+        }));
     });
 }
 

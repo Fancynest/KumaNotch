@@ -110,33 +110,37 @@ pub fn truncate_string(s: &str, max_chars: usize) -> String {
 pub fn init_keep_awake_thread() {
     KEEP_AWAKE_TX.get_or_init(|| {
         let (tx, rx) = channel::<bool>();
-        thread::Builder::new()
+        if let Err(e) = thread::Builder::new()
             .name("kumanotch-keep-awake".to_string())
             .spawn(move || {
-                #[cfg(windows)]
-                unsafe {
-                    let mut active_count: usize = 0;
-                    while let Ok(activate) = rx.recv() {
-                        if activate {
-                            active_count = active_count.saturating_add(1);
-                        } else {
-                            active_count = active_count.saturating_sub(1);
-                        }
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    #[cfg(windows)]
+                    unsafe {
+                        let mut active_count: usize = 0;
+                        while let Ok(activate) = rx.recv() {
+                            if activate {
+                                active_count = active_count.saturating_add(1);
+                            } else {
+                                active_count = active_count.saturating_sub(1);
+                            }
 
-                        if active_count > 0 {
-                            // Hold ES_CONTINUOUS | ES_SYSTEM_REQUIRED
-                            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
-                            log::debug!("ProcessWatcher: Keep-Awake engaged (active={})", active_count);
-                        } else {
-                            // Release execution state back to continuous normal
-                            SetThreadExecutionState(ES_CONTINUOUS);
-                            log::debug!("ProcessWatcher: Keep-Awake released");
+                            if active_count > 0 {
+                                // Hold ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+                                SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+                                log::debug!("ProcessWatcher: Keep-Awake engaged (active={})", active_count);
+                            } else {
+                                // Release execution state back to continuous normal
+                                SetThreadExecutionState(ES_CONTINUOUS);
+                                log::debug!("ProcessWatcher: Keep-Awake released");
+                            }
                         }
+                        SetThreadExecutionState(ES_CONTINUOUS);
                     }
-                    SetThreadExecutionState(ES_CONTINUOUS);
-                }
+                }));
             })
-            .expect("failed to spawn keep-awake thread");
+        {
+            log::error!("ProcessWatcher: Failed to spawn keep-awake thread: {}", e);
+        }
         tx
     });
 }
@@ -219,19 +223,20 @@ pub fn watch_process_pid(
     app: AppHandle,
 ) {
     thread::spawn(move || {
-        #[cfg(windows)]
-        unsafe {
-            let h_process = match OpenProcess(
-                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
-                false,
-                pid,
-            ) {
-                Ok(h) if !h.is_invalid() => h,
-                _ => {
-                    log::warn!("ProcessWatcher: Unable to open process PID {}", pid);
-                    return;
-                }
-            };
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            #[cfg(windows)]
+            unsafe {
+                let h_process = match OpenProcess(
+                    PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+                    false,
+                    pid,
+                ) {
+                    Ok(h) if !h.is_invalid() => h,
+                    _ => {
+                        log::warn!("ProcessWatcher: Unable to open process PID {}", pid);
+                        return;
+                    }
+                };
 
             let cmd_display = command_name.unwrap_or_else(|| format!("PID {}", pid));
             let clean_cmd = truncate_string(&cmd_display, MAX_COMMAND_LEN);
@@ -279,6 +284,7 @@ pub fn watch_process_pid(
             };
             let _ = app.emit("process_event", &completed_event);
         }
+        }));
     });
 }
 
@@ -766,10 +772,11 @@ pub fn start_process_watcher(app_handle: AppHandle) {
 
     #[cfg(windows)]
     thread::spawn(move || {
-        let pipe_name: Vec<u16> = PIPE_NAME
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let pipe_name: Vec<u16> = PIPE_NAME
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
 
         let sa_opt = unsafe { create_user_only_security_attributes() };
         let sa_ptr = sa_opt.as_ref().map(|(sa, _)| sa as *const SECURITY_ATTRIBUTES);
@@ -904,6 +911,7 @@ pub fn start_process_watcher(app_handle: AppHandle) {
                 }
             }
         }
+        }));
     });
 }
 

@@ -503,7 +503,7 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
     let app_handle_audio = app_handle.clone();
     let audio_tracker = global_tracker.clone();
     thread::spawn(move || {
-        unsafe {
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
             if CoInitializeEx(None, COINIT_MULTITHREADED).is_err() {
                 log::warn!("AudioWatcher: CoInitializeEx failed");
                 return;
@@ -562,14 +562,15 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
             loop {
                 thread::sleep(std::time::Duration::from_secs(3600));
             }
-        }
+        }));
     });
 
     // 2. WinRT Bluetooth Device Watcher (Keyboards, Mice, Gamepads, Bluetooth Audio)
     let app_handle_bt = app_handle.clone();
     let bt_tracker = global_tracker;
     thread::spawn(move || {
-        let is_initialized = Arc::new(AtomicBool::new(false));
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let is_initialized = Arc::new(AtomicBool::new(false));
         let known_devices = Arc::new(Mutex::new(HashMap::<String, (String, String)>::new()));
 
         let start_one = |selector: windows_core::HSTRING| -> windows_core::Result<DeviceWatcher> {
@@ -683,5 +684,6 @@ pub fn start_audio_device_watcher(app_handle: AppHandle) {
         loop {
             thread::sleep(std::time::Duration::from_secs(3600));
         }
+        }));
     });
 }

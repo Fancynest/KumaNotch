@@ -403,16 +403,35 @@ export default function App() {
   const leaveCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const openedViaHoverRef = useRef(false)
 
+  // Cleanup timers on unmount to prevent orphan callbacks
+  useEffect(() => {
+    return () => {
+      if (hoverDwellTimerRef.current) {
+        clearTimeout(hoverDwellTimerRef.current)
+        hoverDwellTimerRef.current = null
+      }
+      if (leaveCollapseTimerRef.current) {
+        clearTimeout(leaveCollapseTimerRef.current)
+        leaveCollapseTimerRef.current = null
+      }
+    }
+  }, [])
+
   const handleBubblePointerEnter = (type: 'timer' | 'music' | 'freshFile') => {
     if (leaveCollapseTimerRef.current) {
       clearTimeout(leaveCollapseTimerRef.current)
       leaveCollapseTimerRef.current = null
+    }
+    if (hoverDwellTimerRef.current) {
+      clearTimeout(hoverDwellTimerRef.current)
+      hoverDwellTimerRef.current = null
     }
     setHoveredTarget(type)
     hoverDwellTimerRef.current = setTimeout(() => {
       openedViaHoverRef.current = true
       setExpandedActivity(type)
       setHoveredTarget(null)
+      hoverDwellTimerRef.current = null
     }, 2000)
   }
 

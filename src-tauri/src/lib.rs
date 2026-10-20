@@ -11,6 +11,22 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    std::panic::set_hook(Box::new(|info| {
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "unknown".into());
+        let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            *s
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.as_str()
+        } else {
+            "Box<Any>"
+        };
+        log::error!("CRITICAL: Thread panic at {}: {}", location, payload);
+        eprintln!("CRITICAL: Thread panic at {}: {}", location, payload);
+    }));
+
     let log_level = if cfg!(debug_assertions) {
         log::LevelFilter::Debug
     } else {

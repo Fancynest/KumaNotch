@@ -83,8 +83,9 @@ pub fn init_media(app_handle: AppHandle) {
 
     // Dedicated thread for WinRT SMTC session management
     thread::spawn(move || {
-        let session_manager_res = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-            .and_then(|op| op.join());
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let session_manager_res = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+                .and_then(|op| op.join());
 
         let session_manager = match session_manager_res {
             Ok(sm) => sm,
@@ -147,6 +148,7 @@ pub fn init_media(app_handle: AppHandle) {
                 Ok(())
             },
         ));
+        }));
     });
 }
 
