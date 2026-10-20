@@ -21,9 +21,10 @@ interface ClockCapsuleProps {
   isProcessRunning?: boolean
   isMagnetSnapped?: boolean
   mediaData?: MediaData | null
+  isTransitioning?: boolean
 }
 
-export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
+const ClockCapsuleComponent: React.FC<ClockCapsuleProps> = ({
   timeStr,
   personalityEnabled,
   idleBeforeEyesSeconds,
@@ -38,6 +39,7 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
   isProcessRunning,
   isMagnetSnapped,
   mediaData,
+  isTransitioning,
 }) => {
   const [isPersonalityIdle, setIsPersonalityIdle] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
@@ -137,6 +139,7 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
                 idleDurationMs,
                 isOliviaRodrigo: isFavArtist,
                 isHovered,
+                isTransitioning,
               }}
             />
           </motion.div>
@@ -156,3 +159,5 @@ export const ClockCapsule: React.FC<ClockCapsuleProps> = ({
     </motion.div>
   )
 }
+
+export const ClockCapsule = React.memo(ClockCapsuleComponent)

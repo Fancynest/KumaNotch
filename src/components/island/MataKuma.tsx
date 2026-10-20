@@ -25,6 +25,7 @@ export interface MataKumaContext {
   idleDurationMs?: number
   isOliviaRodrigo?: boolean
   isHovered?: boolean
+  isTransitioning?: boolean
 }
 
 interface MataKumaProps {
@@ -263,10 +264,11 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   ])
 
   const currentEmotion: KumaEmotion = externalEmotion ?? contextualEmotion
+  const isTransitioning = Boolean(context?.isTransitioning)
 
   // ─── Pupil Tracking Cursor (Only when cursor is within window) ───
   useEffect(() => {
-    if (!isVisible) return
+    if (!isVisible || isTransitioning) return
 
     const handleMouseMove = (e: MouseEvent) => {
       if (
@@ -306,7 +308,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
 
   // ─── Autonomous Organic Mood Cycle During Idle ────────────────────
   useEffect(() => {
-    if (!isVisible || isBusy) return
+    if (!isVisible || isBusy || isTransitioning) return
     let active = true
 
     const scheduleNextMood = () => {
@@ -363,7 +365,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
 
   // ─── Periodic Micro-Gaze (Looking Around) ─────────────────────────
   useEffect(() => {
-    if (!isVisible) return
+    if (!isVisible || isTransitioning) return
     let active = true
 
     const scheduleLook = () => {
@@ -390,7 +392,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
 
   // ─── Natural Blink Engine with Double-Blink ───────────────────────
   useEffect(() => {
-    if (!isVisible) return
+    if (!isVisible || isTransitioning) return
     activeRef.current = true
 
     let blinkTimeout: ReturnType<typeof setTimeout> | null = null

@@ -24,6 +24,7 @@ interface IslandStoreState {
   hoveredTarget: 'timer' | 'music' | 'freshFile' | 'process' | null
   isDragOver: boolean
   showCustomInput: boolean
+  isTransitioning: boolean
 
   setDisplayState: (state: DisplayState) => void
   setExpandedActivity: (activity: ExpandedActivity) => void
@@ -33,6 +34,7 @@ interface IslandStoreState {
   setHoveredTarget: (target: 'timer' | 'music' | 'freshFile' | 'process' | null) => void
   setIsDragOver: (isDragOver: boolean) => void
   setShowCustomInput: (show: boolean) => void
+  setIsTransitioning: (isTransitioning: boolean) => void
   collapseAll: () => void
 }
 
@@ -45,6 +47,7 @@ export const useIslandStore = create<IslandStoreState>((set) => ({
   hoveredTarget: null,
   isDragOver: false,
   showCustomInput: false,
+  isTransitioning: false,
 
   setDisplayState: (displayState) => set({ displayState }),
   setExpandedActivity: (expandedActivity) =>
@@ -62,6 +65,7 @@ export const useIslandStore = create<IslandStoreState>((set) => ({
   setHoveredTarget: (hoveredTarget) => set({ hoveredTarget }),
   setIsDragOver: (isDragOver) => set({ isDragOver }),
   setShowCustomInput: (showCustomInput) => set({ showCustomInput }),
+  setIsTransitioning: (isTransitioning) => set({ isTransitioning }),
   collapseAll: () =>
     set({
       expandedActivity: null,

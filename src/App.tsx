@@ -1,128 +1,29 @@
-import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { UploadCloud, Sparkles, Pause } from 'lucide-react'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { listen } from '@tauri-apps/api/event'
-import { invoke } from '@tauri-apps/api/core'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { DevFrameMeter } from './ui/DevFrameMeter'
+import { DevControls } from './ui/DevControls'
 import {
-  WINDOW_SIZES,
-  SHELL_CONFIGS,
   setHitRegion,
-  setIslandOffset,
+  getIslandView,
+  getDynamicDimensions,
 } from './core/windowSizing'
 import {
   globalTimerEngine,
-  formatTimeDisplay,
   type TimerData,
 } from './core/timer'
-import { globalShelfEngine } from './core/shelf'
 import { globalMediaEngine, type MediaData } from './core/media'
-import { AudioWaveform } from './features/media/AudioWaveform'
-import { ExpandedMusic } from './features/media/ExpandedMusic'
 import { getT } from './core/i18n'
 import { globalSettingsEngine, type AppSettings } from './core/settings'
-import { SettingsView } from './features/settings/SettingsView'
-import {
-  useIslandStore,
-  type IslandView,
-  type ExpandedActivity,
-} from './core/islandStore'
+import { useIslandStore } from './core/islandStore'
 import { Shell } from './components/island/Shell'
-import { ClockCapsule } from './components/island/ClockCapsule'
-import { HomePager } from './components/island/HomePager'
-import { TimerCard } from './components/island/TimerCard'
-import { AlertCard } from './components/island/AlertCard'
+import { LeftBubble } from './components/island/LeftBubble'
+import { RightBubble } from './components/island/RightBubble'
+import { IslandContent } from './components/island/IslandContent'
 import { globalFreshFileEngine, type FreshFileInfo } from './core/freshFile'
-import { FreshFileCard } from './components/island/FreshFileCard'
 import { globalAudioDeviceEngine, type AudioDeviceNotification } from './core/audioDevice'
-import { DeviceNotificationCard } from './components/island/DeviceNotificationCard'
 import { globalProcessWatcherEngine, type ProcessEvent } from './core/processWatcher'
-import { ProcessNotificationCard } from './components/island/ProcessNotificationCard'
-
-function formatClockTime(now: Date, mode: 'auto' | '12h' | '24h' = 'auto'): string {
-  if (mode === '12h') {
-    return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
-  }
-  if (mode === '24h') {
-    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-  }
-  return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-}
-
-function formatCompactRemaining(secs: number): string {
-  if (secs <= 0) return '0s'
-  if (secs < 60) return `${secs}s`
-  const m = Math.ceil(secs / 60)
-  if (m < 60) return `${m}m`
-  const h = Math.floor(secs / 3600)
-  return `${h}h`
-}
-
-function getIslandView(
-  expandedActivity: ExpandedActivity,
-  timerData: TimerData | null,
-  isDragOver: boolean,
-  deviceNotification: AudioDeviceNotification | null,
-  processAlert: ProcessEvent | null,
-): IslandView {
-  if (timerData?.status === 'completed') return 'alert'
-  if (processAlert !== null) return 'processAlert'
-  if (expandedActivity === 'settings') return 'settings'
-  if (expandedActivity === 'music') return 'expandedMusic'
-  if (expandedActivity === 'home') return 'home'
-  if (expandedActivity === 'timer') return 'expandedTimer'
-  if (expandedActivity === 'freshFile') return 'expandedFreshFile'
-  if (isDragOver) return 'dropTarget'
-  if (deviceNotification !== null) return 'deviceNotification'
-  return 'idle'
-}
-
-function getDynamicDimensions(
-  view: IslandView,
-  isCustom: boolean,
-  musicActive: boolean,
-  timerActive: boolean,
-  freshFileActive: boolean = false,
-  hasPostAction: boolean = false,
-) {
-  const baseShell = { ...SHELL_CONFIGS[view] }
-  const baseWin = { ...WINDOW_SIZES[view] }
-
-  if (view === 'idle') {
-    const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
-    if (auxCount >= 2) {
-      baseWin.width = 200
-    } else if (auxCount === 1) {
-      baseWin.width = 180
-    } else {
-      baseWin.width = 130
-    }
-  }
-
-  if (view === 'deviceNotification' || view === 'processAlert') {
-    const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
-    if (view === 'processAlert' && hasPostAction) {
-      baseShell.width = 340
-      baseWin.width = 370
-    } else if (auxCount >= 2) {
-      baseWin.width = 380
-    } else if (auxCount === 1) {
-      baseWin.width = 340
-    } else {
-      baseWin.width = 300
-    }
-  }
-
-  if (view === 'home') {
-    const height = isCustom ? 268 : 230
-    const winHeight = isCustom ? 310 : 270
-    baseShell.height = height
-    baseWin.height = winHeight
-  }
-
-  return { shell: baseShell, win: baseWin }
-}
+import { useSystemClock } from './hooks/useSystemClock'
+import { useIslandDrag } from './hooks/useIslandDrag'
+import { useIslandEvents } from './hooks/useIslandEvents'
 
 export default function App() {
   const {
@@ -138,10 +39,11 @@ export default function App() {
     setHoveredTarget,
     setIsDragOver,
     setShowCustomInput,
+    setIsTransitioning,
     collapseAll,
   } = useIslandStore()
 
-  // App Settings Engine subscription
+  // 1. App Settings Engine subscription
   const [settings, setSettings] = useState<AppSettings>(() => globalSettingsEngine.getSettings())
   useEffect(() => {
     return globalSettingsEngine.subscribe((newSettings) => {
@@ -150,7 +52,7 @@ export default function App() {
   }, [])
   const t = getT(settings.language)
 
-  // Timer Engine subscription
+  // 2. Timer Engine subscription
   const [timerData, setTimerData] = useState<TimerData | null>(() => globalTimerEngine.getData())
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() => globalTimerEngine.getRemainingSeconds())
   useEffect(() => {
@@ -163,7 +65,7 @@ export default function App() {
     })
   }, [])
 
-  // SMTC Media Engine subscription
+  // 3. SMTC Media Engine subscription
   const [mediaData, setMediaData] = useState<MediaData | null>(() => globalMediaEngine.getData())
   useEffect(() => {
     return globalMediaEngine.subscribe((data) => {
@@ -171,7 +73,7 @@ export default function App() {
     })
   }, [])
 
-  // Fresh File Engine subscription (Fase 6a)
+  // 4. Fresh File Engine subscription (Fase 6a)
   const [freshFile, setFreshFile] = useState<FreshFileInfo | null>(() => globalFreshFileEngine.getActiveFile())
   useEffect(() => {
     return globalFreshFileEngine.subscribe((active) => {
@@ -179,7 +81,7 @@ export default function App() {
     })
   }, [])
 
-  // Audio & Bluetooth Device Engine subscription
+  // 5. Audio & Bluetooth Device Engine subscription
   const [deviceNotification, setDeviceNotification] = useState<AudioDeviceNotification | null>(
     () => globalAudioDeviceEngine.getActiveNotification(),
   )
@@ -189,7 +91,7 @@ export default function App() {
     })
   }, [])
 
-  // Process Watcher Engine subscription (Fase 6b)
+  // 6. Process Watcher Engine subscription (Fase 6b)
   const [activeProcess, setActiveProcess] = useState<ProcessEvent | null>(() =>
     globalProcessWatcherEngine.getActiveProcess(),
   )
@@ -203,121 +105,10 @@ export default function App() {
     })
   }, [])
 
-  // Dev controls in standard browser dev mode
-  const isBrowserDev =
-    import.meta.env.DEV &&
-    typeof window !== 'undefined' &&
-    !('__TAURI_INTERNALS__' in window)
-  const [showDevControls, setShowDevControls] = useState(isBrowserDev)
+  // 7. System Clock hook
+  const { timeStr, dateStr } = useSystemClock(settings.timeFormat, settings.language)
 
-  // System Clock format & strings
-  const [clockFormat, setClockFormat] = useState<'auto' | '12h' | '24h'>('auto')
-  useEffect(() => {
-    invoke<string>('get_system_time_format')
-      .then((fmt) => {
-        if (fmt === '12h' || fmt === '24h') setClockFormat(fmt)
-      })
-      .catch(() => {})
-  }, [])
-
-  const [timeStr, setTimeStr] = useState(() => formatClockTime(new Date(), 'auto'))
-  const [dateStr, setDateStr] = useState(() => {
-    return new Date().toLocaleDateString(typeof navigator !== 'undefined' ? navigator.language : undefined, {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-    })
-  })
-
-  useEffect(() => {
-    const effectiveFormat = settings.timeFormat === 'auto' ? clockFormat : settings.timeFormat
-    const updateTime = () => {
-      const now = new Date()
-      setTimeStr(formatClockTime(now, effectiveFormat))
-      const locale =
-        settings.language === 'id'
-          ? 'id-ID'
-          : settings.language === 'en'
-          ? 'en-US'
-          : typeof navigator !== 'undefined'
-          ? navigator.language
-          : undefined
-      setDateStr(
-        now.toLocaleDateString(locale, {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        }),
-      )
-    }
-
-    updateTime()
-    const now = new Date()
-    const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds()
-
-    let intervalId: ReturnType<typeof setInterval>
-    const timeoutId = setTimeout(() => {
-      updateTime()
-      intervalId = setInterval(updateTime, 60000)
-    }, msToNextMinute)
-
-    return () => {
-      clearTimeout(timeoutId)
-      clearInterval(intervalId)
-    }
-  }, [clockFormat, settings.timeFormat, settings.language])
-
-  // Drag and drop listener for File Shelf
-  useEffect(() => {
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault()
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
-    }
-    const handleDragEnter = (e: DragEvent) => {
-      e.preventDefault()
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
-    }
-    const handleDrop = (e: DragEvent) => {
-      e.preventDefault()
-    }
-
-    window.addEventListener('dragover', handleDragOver)
-    window.addEventListener('dragenter', handleDragEnter)
-    window.addEventListener('drop', handleDrop)
-
-    let unlisten: (() => void) | undefined
-    try {
-      getCurrentWebviewWindow()
-        .onDragDropEvent((event) => {
-          if (event.payload.type === 'enter' || event.payload.type === 'over') {
-            setIsDragOver(true)
-            setHomePage(2)
-          } else if (event.payload.type === 'leave') {
-            setIsDragOver(false)
-          } else if (event.payload.type === 'drop') {
-            setIsDragOver(false)
-            setHomePage(2)
-            if (event.payload.paths && event.payload.paths.length > 0) {
-              globalShelfEngine.addPaths(event.payload.paths)
-              setExpandedActivity('home')
-            }
-          }
-        })
-        .then((fn) => {
-          unlisten = fn
-        })
-        .catch(() => {})
-    } catch {}
-
-    return () => {
-      window.removeEventListener('dragover', handleDragOver)
-      window.removeEventListener('dragenter', handleDragEnter)
-      window.removeEventListener('drop', handleDrop)
-      if (unlisten) unlisten()
-    }
-  }, [setIsDragOver, setHomePage, setExpandedActivity])
-
-  // Multi-activity flags
+  // 8. Multi-activity & dynamic view calculation
   const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
   const isMediaActive = mediaData !== null && mediaData.isActive
   const isFreshActive = freshFile !== null && settings.freshFileEnabled
@@ -328,7 +119,6 @@ export default function App() {
   const hasLeftAux = hasMusic || (hasTimer && hasFresh)
   const hasRightAux = hasTimer || (!hasMusic && hasFresh)
 
-  // Dynamic dimensions & window synchronization
   const currentView = getIslandView(
     expandedActivity,
     timerData,
@@ -345,8 +135,7 @@ export default function App() {
     Boolean(processAlert?.post_action),
   )
 
-  // Track growing vs shrinking for asymmetric spring physics
-  // Melebar (stiffness 380, damping 26, mass 1) vs Menciut (stiffness 200, damping 28, mass 1)
+  // 9. Asymmetric Spring Physics tracking (Melebar vs Menciut)
   const [prevShell, setPrevShell] = useState(dims.shell)
   const [isGrowing, setIsGrowing] = useState(false)
 
@@ -355,7 +144,7 @@ export default function App() {
     setPrevShell(dims.shell)
   }
 
-  // Upward physical nudge (-6px) on new events
+  // 10. Downward physical nudge (+4px) on new events
   const [nudge, setNudge] = useState(false)
   const lastNudgeKeyRef = useRef<string | null>(null)
 
@@ -375,16 +164,16 @@ export default function App() {
     }
   }, [processAlert?.id, deviceNotification?.id, timerData?.status, freshFile?.id])
 
-  // Window Stage Hit Region Choreography (Fase 8b Spike)
+  // 11. Window Stage Hit Region Choreography & Motion Polishing (Fase 8b & 8c)
   // Stage width = 460, height = 420 (pinned at y = 0)
   const STAGE_WIDTH = 460
   const STAGE_HEIGHT = 420
   const hitRegionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const shellW = dims.shell.width
     const shellH = dims.shell.height
-    // Margin for rounded squircle antialiasing, CSS drop shadow & spring overshoot
     const marginX = 24
     const marginY = 32
 
@@ -398,6 +187,14 @@ export default function App() {
       hitRegionTimerRef.current = null
     }
 
+    // Flag transition active so heavy loops (blinking, waveforms) pause
+    setIsTransitioning(true)
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current)
+    transitionTimerRef.current = setTimeout(() => {
+      setIsTransitioning(false)
+      transitionTimerRef.current = null
+    }, 280)
+
     if (isGrowing) {
       // Melebar: expand hit region FIRST, then animate shell
       setHitRegion(bboxX, bboxY, bboxW, bboxH)
@@ -408,19 +205,23 @@ export default function App() {
         hitRegionTimerRef.current = null
       }, 260)
     }
-  }, [dims.shell.width, dims.shell.height, isGrowing])
+  }, [dims.shell.width, dims.shell.height, isGrowing, setIsTransitioning])
 
-  // Hover Dwell (2s) and Auto-Collapse handlers
+  // 12. Hover Dwell (2s) and Auto-Collapse handlers
   const hoverDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const leaveCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const openedViaHoverRef = useRef(false)
 
-  // Cleanup timers on unmount to prevent orphan callbacks
+  // Unmount cleanup for timers
   useEffect(() => {
     return () => {
       if (hitRegionTimerRef.current) {
         clearTimeout(hitRegionTimerRef.current)
         hitRegionTimerRef.current = null
+      }
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current)
+        transitionTimerRef.current = null
       }
       if (hoverDwellTimerRef.current) {
         clearTimeout(hoverDwellTimerRef.current)
@@ -433,7 +234,7 @@ export default function App() {
     }
   }, [])
 
-  const handleBubblePointerEnter = (type: 'timer' | 'music' | 'freshFile') => {
+  const handleBubblePointerEnter = useCallback((type: 'timer' | 'music' | 'freshFile') => {
     if (leaveCollapseTimerRef.current) {
       clearTimeout(leaveCollapseTimerRef.current)
       leaveCollapseTimerRef.current = null
@@ -449,24 +250,24 @@ export default function App() {
       setHoveredTarget(null)
       hoverDwellTimerRef.current = null
     }, 2000)
-  }
+  }, [setHoveredTarget, setExpandedActivity])
 
-  const handleBubblePointerLeave = () => {
+  const handleBubblePointerLeave = useCallback(() => {
     if (hoverDwellTimerRef.current) {
       clearTimeout(hoverDwellTimerRef.current)
       hoverDwellTimerRef.current = null
     }
     setHoveredTarget(null)
-  }
+  }, [setHoveredTarget])
 
-  const handleExpandedPointerEnter = () => {
+  const handleExpandedPointerEnter = useCallback(() => {
     if (leaveCollapseTimerRef.current) {
       clearTimeout(leaveCollapseTimerRef.current)
       leaveCollapseTimerRef.current = null
     }
-  }
+  }, [])
 
-  const handleExpandedPointerLeave = () => {
+  const handleExpandedPointerLeave = useCallback(() => {
     if (
       openedViaHoverRef.current &&
       (expandedActivity === 'timer' ||
@@ -478,364 +279,57 @@ export default function App() {
         openedViaHoverRef.current = false
       }, 250)
     }
-  }
+  }, [expandedActivity, setExpandedActivity])
 
-  // OS Foreground mode events
-  useEffect(() => {
-    let unlisten: (() => void) | undefined
+  // 13. Dev controls in standard browser dev mode
+  const isBrowserDev =
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    !('__TAURI_INTERNALS__' in window)
+  const [showDevControls, setShowDevControls] = useState(isBrowserDev)
 
-    invoke<string>('get_app_mode')
-      .then((mode) => {
-        if (mode === 'app' || mode === 'desktop' || mode === 'hidden') {
-          setSystemMode(mode)
-        }
-      })
-      .catch(() => {})
-
-    listen<{ mode: 'desktop' | 'app' | 'hidden' }>('app_mode_changed', (event) => {
-      setSystemMode(event.payload.mode)
-      if (
-        event.payload.mode === 'hidden' ||
-        (event.payload.mode === 'app' && settings.hideOnFullscreen)
-      ) {
-        getCurrentWebviewWindow().hide().catch(() => {})
-      } else {
-        getCurrentWebviewWindow().show().catch(() => {})
-      }
-    })
-      .then((fn) => {
-        unlisten = fn
-      })
-      .catch(() => {})
-
-    return () => {
-      if (unlisten) unlisten()
-    }
-  }, [setSystemMode, settings.hideOnFullscreen])
-
-  // React to hideOnFullscreen setting change in app mode
-  useEffect(() => {
-    if (systemMode === 'app') {
-      if (settings.hideOnFullscreen) {
-        getCurrentWebviewWindow().hide().catch(() => {})
-      } else {
-        getCurrentWebviewWindow().show().catch(() => {})
-      }
-    }
-  }, [settings.hideOnFullscreen, systemMode])
-
-  // Tray events
-  useEffect(() => {
-    const unlisteners: Array<() => void> = []
-
-    listen('open_settings', () => {
-      setExpandedActivity('settings')
-    })
-      .then((fn) => unlisteners.push(fn))
-      .catch(() => {})
-
-    listen('toggle_personality', () => {
-      const curr = globalSettingsEngine.getSettings().personalityEnabled
-      globalSettingsEngine.update({ personalityEnabled: !curr })
-    })
-      .then((fn) => unlisteners.push(fn))
-      .catch(() => {})
-
-    listen<boolean>('autostart_changed', (e) => {
-      globalSettingsEngine.update({ autostart: e.payload })
-    })
-      .then((fn) => unlisteners.push(fn))
-      .catch(() => {})
-
-    return () => {
-      unlisteners.forEach((fn) => fn())
-    }
-  }, [setExpandedActivity])
-
-  // Alert Auto-Dismiss after 30s
-  useEffect(() => {
-    if (currentView !== 'alert' && timerData?.status !== 'completed') return
-    const timer = setTimeout(() => {
-      globalTimerEngine.dismissAlert()
-    }, 30000)
-    return () => clearTimeout(timer)
-  }, [currentView, timerData?.status])
-
-  // Collapse on Escape & Window blur
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (currentView === 'alert' || timerData?.status === 'completed') {
-          globalTimerEngine.dismissAlert()
-        } else {
-          collapseAll()
-        }
-      }
-    }
-    const handleBlur = () => {
-      if (currentView !== 'alert') collapseAll()
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('blur', handleBlur)
-
-    let unlisten: (() => void) | undefined
-    try {
-      getCurrentWebviewWindow()
-        .onFocusChanged(({ payload: focused }) => {
-          if (!focused && currentView !== 'alert') collapseAll()
-        })
-        .then((fn) => {
-          unlisten = fn
-        })
-        .catch(() => {})
-    } catch {}
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('blur', handleBlur)
-      if (unlisten) unlisten()
-    }
-  }, [currentView, timerData?.status, collapseAll])
-
-  // Auto-collapse when capsule is open and idle/unclicked for settings.autoCollapseSeconds
-  useEffect(() => {
-    if (
-      !settings.autoCollapseExpanded ||
-      expandedActivity === null ||
-      currentView === 'alert'
-    )
-      return
-
-    const timeoutMs = (settings.autoCollapseSeconds || 10) * 1000
-
-    let timer = setTimeout(() => {
-      collapseAll()
-      openedViaHoverRef.current = false
-    }, timeoutMs)
-
-    const resetInactivity = () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        collapseAll()
-        openedViaHoverRef.current = false
-      }, timeoutMs)
-    }
-
-    const handlePointerActivity = () => {
-      openedViaHoverRef.current = false
-      resetInactivity()
-    }
-
-    window.addEventListener('mousemove', resetInactivity)
-    window.addEventListener('mousedown', handlePointerActivity)
-    window.addEventListener('keydown', resetInactivity)
-    window.addEventListener('wheel', resetInactivity)
-
-    return () => {
-      clearTimeout(timer)
-      window.removeEventListener('mousemove', resetInactivity)
-      window.removeEventListener('mousedown', handlePointerActivity)
-      window.removeEventListener('keydown', resetInactivity)
-      window.removeEventListener('wheel', resetInactivity)
-    }
-  }, [
-    expandedActivity,
+  // 14. Island dragging hook
+  const {
+    isDragging,
+    isMagnetSnapped,
+    setIsMagnetSnapped,
+    setHorizontalOffset,
+    handleShellPointerDown,
+    handleShellPointerMove,
+    handleShellPointerUp,
+    handleShellPointerCancel,
+    handleShellDoubleClick,
+    handleShellClick,
+  } = useIslandDrag({
     currentView,
-    settings.autoCollapseExpanded,
-    settings.autoCollapseSeconds,
+    initialOffset: settings.horizontalOffset,
+    isBrowserDev,
+    onExpandHome: (page) => {
+      openedViaHoverRef.current = false
+      setExpandedActivity('home')
+      setHomePage(page)
+    },
+  })
+
+  // 15. OS & window events hook
+  useIslandEvents({
+    currentView,
+    expandedActivity,
+    timerStatus: timerData?.status,
+    settings,
+    systemMode,
+    setSystemMode,
+    setExpandedActivity,
+    setHomePage,
+    setIsDragOver,
     collapseAll,
-  ])
-
-  // Horizontal Draggable Island & Magnetic Center Snap
-  const [horizontalOffset, setHorizontalOffset] = useState<number>(() => settings.horizontalOffset ?? 0)
-  const [isDragging, setIsDragging] = useState<boolean>(false)
-  const [isMagnetSnapped, setIsMagnetSnapped] = useState<boolean>(false)
-  const dragRef = useRef<{ startScreenX: number; startOffset: number; hasMoved: boolean } | null>(null)
-  const isDraggingRef = useRef<boolean>(false)
-  const lastDragEndTimeRef = useRef<number>(0)
-
-  useEffect(() => {
-    if (settings.horizontalOffset !== undefined && settings.horizontalOffset !== 0) {
-      setIslandOffset(settings.horizontalOffset)
-    }
-  }, [settings.horizontalOffset])
-
-  const rafIdRef = useRef<number | null>(null)
-  const pendingOffsetRef = useRef<number | null>(null)
-
-  const endDrag = (screenX: number) => {
-    if (rafIdRef.current !== null) {
-      cancelAnimationFrame(rafIdRef.current)
-      rafIdRef.current = null
-    }
-    if (!dragRef.current) {
-      setIsDragging(false)
-      isDraggingRef.current = false
-      return
-    }
-    const deltaX = screenX - dragRef.current.startScreenX
-    const hadMoved = dragRef.current.hasMoved
-    const startOffset = dragRef.current.startOffset
-    dragRef.current = null
-
-    if (hadMoved) {
-      lastDragEndTimeRef.current = Date.now()
-      isDraggingRef.current = true
-
-      const rawCandidate = startOffset + deltaX
-      const SNAP_RADIUS = 85
-
-      if (Math.abs(rawCandidate) <= SNAP_RADIUS) {
-        setHorizontalOffset(0)
-        setIslandOffset(0)
-        globalSettingsEngine.update({ horizontalOffset: 0 })
-
-        // If pulled/snapped into center from outside: TRIGGER SURPRISE REACTION!
-        if (Math.abs(startOffset) > 15 || Math.abs(rawCandidate) > 15) {
-          setIsMagnetSnapped(true)
-          setTimeout(() => setIsMagnetSnapped(false), 2600)
-        }
-      } else {
-        setHorizontalOffset(rawCandidate)
-        setIslandOffset(rawCandidate)
-        globalSettingsEngine.update({ horizontalOffset: rawCandidate })
-      }
-
-      // Suppress dragging flag after 500ms to guarantee any subsequent click event is dropped
-      setTimeout(() => {
-        setIsDragging(false)
-        isDraggingRef.current = false
-      }, 500)
-    } else {
-      setIsDragging(false)
-      isDraggingRef.current = false
-    }
-  }
-
-  useEffect(() => {
-    const handleGlobalPointerUp = (e: PointerEvent) => {
-      if (dragRef.current) {
-        endDrag(e.screenX)
-      }
-    }
-    window.addEventListener('pointerup', handleGlobalPointerUp)
-    window.addEventListener('pointercancel', handleGlobalPointerUp)
-    return () => {
-      window.removeEventListener('pointerup', handleGlobalPointerUp)
-      window.removeEventListener('pointercancel', handleGlobalPointerUp)
-    }
-  }, [])
-
-  const handleShellPointerDown = (e: React.PointerEvent) => {
-    // Only allow island dragging when in idle capsule view!
-    if (currentView !== 'idle') {
-      return
-    }
-    const target = e.target as HTMLElement
-    if (target.closest('button, input, select, textarea, [data-no-drag]')) {
-      return
-    }
-    dragRef.current = {
-      startScreenX: e.screenX,
-      startOffset: horizontalOffset,
-      hasMoved: false,
-    }
-    isDraggingRef.current = false
-    try {
-      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    } catch {}
-  }
-
-  const handleShellPointerMove = (e: React.PointerEvent) => {
-    if (currentView !== 'idle' || !dragRef.current) return
-    const deltaX = e.screenX - dragRef.current.startScreenX
-    if (!dragRef.current.hasMoved) {
-      if (Math.abs(deltaX) >= 5) {
-        dragRef.current.hasMoved = true
-        isDraggingRef.current = true
-        setIsDragging(true)
-      } else {
-        return
-      }
-    }
-
-    const rawCandidate = dragRef.current.startOffset + deltaX
-    const SNAP_RADIUS = 85
-
-    const targetOffset = Math.abs(rawCandidate) <= SNAP_RADIUS ? 0 : rawCandidate
-
-    pendingOffsetRef.current = targetOffset
-    if (rafIdRef.current === null) {
-      rafIdRef.current = requestAnimationFrame(() => {
-        rafIdRef.current = null
-        if (pendingOffsetRef.current !== null) {
-          setIslandOffset(pendingOffsetRef.current)
-          if (isBrowserDev) setHorizontalOffset(pendingOffsetRef.current)
-        }
-      })
-    }
-  }
-
-  const handleShellPointerUp = (e: React.PointerEvent) => {
-    try {
-      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-    } catch {}
-    endDrag(e.screenX)
-  }
-
-  const handleShellPointerCancel = (e: React.PointerEvent) => {
-    try {
-      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-    } catch {}
-    endDrag(e.screenX)
-  }
-
-  const handleShellDoubleClick = () => {
-    if (currentView !== 'idle') return
-    if (horizontalOffset !== 0) {
-      setHorizontalOffset(0)
-      setIslandOffset(0)
-      globalSettingsEngine.update({ horizontalOffset: 0 })
-      setIsMagnetSnapped(true)
-      setTimeout(() => setIsMagnetSnapped(false), 2600)
-    }
-  }
-
-  const handleShellClick = (e?: React.MouseEvent) => {
-    // If we were dragging or just finished dragging (< 500ms), DO NOT EXPAND!
-    if (
-      isDragging ||
-      isDraggingRef.current ||
-      Date.now() - lastDragEndTimeRef.current < 500
-    ) {
-      if (e) {
-        e.preventDefault()
-        e.stopPropagation()
-      }
-      return
-    }
-    openedViaHoverRef.current = false
-    if (currentView === 'idle') {
-      setExpandedActivity('home')
-      setHomePage(1)
-    } else if (currentView === 'dropTarget') {
-      setExpandedActivity('home')
-      setHomePage(2)
-    }
-  }
+  })
 
   const handleBackdropPointerDown = (e: React.PointerEvent) => {
     if (e.target === e.currentTarget && expandedActivity !== null) {
       collapseAll()
     }
   }
-
-  const timerProgress =
-    timerData && timerData.totalDurationSeconds > 0
-      ? Math.min(1, Math.max(0, remainingSeconds / timerData.totalDurationSeconds))
-      : 0
-  const isPomodoroBreak = timerData?.isPomodoro && timerData.pomodoroPhase !== 'focus'
 
   return (
     <div
@@ -848,149 +342,29 @@ export default function App() {
         onPointerDown={handleBackdropPointerDown}
       >
         {/* LEFT BUBBLE: MUSIC (PRIMARY) OR FRESH FILE (WHEN TIMER IS OCCUPYING RIGHT) */}
-        <AnimatePresence>
-          {!isExpanded && !isDragOver && isMediaActive ? (
-            <motion.div
-              key="bubble-music"
-              initial={{
-                x: 38,
-                scaleX: 1.55,
-                scaleY: 0.6,
-                scale: 0.35,
-                opacity: 0,
-              }}
-              animate={{
-                x: 0,
-                scaleX: 1,
-                scaleY: 1,
-                scale: 1,
-                opacity: 1,
-              }}
-              exit={{
-                x: 38,
-                scaleX: 1.4,
-                scaleY: 0.6,
-                scale: 0.2,
-                opacity: 0,
-                transition: { duration: 0.22, ease: 'easeIn' },
-              }}
-              transition={{
-                type: 'spring',
-                stiffness: 320,
-                damping: 20,
-                mass: 0.75,
-              }}
-              whileHover={{ scale: 1.14 }}
-              whileTap={{ scale: 0.94 }}
-              onPointerEnter={() => handleBubblePointerEnter('music')}
-              onPointerLeave={handleBubblePointerLeave}
-              onClick={(e) => {
-                e.stopPropagation()
-                openedViaHoverRef.current = false
-                handleBubblePointerLeave()
-                setExpandedActivity('music')
-              }}
-              style={{
-                width: 32,
-                height: 32,
-                transformOrigin: 'right center',
-              }}
-              className="relative rounded-full bg-black border border-[#1ed760]/40 shadow-[0_2px_12px_rgba(30,215,96,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
-              title={`${mediaData?.title || t.music} • ${t.clickToOpen}`}
-            >
-              {mediaData?.thumbnailBase64 ? (
-                <img
-                  src={mediaData.thumbnailBase64}
-                  alt={mediaData.title}
-                  className="w-full h-full object-cover rounded-full"
-                />
-              ) : (
-                <AudioWaveform
-                  isPlaying={mediaData?.playbackStatus === 'playing'}
-                  barCount={3}
-                  size="sm"
-                />
-              )}
-
-              {hoveredTarget === 'music' && (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
-                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute inset-0 rounded-full border-2 border-[#1ed760] pointer-events-none"
-                />
-              )}
-            </motion.div>
-          ) : !isExpanded && !isDragOver && isFreshActive && isTimerActive ? (
-            <motion.div
-              key="bubble-fresh-left"
-              initial={{
-                x: 38,
-                scaleX: 1.55,
-                scaleY: 0.6,
-                scale: 0.35,
-                opacity: 0,
-              }}
-              animate={{
-                x: 0,
-                scaleX: 1,
-                scaleY: 1,
-                scale: 1,
-                opacity: 1,
-              }}
-              exit={{
-                x: 38,
-                scaleX: 1.4,
-                scaleY: 0.6,
-                scale: 0.2,
-                opacity: 0,
-                transition: { duration: 0.22, ease: 'easeIn' },
-              }}
-              transition={{
-                type: 'spring',
-                stiffness: 320,
-                damping: 20,
-                mass: 0.75,
-              }}
-              whileHover={{ scale: 1.14 }}
-              whileTap={{ scale: 0.94 }}
-              onPointerEnter={() => handleBubblePointerEnter('freshFile')}
-              onPointerLeave={handleBubblePointerLeave}
-              onClick={(e) => {
-                e.stopPropagation()
-                openedViaHoverRef.current = false
-                handleBubblePointerLeave()
-                setExpandedActivity('freshFile')
-              }}
-              style={{
-                width: 32,
-                height: 32,
-                transformOrigin: 'right center',
-              }}
-              className="relative rounded-full bg-black border border-sky-400/60 shadow-[0_2px_12px_rgba(56,189,248,0.35)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
-              title={`${freshFile?.name || t.freshFile} • ${t.clickToOpen}`}
-            >
-              {freshFile?.thumbnail ? (
-                <img
-                  src={freshFile.thumbnail}
-                  alt={freshFile.name}
-                  className="w-full h-full object-cover rounded-full"
-                />
-              ) : (
-                <Sparkles className="w-4 h-4 text-sky-400 animate-pulse" />
-              )}
-
-              {hoveredTarget === 'freshFile' && (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
-                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute inset-0 rounded-full border-2 border-sky-400 pointer-events-none"
-                />
-              )}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        <LeftBubble
+          isExpanded={isExpanded}
+          isDragOver={isDragOver}
+          isMediaActive={isMediaActive}
+          isFreshActive={isFreshActive}
+          isTimerActive={isTimerActive}
+          mediaData={mediaData}
+          freshFile={freshFile}
+          hoveredTarget={hoveredTarget}
+          musicTitle={t.music}
+          freshFileTitle={t.freshFile}
+          clickToOpenTitle={t.clickToOpen}
+          onBubblePointerEnter={handleBubblePointerEnter}
+          onBubblePointerLeave={handleBubblePointerLeave}
+          onOpenMedia={() => {
+            openedViaHoverRef.current = false
+            setExpandedActivity('music')
+          }}
+          onOpenFreshFile={() => {
+            openedViaHoverRef.current = false
+            setExpandedActivity('freshFile')
+          }}
+        />
 
         {/* SYMMETRY BALANCER: If only right aux is active, balance left side so capsule stays centered */}
         {!isExpanded && !isDragOver && !hasLeftAux && hasRightAux && (
@@ -1013,277 +387,66 @@ export default function App() {
           onMouseEnter={handleExpandedPointerEnter}
           onMouseLeave={handleExpandedPointerLeave}
         >
-          {currentView === 'home' && (
-            <HomePager
-              homePage={homePage}
-              setHomePage={setHomePage}
-              dateStr={dateStr}
-              timeStr={timeStr}
-              timerData={timerData}
-              remainingSeconds={remainingSeconds}
-              mediaData={mediaData}
-              isDragOver={isDragOver}
-              showCustomInput={showCustomInput}
-              setShowCustomInput={setShowCustomInput}
-              onClose={collapseAll}
-              onOpenSettings={() => setExpandedActivity('settings')}
-              onOpenTimer={() => setExpandedActivity('timer')}
-            />
-          )}
-
-          {currentView === 'expandedTimer' && timerData && (
-            <TimerCard
-              timerData={timerData}
-              remainingSeconds={remainingSeconds}
-              mediaData={mediaData}
-              onClose={collapseAll}
-              onOpenMusic={() => {
-                setExpandedActivity('home')
-                setHomePage(0)
-              }}
-              onOpenFileShelf={() => {
-                setExpandedActivity('home')
-                setHomePage(2)
-              }}
-            />
-          )}
-
-          {currentView === 'alert' && (
-            <AlertCard
-              timerData={timerData}
-              onDismiss={() => globalTimerEngine.dismissAlert()}
-            />
-          )}
-
-          {currentView === 'expandedFreshFile' && freshFile && (
-            <FreshFileCard file={freshFile} onClose={collapseAll} />
-          )}
-
-          {currentView === 'expandedMusic' && (
-            <div
-              className="absolute inset-0 px-5 pt-3.5 pb-2.5 flex flex-col justify-between text-white cursor-default overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ExpandedMusic
-                onClose={collapseAll}
-                onOpenTimer={() => setExpandedActivity('timer')}
-                isTimerActive={isTimerActive}
-              />
-            </div>
-          )}
-
-          {currentView === 'deviceNotification' && deviceNotification && (
-            <DeviceNotificationCard
-              notification={deviceNotification}
-              language={settings.language}
-              onDismiss={() => globalAudioDeviceEngine.dismiss()}
-            />
-          )}
-
-          {currentView === 'processAlert' && processAlert && (
-            <ProcessNotificationCard
-              event={processAlert}
-              onDismiss={() => globalProcessWatcherEngine.dismissAlert()}
-            />
-          )}
-
-          {currentView === 'idle' && (
-            <ClockCapsule
-              timeStr={timeStr}
-              personalityEnabled={settings.personalityEnabled}
-              idleBeforeEyesSeconds={settings.idleBeforeEyesSeconds}
-              systemMode={systemMode}
-              isIdleView={currentView === 'idle'}
-              favoriteArtist={settings.favoriteArtist}
-              isMusicPlaying={mediaData?.playbackStatus === 'playing'}
-              isTimerRunning={isTimerActive}
-              isTimerCompleted={timerData?.status === 'completed'}
-              freshFileDetected={isFreshActive}
-              deviceConnected={deviceNotification?.event_type === 'connected'}
-              isProcessRunning={activeProcess !== null}
-              isMagnetSnapped={isMagnetSnapped}
-              mediaData={mediaData}
-            />
-          )}
-
-          {currentView === 'dropTarget' && (
-            <motion.div
-              whileHover={{ scale: 1.04 }}
-              className="absolute inset-0 px-3 flex items-center justify-center gap-2 text-amber-300 overflow-hidden whitespace-nowrap"
-            >
-              <UploadCloud className="w-4 h-4 text-amber-400 animate-bounce shrink-0" />
-              <span className="text-xs font-semibold tracking-tight font-medium">
-                {t.dropFilesHere}
-              </span>
-            </motion.div>
-          )}
-
-          {currentView === 'settings' && (
-            <SettingsView onClose={collapseAll} />
-          )}
+          <IslandContent
+            currentView={currentView}
+            homePage={homePage}
+            setHomePage={setHomePage}
+            dateStr={dateStr}
+            timeStr={timeStr}
+            timerData={timerData}
+            remainingSeconds={remainingSeconds}
+            mediaData={mediaData}
+            isDragOver={isDragOver}
+            showCustomInput={showCustomInput}
+            setShowCustomInput={setShowCustomInput}
+            freshFile={freshFile}
+            deviceNotification={deviceNotification}
+            processAlert={processAlert}
+            activeProcess={activeProcess}
+            isMagnetSnapped={isMagnetSnapped}
+            settings={settings}
+            dropFilesHereText={t.dropFilesHere}
+            isTimerActive={isTimerActive}
+            isFreshActive={isFreshActive}
+            systemMode={systemMode}
+            onClose={collapseAll}
+            onOpenSettings={() => setExpandedActivity('settings')}
+            onOpenTimer={() => setExpandedActivity('timer')}
+            onOpenMusic={() => {
+              setExpandedActivity('home')
+              setHomePage(0)
+            }}
+            onOpenFileShelf={() => {
+              setExpandedActivity('home')
+              setHomePage(2)
+            }}
+          />
         </Shell>
 
         {/* RIGHT BUBBLE: TIMER OR FRESH FILE */}
-        <AnimatePresence>
-          {!isExpanded && !isDragOver && isTimerActive ? (
-            <motion.div
-              key="bubble-timer"
-              initial={{
-                x: -38,
-                scaleX: 1.55,
-                scaleY: 0.6,
-                scale: 0.35,
-                opacity: 0,
-              }}
-              animate={{
-                x: 0,
-                scaleX: 1,
-                scaleY: 1,
-                scale: 1,
-                opacity: 1,
-              }}
-              exit={{
-                x: -38,
-                scaleX: 1.4,
-                scaleY: 0.6,
-                scale: 0.2,
-                opacity: 0,
-                transition: { duration: 0.22, ease: 'easeIn' },
-              }}
-              transition={{
-                type: 'spring',
-                stiffness: 320,
-                damping: 20,
-                mass: 0.75,
-              }}
-              whileHover={{ scale: 1.14 }}
-              whileTap={{ scale: 0.94 }}
-              onPointerEnter={() => handleBubblePointerEnter('timer')}
-              onPointerLeave={handleBubblePointerLeave}
-              onClick={(e) => {
-                e.stopPropagation()
-                openedViaHoverRef.current = false
-                handleBubblePointerLeave()
-                setExpandedActivity('timer')
-              }}
-              style={{
-                width: 32,
-                height: 32,
-                transformOrigin: 'left center',
-              }}
-              className="relative rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
-              title={`${timerData?.label || 'Timer'}: ${formatTimeDisplay(remainingSeconds)} • ${t.clickToOpen}`}
-            >
-              <svg className="w-6 h-6 -rotate-90 absolute" viewBox="0 0 24 24">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="8.5"
-                  fill="none"
-                  stroke="rgba(255, 255, 255, 0.15)"
-                  strokeWidth="2"
-                />
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="8.5"
-                  fill="none"
-                  stroke={isPomodoroBreak ? '#10b981' : '#ff9500'}
-                  strokeWidth="2"
-                  strokeDasharray={53.4}
-                  strokeDashoffset={53.4 * (1 - timerProgress)}
-                  strokeLinecap="round"
-                  className="transition-all duration-300"
-                />
-              </svg>
-
-              {timerData?.status === 'paused' ? (
-                <Pause className="w-2.5 h-2.5 text-amber-400 fill-amber-400 relative z-10" />
-              ) : (
-                <span className="text-[9px] font-mono font-bold text-amber-300 tracking-tighter relative z-10 leading-none">
-                  {formatCompactRemaining(remainingSeconds)}
-                </span>
-              )}
-
-              {hoveredTarget === 'timer' && (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
-                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute inset-0 rounded-full border-2 border-amber-400 pointer-events-none"
-                />
-              )}
-            </motion.div>
-          ) : !isExpanded && !isDragOver && isFreshActive ? (
-            <motion.div
-              key="bubble-fresh-right"
-              initial={{
-                x: -38,
-                scaleX: 1.55,
-                scaleY: 0.6,
-                scale: 0.35,
-                opacity: 0,
-              }}
-              animate={{
-                x: 0,
-                scaleX: 1,
-                scaleY: 1,
-                scale: 1,
-                opacity: 1,
-              }}
-              exit={{
-                x: -38,
-                scaleX: 1.4,
-                scaleY: 0.6,
-                scale: 0.2,
-                opacity: 0,
-                transition: { duration: 0.22, ease: 'easeIn' },
-              }}
-              transition={{
-                type: 'spring',
-                stiffness: 320,
-                damping: 20,
-                mass: 0.75,
-              }}
-              whileHover={{ scale: 1.14 }}
-              whileTap={{ scale: 0.94 }}
-              onPointerEnter={() => handleBubblePointerEnter('freshFile')}
-              onPointerLeave={handleBubblePointerLeave}
-              onClick={(e) => {
-                e.stopPropagation()
-                openedViaHoverRef.current = false
-                handleBubblePointerLeave()
-                setExpandedActivity('freshFile')
-              }}
-              style={{
-                width: 32,
-                height: 32,
-                transformOrigin: 'left center',
-              }}
-              className="relative rounded-full bg-black border border-sky-400/60 shadow-[0_2px_12px_rgba(56,189,248,0.35)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
-              title={`${freshFile?.name || t.freshFile} • ${t.clickToOpen}`}
-            >
-              {freshFile?.thumbnail ? (
-                <img
-                  src={freshFile.thumbnail}
-                  alt={freshFile.name}
-                  className="w-full h-full object-cover rounded-full"
-                />
-              ) : (
-                <Sparkles className="w-4 h-4 text-sky-400 animate-pulse" />
-              )}
-
-              {hoveredTarget === 'freshFile' && (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
-                  transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute inset-0 rounded-full border-2 border-sky-400 pointer-events-none"
-                />
-              )}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        <RightBubble
+          isExpanded={isExpanded}
+          isDragOver={isDragOver}
+          isTimerActive={isTimerActive}
+          isFreshActive={isFreshActive}
+          timerData={timerData}
+          remainingSeconds={remainingSeconds}
+          freshFile={freshFile}
+          hoveredTarget={hoveredTarget}
+          timerTitle="Timer"
+          freshFileTitle={t.freshFile}
+          clickToOpenTitle={t.clickToOpen}
+          onBubblePointerEnter={handleBubblePointerEnter}
+          onBubblePointerLeave={handleBubblePointerLeave}
+          onOpenTimer={() => {
+            openedViaHoverRef.current = false
+            setExpandedActivity('timer')
+          }}
+          onOpenFreshFile={() => {
+            openedViaHoverRef.current = false
+            setExpandedActivity('freshFile')
+          }}
+        />
 
         {/* SYMMETRY BALANCER: If only left aux is active, balance right side so capsule stays centered */}
         {!isExpanded && !isDragOver && hasLeftAux && !hasRightAux && (
@@ -1293,173 +456,15 @@ export default function App() {
 
       {/* Dev Controls */}
       {isBrowserDev && showDevControls && (
-        <div className="absolute bottom-2 z-50 flex items-center gap-1.5 bg-black/90 border border-white/15 px-3 py-1 rounded-full text-[11px] text-white/80 shadow-lg">
-          <Sparkles className="w-3 h-3 text-amber-400" />
-          <button
-            onClick={() => globalTimerEngine.startTimer(5)}
-            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20"
-          >
-            Start 5m
-          </button>
-          <button
-            onClick={() => globalTimerEngine.reset()}
-            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20"
-          >
-            Stop
-          </button>
-          <button
-            onClick={() =>
-              globalAudioDeviceEngine.simulate({
-                event_type: 'connected',
-                device_name: 'OPPO Enco Buds3',
-                device_type: 'tws',
-                is_bluetooth: true,
-                is_default: true,
-              })
-            }
-            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
-          >
-            TWS
-          </button>
-          <button
-            onClick={() =>
-              globalAudioDeviceEngine.simulate({
-                event_type: 'connected',
-                device_name: 'Sony WH-1000XM5',
-                device_type: 'headphones',
-                is_bluetooth: true,
-                is_default: true,
-              })
-            }
-            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
-          >
-            Headphones
-          </button>
-          <button
-            onClick={() =>
-              globalAudioDeviceEngine.simulate({
-                event_type: 'connected',
-                device_name: 'JBL Flip 6',
-                device_type: 'speaker',
-                is_bluetooth: true,
-                is_default: true,
-              })
-            }
-            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
-          >
-            Speaker
-          </button>
-          <button
-            onClick={() =>
-              globalAudioDeviceEngine.simulate({
-                event_type: 'connected',
-                device_name: 'Keychron K2',
-                device_type: 'keyboard',
-                is_bluetooth: true,
-                is_default: false,
-              })
-            }
-            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
-          >
-            Keyboard
-          </button>
-          <button
-            onClick={() =>
-              globalAudioDeviceEngine.simulate({
-                event_type: 'connected',
-                device_name: 'MX Master 3S',
-                device_type: 'mouse',
-                is_bluetooth: true,
-                is_default: false,
-              })
-            }
-            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-400"
-          >
-            Mouse
-          </button>
-          <button
-            onClick={() =>
-              globalMediaEngine.simulate({
-                isActive: true,
-                title: 'vampire',
-                artist: 'Olivia Rodrigo',
-                album: 'GUTS',
-                playbackStatus: 'playing',
-              })
-            }
-            className="px-1.5 py-0.5 rounded bg-purple-950/80 hover:bg-purple-900 border border-purple-400/60 text-purple-300 font-medium"
-            title="Simulate playing Olivia Rodrigo - vampire"
-          >
-            💜 Olivia
-          </button>
-          <button
-            onClick={() => globalProcessWatcherEngine.runCommand('npm run build')}
-            className="px-1.5 py-0.5 rounded bg-amber-950/80 hover:bg-amber-900 border border-amber-400/60 text-amber-300 font-medium font-mono text-[10px]"
-            title="Simulate kuma run npm run build"
-          >
-            ⚡ kuma run
-          </button>
-          <button
-            onClick={() =>
-              globalProcessWatcherEngine.handleEvent({
-                id: `mock-err-${Date.now()}`,
-                command: 'cargo test',
-                status: 'error',
-                exit_code: 1,
-                duration_ms: 3120,
-                message: 'Process exited with error code 1',
-              })
-            }
-            className="px-1.5 py-0.5 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-400/60 text-rose-300 font-medium font-mono text-[10px]"
-            title="Simulate kuma process error"
-          >
-            ❌ kuma err
-          </button>
-          <button
-            onClick={() =>
-              globalProcessWatcherEngine.handleEvent({
-                id: `mock-post-${Date.now()}`,
-                command: 'kuma run --post-action sleep train.py',
-                status: 'success',
-                exit_code: 0,
-                duration_ms: 12450,
-                post_action: 'sleep',
-              })
-            }
-            className="px-1.5 py-0.5 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-400/60 text-cyan-300 font-medium font-mono text-[10px]"
-            title="Simulate process with post-action countdown"
-          >
-            💤 post-act
-          </button>
-          <button
-            onClick={() => {
-              setHorizontalOffset(120)
-              setIslandOffset(120)
-            }}
-            className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-cyan-300 font-mono text-[10px]"
-            title="Shift island +120px right"
-          >
-            ➡️ +120
-          </button>
-          <button
-            onClick={() => {
-              setHorizontalOffset(0)
-              setIslandOffset(0)
-              setIsMagnetSnapped(true)
-              setTimeout(() => setIsMagnetSnapped(false), 2600)
-            }}
-            className="px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 font-mono text-[10px] font-bold"
-            title="Snap to center with surprised reaction"
-          >
-            🧲 Snap
-          </button>
-          <button
-            onClick={() => setShowDevControls(false)}
-            className="text-white/40 hover:text-white ml-1"
-          >
-            ✕
-          </button>
-        </div>
+        <DevControls
+          onClose={() => setShowDevControls(false)}
+          onSetHorizontalOffset={(offset) => setHorizontalOffset(offset)}
+          onTriggerSnap={() => {
+            setHorizontalOffset(0)
+            setIsMagnetSnapped(true)
+            setTimeout(() => setIsMagnetSnapped(false), 2600)
+          }}
+        />
       )}
       {import.meta.env.DEV && <DevFrameMeter />}
     </div>

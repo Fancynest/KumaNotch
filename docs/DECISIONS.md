@@ -425,3 +425,26 @@ This document records architectural choices, deviations from the initial spec, a
      - *Result*: Average frame time locked at 16.6ms (solid 60 FPS), peak frame time reduced from 31.4ms to 17.8ms, and zero `longtask` entries (>50ms).
 - **Decision**: **Approve Fixed Window Stage architecture with Win32 SetWindowRgn.** Fallback cursor polling / `OBJID_CURSOR` hook is not needed because `SetWindowRgn` is reliable and zero-cost on Windows 11.
 
+## Decision 027: Fase 8c — Codebase Modularization & Motion Polishing
+- **Date**: 2026-10-20
+- **Context**: In Fase 8c of `KUMANOTCH_SPEC.md`, `App.tsx` grew to ~1,500 lines with dozens of hooks and subscriptions. Frequent updates (such as timer second countdowns or cursor moves) triggered root re-renders across the entire tree during spring animations. In addition, view transitions lacked overlapping crossfades, and concurrent animations (eye blinks, audio waveforms) competed with spring physics for frame budget.
+- **Decision & Implementation**:
+  1. **Monolith Decomposition**: Decomposed `App.tsx` from 1,467 lines down to 435 lines (>70% reduction):
+     - `src/components/island/LeftBubble.tsx`: Isolated media / fresh file bubble with `React.memo`.
+     - `src/components/island/RightBubble.tsx`: Isolated timer / fresh file bubble with `React.memo`.
+     - `src/components/island/IslandContent.tsx`: Isolated view dispatcher with `React.memo` and overlapping crossfade.
+     - `src/ui/DevControls.tsx`: Isolated dev toolbar with `React.memo`.
+     - `src/hooks/useSystemClock.ts`: Encapsulated clock format and interval updates at minute boundaries.
+     - `src/hooks/useIslandDrag.ts`: Encapsulated horizontal dragging, magnetic snapping, and pointer capture.
+     - `src/hooks/useIslandEvents.ts`: Encapsulated OS foreground, tray menu, window blur, and inactivity timeouts.
+  2. **Transition Concurrency Throttling (`isTransitioning`)**:
+     - Added `isTransitioning` flag to `islandStore` activated for 280ms upon geometry/view changes.
+     - `AudioWaveform`: Pauses `repeat: Infinity` animations during transitions, freezing bars at baseline height to eliminate compositor workload.
+     - `MataKuma`: Pauses blinking timeouts, micro-gaze wandering, and mood cycle timers while `isTransitioning` is true, avoiding React state updates during Framer Motion springs.
+  3. **Overlapping Crossfade**:
+     - Configured `<AnimatePresence mode="popLayout" initial={false}>` with `exit={{ opacity: 0, scale: 0.98, position: 'absolute' }}` inside `IslandContent.tsx`.
+     - Exiting card smoothly dissolves in place while the entering card scales and fades in, preventing layout snaps or blank transition frames.
+  4. **Performance Target Met**:
+     - Verified with `DevFrameMeter`: 0 frames >20ms on 60 Hz during expanding/collapsing transitions; zero long tasks (>50ms).
+
+
