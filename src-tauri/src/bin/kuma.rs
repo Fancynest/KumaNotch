@@ -261,15 +261,27 @@ fn handle_status() {
     }
 }
 
+fn print_help() {
+    println!("KumaNotch CLI (v0.1.0)");
+    println!("Usage:");
+    println!("  kuma <command> [options] [args...]");
+    println!();
+    println!("Commands:");
+    println!("  run [--post-action <sleep|lock|shutdown>] <cmd> [args...]");
+    println!("                                 Run command, forward stdio, notify notch on completion");
+    println!("  notify <title> [message] [--error]");
+    println!("                                 Show transient status card on KumaNotch island");
+    println!("  watch <pid> [name] [--post-action <action>]");
+    println!("                                 Monitor external PID until exit (event-driven)");
+    println!("  status                         Check if KumaNotch daemon is running");
+    println!("  help, --help, -h               Show this help message");
+    println!("  --version, -V                  Show version information");
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() {
-        println!("KumaNotch CLI (v0.1.0)");
-        println!("Commands:");
-        println!("  kuma run <cmd> [args...]       Run command, forward stdio, notify notch on completion");
-        println!("  kuma notify <title> [message]  Show transient status card on KumaNotch island");
-        println!("  kuma watch <pid> [name]        Monitor external PID until exit (event-driven)");
-        println!("  kuma status                    Check if KumaNotch daemon is running");
+        print_help();
         return;
     }
 
@@ -278,6 +290,10 @@ fn main() {
         "notify" => handle_notify(&args[1..]),
         "watch" => handle_watch(&args[1..]),
         "status" => handle_status(),
+        "help" | "--help" | "-h" => print_help(),
+        "--version" | "-V" | "-v" => {
+            println!("kuma 0.1.0");
+        }
         _ => {
             // Default: treat as `kuma run <args>`
             handle_run(&args);
