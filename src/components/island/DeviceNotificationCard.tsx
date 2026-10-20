@@ -112,8 +112,8 @@ export const DeviceNotificationCard: React.FC<DeviceNotificationCardProps> = ({
       title={`${notification.device_name} • ${subtitle}`}
     >
       {/* Left Icon with subtle glow and type badge */}
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className="relative">
+      <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+        <div className="relative shrink-0">
           <div
             className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border ${
               isConnected
@@ -133,9 +133,12 @@ export const DeviceNotificationCard: React.FC<DeviceNotificationCardProps> = ({
           )}
         </div>
 
-        {/* Text Details: Sejajar Horizontal */}
-        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-          <span className="text-xs font-semibold text-white/95 truncate tracking-tight whitespace-nowrap leading-none">
+        {/* Text Details: Sejajar Horizontal dengan Full Device Name */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+          <span
+            className="text-xs font-semibold text-white/95 truncate tracking-tight whitespace-nowrap leading-none max-w-[210px]"
+            title={notification.device_name}
+          >
             {notification.device_name}
           </span>
           <span

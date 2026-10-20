@@ -80,6 +80,16 @@ export class MediaEngine {
       const effectiveThumbnail = this.cachedThumbnail
       const lastUpdated = raw.lastUpdatedTime && raw.lastUpdatedTime > 0 ? raw.lastUpdatedTime : Date.now()
 
+      const hasChanged =
+        !this.data ||
+        this.data.isActive !== true ||
+        this.data.title !== raw.title ||
+        this.data.artist !== raw.artist ||
+        this.data.album !== raw.album ||
+        this.data.playbackStatus !== status ||
+        this.data.appId !== raw.appId ||
+        this.data.thumbnailBase64 !== effectiveThumbnail
+
       this.data = {
         isActive: true,
         title: raw.title,
@@ -93,26 +103,31 @@ export class MediaEngine {
         lastUpdated,
       }
 
-      globalActivityRegistry.register({
-        id: 'media',
-        kind: 'media',
-        priority: ACTIVITY_PRIORITIES.media,
-        title: raw.title,
-        updatedAt: Date.now(),
-        metadata: {
-          artist: raw.artist,
-          playbackStatus: status,
-          thumbnailBase64: effectiveThumbnail,
-        },
-      })
+      if (hasChanged) {
+        globalActivityRegistry.register({
+          id: 'media',
+          kind: 'media',
+          priority: ACTIVITY_PRIORITIES.media,
+          title: raw.title,
+          updatedAt: Date.now(),
+          metadata: {
+            artist: raw.artist,
+            playbackStatus: status,
+            thumbnailBase64: effectiveThumbnail,
+          },
+        })
+        this.notify()
+      }
     } else {
+      const wasActive = this.data !== null
       this.data = null
       this.cachedThumbnail = null
       this.currentTrackKey = ''
-      globalActivityRegistry.remove('media')
+      if (wasActive) {
+        globalActivityRegistry.remove('media')
+        this.notify()
+      }
     }
-
-    this.notify()
   }
 
   public getData(): MediaData | null {

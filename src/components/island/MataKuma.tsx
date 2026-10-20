@@ -534,31 +534,32 @@ export const MataKuma: React.FC<MataKumaProps> = ({
         animate={
           isOlivia
             ? {
-                y: [0, -3.0, 0, -1.8, 0],
-                rotate: [-2, 2, -2, 2, -2],
-                scale: [1, 1.05, 1, 1.03, 1],
+                y: [0, -6.0, 1.0, -3.8, 0],
+                rotate: [-7, 7, -5, 5, -7],
+                scale: [1, 1.1, 0.94, 1.06, 1],
               }
             : isMusic || currentEmotion === 'happy'
             ? {
-                y: [0, -2.6, 0, -1.4, 0],
-                rotate: [-2, 2, -2, 2, -2],
-                scale: [1, 1.04, 1, 1.02, 1],
+                y: [0, -5.0, 1.0, -3.0, 0],
+                rotate: [-5, 5, -4, 4, -5],
+                scale: [1, 1.08, 0.96, 1.04, 1],
               }
             : isHappyMood
             ? {
-                y: [0, -1.5, 0],
-                rotate: [-1, 1, -1],
+                y: [0, -3.5, 0.5, -2.0, 0],
+                rotate: [-3, 3, -2, 2, -3],
+                scale: [1, 1.05, 0.98, 1.03, 1],
               }
-            : { y: 0 }
+            : { y: 0, rotate: 0, scale: 1 }
         }
         transition={
           isOlivia
-            ? { duration: 1.1, repeat: Infinity, ease: 'easeInOut' }
+            ? { duration: 0.92, repeat: Infinity, ease: 'easeInOut' }
             : isMusic || currentEmotion === 'happy'
-            ? { duration: 1.15, repeat: Infinity, ease: 'easeInOut' }
+            ? { duration: 0.98, repeat: Infinity, ease: 'easeInOut' }
             : isHappyMood
-            ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }
-            : { duration: 0.3 }
+            ? { duration: 1.25, repeat: Infinity, ease: 'easeInOut' }
+            : { duration: 0.25 }
         }
         className="flex items-center justify-center gap-1.5 relative px-1"
       >

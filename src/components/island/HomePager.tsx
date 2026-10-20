@@ -245,7 +245,7 @@ export const HomePager: React.FC<HomePagerProps> = ({
             {/* Active Running Timer Banner if timer is ticking */}
             {isTimerActive && (
               activeTimersList.length > 1 ? (
-                <div className="flex flex-col gap-1 my-0.5 max-h-24 overflow-y-auto no-scrollbar">
+                <div className="flex flex-col gap-1.5 my-1">
                   {activeTimersList.map((item) => {
                     const rem = item.id === timerData?.id ? remainingSeconds : calculateRemainingSeconds(item)
                     const isRunning = item.status === 'running'
@@ -256,15 +256,15 @@ export const HomePager: React.FC<HomePagerProps> = ({
                           e.stopPropagation()
                           onOpenTimer()
                         }}
-                        className="flex items-center justify-between px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-colors"
+                        className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-colors"
                       >
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
                           {item.isPomodoro ? (
                             <Brain className="w-3.5 h-3.5 shrink-0 text-amber-300" />
                           ) : (
                             <Clock className="w-3.5 h-3.5 shrink-0 text-amber-300" />
                           )}
-                          <span className="text-[11px] font-semibold text-amber-200/90 truncate max-w-[85px]">
+                          <span className="text-[11px] font-semibold text-amber-200/90 truncate max-w-[95px]">
                             {item.label}
                           </span>
                           <span className="text-xs font-mono font-bold text-amber-300">

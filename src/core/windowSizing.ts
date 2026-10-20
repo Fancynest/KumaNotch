@@ -28,7 +28,7 @@ export const WINDOW_SIZES: Record<string, WindowSize> = {
   expandedTimer: { width: 380, height: 230 },
   alert: { width: 380, height: 220 },
   expandedFreshFile: { width: 400, height: 250 },
-  deviceNotification: { width: 300, height: 56 },
+  deviceNotification: { width: 390, height: 56 },
   processAlert: { width: 310, height: 56 },
   settings: { width: 420, height: 390 },
 }
@@ -106,7 +106,7 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
     y: 0,
   },
   deviceNotification: {
-    width: 260,
+    width: 350,
     height: 34,
     borderRadius: 17,
     boxShadow: 'none',
@@ -192,6 +192,7 @@ export function getDynamicDimensions(
   isCustom: boolean,
   musicActive: boolean,
   timerActive: boolean,
+  activeTimerCount: number = 0,
 ) {
   const baseShell = { ...(SHELL_CONFIGS[view] || SHELL_CONFIGS.idle) }
   const baseWin = { ...(WINDOW_SIZES[view] || WINDOW_SIZES.idle) }
@@ -209,18 +210,28 @@ export function getDynamicDimensions(
 
   if (view === 'deviceNotification') {
     const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0)
+    baseShell.width = 350
     if (auxCount >= 2) {
-      baseWin.width = 380
+      baseWin.width = 430
     } else if (auxCount === 1) {
-      baseWin.width = 340
+      baseWin.width = 410
     } else {
-      baseWin.width = 300
+      baseWin.width = 390
     }
   }
 
   if (view === 'home') {
-    const height = isCustom ? 268 : 230
-    const winHeight = isCustom ? 310 : 270
+    let extraHeight = 0
+    if (activeTimerCount > 1) {
+      // Allocate 38px per extra active timer beyond the first
+      extraHeight += (activeTimerCount - 1) * 38
+    }
+    if (musicActive && activeTimerCount > 0) {
+      // Extra breathing space when both multi-timers and media banner are displayed
+      extraHeight += 12
+    }
+    const height = (isCustom ? 268 : 230) + extraHeight
+    const winHeight = (isCustom ? 310 : 270) + extraHeight
     baseShell.height = height
     baseWin.height = winHeight
   }

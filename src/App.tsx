@@ -89,7 +89,10 @@ export default function App() {
   const { timeStr, dateStr } = useSystemClock(settings.timeFormat, settings.language)
 
   // 6. Multi-activity & dynamic view calculation
-  const isTimerActive = allTimers.some((t) => t.status === 'running' || t.status === 'paused')
+  const activeTimersList = allTimers.filter(
+    (t) => t.status === 'running' || t.status === 'paused'
+  )
+  const isTimerActive = activeTimersList.length > 0
   const isMediaActive = mediaData !== null && mediaData.isActive
   const isExpanded = expandedActivity !== null || timerData?.status === 'completed'
   const hasMusic = isMediaActive && !isExpanded && !isDragOver
@@ -108,6 +111,7 @@ export default function App() {
     showCustomInput,
     hasMusic,
     hasTimer,
+    activeTimersList.length,
   )
 
   // 7. Asymmetric Spring Physics tracking (Melebar vs Menciut)

@@ -35,7 +35,14 @@ export function isFavoriteArtistMedia(
   const title = (media.title || '').trim().toLowerCase()
   const album = (media.album || '').trim().toLowerCase()
 
-  return targets.some((t) => t.length > 0 && (artist.includes(t) || title.includes(t) || album.includes(t)))
+  return targets.some(
+    (t) =>
+      t.length > 0 &&
+      (artist.includes(t) ||
+        (artist.length > 0 && t.includes(artist)) ||
+        title.includes(t) ||
+        album.includes(t))
+  )
 }
 
 /**
