@@ -6,20 +6,92 @@ static CURRENT_OFFSET_X: AtomicI32 = AtomicI32::new(0);
 static CURRENT_HIT_REGION: Mutex<Option<(i32, i32, i32, i32)>> = Mutex::new(None);
 
 #[cfg(windows)]
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+#[cfg(windows)]
+use windows::Win32::Graphics::Dwm::{
+    DwmSetWindowAttribute, DWMNCRP_DISABLED, DWMWA_BORDER_COLOR, DWMWA_CAPTION_COLOR,
+    DWMWA_COLOR_NONE, DWMWA_NCRENDERING_POLICY, DWMWA_WINDOW_CORNER_PREFERENCE,
+    DWMWCP_DONOTROUND,
+};
 #[cfg(windows)]
 use windows::Win32::Graphics::Gdi::{CreateRectRgn, SetWindowRgn};
 #[cfg(windows)]
+use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+#[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_EXSTYLE, GWL_STYLE, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_DLGFRAME,
-    WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_EX_STATICEDGE, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX,
-    WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
+    GetWindowLongW, SetClassLongPtrW, SetWindowLongW, SetWindowPos, GCLP_HBRBACKGROUND,
+    GWL_EXSTYLE, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_DLGFRAME, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME,
+    WS_EX_STATICEDGE, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU,
+    WS_THICKFRAME,
 };
+
+#[cfg(windows)]
+unsafe extern "system" fn no_nc_paint_subclass_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id_subclass: usize,
+    _ref_data: usize,
+) -> LRESULT {
+    const WM_NCPAINT: u32 = 0x0085;
+    const WM_ERASEBKGND: u32 = 0x0014;
+    const WM_NCACTIVATE: u32 = 0x0086;
+
+    match msg {
+        WM_NCPAINT => {
+            // Suppress non-client painting completely: no titlebar, no borders, no classic fallback caption
+            LRESULT(0)
+        }
+        WM_NCACTIVATE => {
+            // Prevent Windows from repainting titlebar/caption on focus change
+            // Return TRUE to allow activation change, but block DefWindowProc caption drawing
+            LRESULT(1)
+        }
+        WM_ERASEBKGND => {
+            // Prevent Windows from painting default window class background brush
+            LRESULT(1)
+        }
+        _ => unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) },
+    }
+}
 
 #[cfg(windows)]
 pub fn strip_window_decorations(hwnd: HWND) {
     unsafe {
+        // 1. Disable DWM non-client rendering policy completely
+        let nc_policy = DWMNCRP_DISABLED.0;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_NCRENDERING_POLICY,
+            &nc_policy as *const _ as _,
+            std::mem::size_of_val(&nc_policy) as u32,
+        );
+
+        let corner_pref = DWMWCP_DONOTROUND.0;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &corner_pref as *const _ as _,
+            std::mem::size_of_val(&corner_pref) as u32,
+        );
+
+        let color_none = DWMWA_COLOR_NONE;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_BORDER_COLOR,
+            &color_none as *const _ as _,
+            std::mem::size_of_val(&color_none) as u32,
+        );
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_CAPTION_COLOR,
+            &color_none as *const _ as _,
+            std::mem::size_of_val(&color_none) as u32,
+        );
+
+        // 2. Strip Win32 styles
         let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
         let stripped_style = style
             & !(WS_CAPTION.0
@@ -40,6 +112,13 @@ pub fn strip_window_decorations(hwnd: HWND) {
                 | WS_EX_STATICEDGE.0);
         let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, new_ex_style as i32);
 
+        // 3. Subclass the window to intercept WM_NCPAINT, WM_NCACTIVATE, WM_ERASEBKGND
+        let _ = SetWindowSubclass(hwnd, Some(no_nc_paint_subclass_proc), 1001, 0);
+
+        // 4. Clear class background brush so User32 has no background brush to paint
+        let _ = SetClassLongPtrW(hwnd, GCLP_HBRBACKGROUND, 0);
+
+        // 5. Force frame change
         let _ = SetWindowPos(
             hwnd,
             None,
@@ -127,20 +206,20 @@ pub fn set_hit_region(
                     .map(|m| m.scale_factor())
                     .unwrap_or(1.0);
 
-                let is_visible = window.is_visible().unwrap_or(false);
+                let _is_visible = window.is_visible().unwrap_or(false);
 
                 unsafe {
                     if width <= 0 || height <= 0 {
                         // Passing None resets window region (unclipped)
-                        let _ = SetWindowRgn(HWND(hwnd.0 as _), None, is_visible);
+                        let _ = SetWindowRgn(HWND(hwnd.0 as _), None, false);
                     } else {
                         let (phys_left, phys_top, phys_right, phys_bottom) =
                             calculate_hit_region_physical(x, y, width, height, scale_factor);
 
                         let hrgn = CreateRectRgn(phys_left, phys_top, phys_right, phys_bottom);
                         // Windows OS takes ownership of hrgn when passed to SetWindowRgn.
-                        // bRedraw is set to is_visible so we NEVER repaint or wake a hidden window.
-                        let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), is_visible);
+                        // bRedraw is set to false so User32 NEVER paints legacy window backgrounds over the region.
+                        let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), false);
                     }
                 }
             }
@@ -283,7 +362,7 @@ pub fn setup_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                         let phys_bottom = ((init_y + init_h) * scale_factor).round() as i32;
 
                         let hrgn = CreateRectRgn(phys_left, phys_top, phys_right, phys_bottom);
-                        let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), true);
+                        let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), false);
                     }
                 }
             }
@@ -333,7 +412,7 @@ pub fn handle_monitor_or_dpi_changed(window: &tauri::WebviewWindow) -> Result<()
                 #[cfg(windows)]
                 unsafe {
                     let hrgn = CreateRectRgn(l, t, r_right, b);
-                    let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), true);
+                    let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), false);
                 }
             }
         }
