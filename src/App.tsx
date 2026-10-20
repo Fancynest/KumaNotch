@@ -26,12 +26,10 @@ import { SettingsView } from './features/settings/SettingsView'
 import {
   useIslandStore,
   type IslandView,
-  type DisplayState,
   type ExpandedActivity,
 } from './core/islandStore'
 import { Shell } from './components/island/Shell'
 import { ClockCapsule } from './components/island/ClockCapsule'
-import { Droplet } from './components/island/Droplet'
 import { HomePager } from './components/island/HomePager'
 import { TimerCard } from './components/island/TimerCard'
 import { AlertCard } from './components/island/AlertCard'
@@ -62,7 +60,6 @@ function formatCompactRemaining(secs: number): string {
 }
 
 function getIslandView(
-  displayState: DisplayState,
   expandedActivity: ExpandedActivity,
   timerData: TimerData | null,
   isDragOver: boolean,
@@ -78,7 +75,6 @@ function getIslandView(
   if (expandedActivity === 'freshFile') return 'expandedFreshFile'
   if (isDragOver) return 'dropTarget'
   if (deviceNotification !== null) return 'deviceNotification'
-  if (displayState === 'droplet') return 'droplet'
   return 'idle'
 }
 
@@ -130,19 +126,15 @@ function getDynamicDimensions(
 
 export default function App() {
   const {
-    displayState,
     expandedActivity,
     homePage,
     systemMode,
-    isDwelling,
     hoveredTarget,
     isDragOver,
     showCustomInput,
-    setDisplayState,
     setExpandedActivity,
     setHomePage,
     setSystemMode,
-    setIsDwelling,
     setHoveredTarget,
     setIsDragOver,
     setShowCustomInput,
@@ -330,16 +322,14 @@ export default function App() {
   const isMediaActive = mediaData !== null && mediaData.isActive
   const isFreshActive = freshFile !== null && settings.freshFileEnabled
   const isExpanded = expandedActivity !== null || timerData?.status === 'completed'
-  const isDroplet = displayState === 'droplet'
-  const hasMusic = isMediaActive && !isExpanded && !isDroplet && !isDragOver
-  const hasTimer = isTimerActive && !isExpanded && !isDroplet && !isDragOver
-  const hasFresh = isFreshActive && !isExpanded && !isDroplet && !isDragOver
+  const hasMusic = isMediaActive && !isExpanded && !isDragOver
+  const hasTimer = isTimerActive && !isExpanded && !isDragOver
+  const hasFresh = isFreshActive && !isExpanded && !isDragOver
   const hasLeftAux = hasMusic || (hasTimer && hasFresh)
   const hasRightAux = hasTimer || (!hasMusic && hasFresh)
 
   // Dynamic dimensions & window synchronization
   const currentView = getIslandView(
-    displayState,
     expandedActivity,
     timerData,
     isDragOver,
@@ -386,9 +376,9 @@ export default function App() {
   }, [processAlert?.id, deviceNotification?.id, timerData?.status, freshFile?.id])
 
   // Window Stage Hit Region Choreography (Fase 8b Spike)
-  // Stage width = 460, height = 320 (pinned at y = 0)
+  // Stage width = 460, height = 420 (pinned at y = 0)
   const STAGE_WIDTH = 460
-  const STAGE_HEIGHT = 320
+  const STAGE_HEIGHT = 420
   const hitRegionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -504,6 +494,14 @@ export default function App() {
 
     listen<{ mode: 'desktop' | 'app' | 'hidden' }>('app_mode_changed', (event) => {
       setSystemMode(event.payload.mode)
+      if (
+        event.payload.mode === 'hidden' ||
+        (event.payload.mode === 'app' && settings.hideOnFullscreen)
+      ) {
+        getCurrentWebviewWindow().hide().catch(() => {})
+      } else {
+        getCurrentWebviewWindow().show().catch(() => {})
+      }
     })
       .then((fn) => {
         unlisten = fn
@@ -513,7 +511,18 @@ export default function App() {
     return () => {
       if (unlisten) unlisten()
     }
-  }, [setSystemMode])
+  }, [setSystemMode, settings.hideOnFullscreen])
+
+  // React to hideOnFullscreen setting change in app mode
+  useEffect(() => {
+    if (systemMode === 'app') {
+      if (settings.hideOnFullscreen) {
+        getCurrentWebviewWindow().hide().catch(() => {})
+      } else {
+        getCurrentWebviewWindow().show().catch(() => {})
+      }
+    }
+  }, [settings.hideOnFullscreen, systemMode])
 
   // Tray events
   useEffect(() => {
@@ -542,69 +551,6 @@ export default function App() {
       unlisteners.forEach((fn) => fn())
     }
   }, [setExpandedActivity])
-
-  // In app mode, auto droplet after inactivity
-  useEffect(() => {
-    if (
-      !settings.autoDroplet ||
-      systemMode !== 'app' ||
-      displayState !== 'capsule' ||
-      expandedActivity !== null ||
-      currentView === 'alert'
-    )
-      return
-
-    const timeoutMs = (settings.inactivitySeconds || 10) * 1000
-    let timer = setTimeout(() => {
-      setDisplayState('droplet')
-    }, timeoutMs)
-
-    const resetDropletTimer = () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        setDisplayState('droplet')
-      }, timeoutMs)
-    }
-
-    window.addEventListener('mousemove', resetDropletTimer)
-    window.addEventListener('mousedown', resetDropletTimer)
-    window.addEventListener('keydown', resetDropletTimer)
-
-    return () => {
-      clearTimeout(timer)
-      window.removeEventListener('mousemove', resetDropletTimer)
-      window.removeEventListener('mousedown', resetDropletTimer)
-      window.removeEventListener('keydown', resetDropletTimer)
-    }
-  }, [
-    systemMode,
-    displayState,
-    expandedActivity,
-    currentView,
-    settings.autoDroplet,
-    settings.inactivitySeconds,
-    setDisplayState,
-  ])
-
-  // Dwell hover on droplet re-emerges capsule
-  useEffect(() => {
-    if (!isDwelling || displayState !== 'droplet') return
-
-    const dwellMs = (settings.dwellSeconds || 2) * 1000
-    const dwellTimer = setTimeout(() => {
-      setIsDwelling(false)
-      setDisplayState('capsule')
-    }, dwellMs)
-
-    return () => clearTimeout(dwellTimer)
-  }, [isDwelling, displayState, settings.dwellSeconds, setIsDwelling, setDisplayState])
-
-  // Re-emerge capsule from droplet mode when a device connects/disconnects
-  useEffect(() => {
-    if (deviceNotification && displayState === 'droplet') {
-      setDisplayState('capsule')
-    }
-  }, [deviceNotification, displayState, setDisplayState])
 
   // Alert Auto-Dismiss after 30s
   useEffect(() => {
@@ -873,9 +819,6 @@ export default function App() {
     if (currentView === 'idle') {
       setExpandedActivity('home')
       setHomePage(1)
-    } else if (currentView === 'droplet') {
-      setIsDwelling(false)
-      setDisplayState('capsule')
     } else if (currentView === 'dropTarget') {
       setExpandedActivity('home')
       setHomePage(2)
@@ -899,41 +842,14 @@ export default function App() {
       className="w-full h-full relative select-none overflow-hidden flex flex-col items-center justify-start"
       onPointerDown={handleBackdropPointerDown}
     >
-      {/* Ripple progress cue during 2s dwell hover on droplet */}
-      {currentView === 'droplet' && isDwelling && (
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0.9 }}
-          animate={{ scale: 2.6, opacity: 0 }}
-          transition={{ duration: 1.8, ease: 'easeOut', repeat: Infinity }}
-          style={{
-            position: 'absolute',
-            top: dims.shell.y + 8 + dims.shell.height / 2,
-            left: '50%',
-            x: '-50%',
-            y: '-50%',
-            width: dims.shell.width,
-            height: dims.shell.height,
-            borderRadius: '9999px',
-            border: '2px solid rgba(255, 255, 255, 0.65)',
-            pointerEvents: 'none',
-            zIndex: 30,
-          }}
-        />
-      )}
-
-      {/* CENTERED CONTAINER FOR MULTI-BUBBLE 3-TASK ISLAND */}
+      {/* CENTERED CONTAINER FOR ATTACHED PONI (Y=0) AND MULTI-BUBBLE 3-TASK ISLAND */}
       <div
-        className={`pt-2 flex items-center justify-center z-40 transition-transform ${
-          isDroplet ? 'gap-0' : 'gap-2.5'
-        }`}
-        style={{
-          transform: isBrowserDev && horizontalOffset !== 0 ? `translateX(${horizontalOffset}px)` : undefined,
-        }}
+        className="flex items-start justify-center z-40 gap-2.5 pt-0 relative"
         onPointerDown={handleBackdropPointerDown}
       >
         {/* LEFT BUBBLE: MUSIC (PRIMARY) OR FRESH FILE (WHEN TIMER IS OCCUPYING RIGHT) */}
         <AnimatePresence>
-          {!isDroplet && !isExpanded && !isDragOver && isMediaActive ? (
+          {!isExpanded && !isDragOver && isMediaActive ? (
             <motion.div
               key="bubble-music"
               initial={{
@@ -1005,7 +921,7 @@ export default function App() {
                 />
               )}
             </motion.div>
-          ) : !isDroplet && !isExpanded && !isDragOver && isFreshActive && isTimerActive ? (
+          ) : !isExpanded && !isDragOver && isFreshActive && isTimerActive ? (
             <motion.div
               key="bubble-fresh-left"
               initial={{
@@ -1077,11 +993,11 @@ export default function App() {
         </AnimatePresence>
 
         {/* SYMMETRY BALANCER: If only right aux is active, balance left side so capsule stays centered */}
-        {!isDroplet && !isExpanded && !isDragOver && !hasLeftAux && hasRightAux && (
-          <div style={{ width: 32, height: 32 }} className="invisible shrink-0 pointer-events-none" />
+        {!isExpanded && !isDragOver && !hasLeftAux && hasRightAux && (
+          <div style={{ width: 28, height: 28 }} className="invisible shrink-0 pointer-events-none" />
         )}
 
-        {/* SINGLE PERSISTENT SHELL */}
+        {/* SINGLE PERSISTENT SHELL (ATTACHED PONI AT Y=0) */}
         <Shell
           shellConfig={dims.shell}
           currentView={currentView}
@@ -1094,14 +1010,8 @@ export default function App() {
           onPointerMove={handleShellPointerMove}
           onPointerUp={handleShellPointerUp}
           onPointerCancel={handleShellPointerCancel}
-          onMouseEnter={() => {
-            if (currentView === 'droplet') setIsDwelling(true)
-            handleExpandedPointerEnter()
-          }}
-          onMouseLeave={() => {
-            setIsDwelling(false)
-            handleExpandedPointerLeave()
-          }}
+          onMouseEnter={handleExpandedPointerEnter}
+          onMouseLeave={handleExpandedPointerLeave}
         >
           {currentView === 'home' && (
             <HomePager
@@ -1143,10 +1053,6 @@ export default function App() {
               timerData={timerData}
               onDismiss={() => globalTimerEngine.dismissAlert()}
             />
-          )}
-
-          {currentView === 'droplet' && (
-            <Droplet timerData={timerData} mediaData={mediaData} freshFile={freshFile} />
           )}
 
           {currentView === 'expandedFreshFile' && freshFile && (
@@ -1219,7 +1125,7 @@ export default function App() {
 
         {/* RIGHT BUBBLE: TIMER OR FRESH FILE */}
         <AnimatePresence>
-          {!isDroplet && !isExpanded && !isDragOver && isTimerActive ? (
+          {!isExpanded && !isDragOver && isTimerActive ? (
             <motion.div
               key="bubble-timer"
               initial={{
@@ -1308,7 +1214,7 @@ export default function App() {
                 />
               )}
             </motion.div>
-          ) : !isDroplet && !isExpanded && !isDragOver && isFreshActive ? (
+          ) : !isExpanded && !isDragOver && isFreshActive ? (
             <motion.div
               key="bubble-fresh-right"
               initial={{
@@ -1380,8 +1286,8 @@ export default function App() {
         </AnimatePresence>
 
         {/* SYMMETRY BALANCER: If only left aux is active, balance right side so capsule stays centered */}
-        {!isDroplet && !isExpanded && !isDragOver && hasLeftAux && !hasRightAux && (
-          <div style={{ width: 32, height: 32 }} className="invisible shrink-0 pointer-events-none" />
+        {!isExpanded && !isDragOver && hasLeftAux && !hasRightAux && (
+          <div style={{ width: 28, height: 28 }} className="invisible shrink-0 pointer-events-none" />
         )}
       </div>
 

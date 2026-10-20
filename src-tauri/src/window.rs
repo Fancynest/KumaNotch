@@ -1,7 +1,9 @@
 use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::Mutex;
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize};
 
 static CURRENT_OFFSET_X: AtomicI32 = AtomicI32::new(0);
+static CURRENT_HIT_REGION: Mutex<Option<(i32, i32, i32, i32)>> = Mutex::new(None);
 
 #[cfg(windows)]
 use windows::Win32::Foundation::HWND;
@@ -72,6 +74,8 @@ pub fn set_hit_region(
     width: i32,
     height: i32,
 ) -> Result<(), String> {
+    *CURRENT_HIT_REGION.lock().unwrap() = Some((x, y, width, height));
+
     #[cfg(windows)]
     {
         if let Some(window) = app.get_webview_window("main") {
@@ -83,17 +87,20 @@ pub fn set_hit_region(
                     .map(|m| m.scale_factor())
                     .unwrap_or(1.0);
 
+                let is_visible = window.is_visible().unwrap_or(false);
+
                 unsafe {
                     if width <= 0 || height <= 0 {
                         // Passing None resets window region (unclipped)
-                        let _ = SetWindowRgn(HWND(hwnd.0 as _), None, true);
+                        let _ = SetWindowRgn(HWND(hwnd.0 as _), None, is_visible);
                     } else {
                         let (phys_left, phys_top, phys_right, phys_bottom) =
                             calculate_hit_region_physical(x, y, width, height, scale_factor);
 
                         let hrgn = CreateRectRgn(phys_left, phys_top, phys_right, phys_bottom);
-                        // Windows OS takes ownership of hrgn when passed to SetWindowRgn
-                        let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), true);
+                        // Windows OS takes ownership of hrgn when passed to SetWindowRgn.
+                        // bRedraw is set to is_visible so we NEVER repaint or wake a hidden window.
+                        let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), is_visible);
                     }
                 }
             }
@@ -103,7 +110,7 @@ pub fn set_hit_region(
 }
 
 pub const STAGE_WIDTH: f64 = 460.0;
-pub const STAGE_HEIGHT: f64 = 320.0;
+pub const STAGE_HEIGHT: f64 = 420.0;
 
 #[tauri::command]
 pub fn resize_island(_app: AppHandle, _width: f64, _height: f64) -> Result<(), String> {
@@ -238,9 +245,54 @@ pub fn setup_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
+            *CURRENT_HIT_REGION.lock().unwrap() =
+                Some((init_x as i32, init_y as i32, init_w as i32, init_h as i32));
+
             let _ = window.show();
         } else {
             let _ = window.show();
+        }
+    }
+    Ok(())
+}
+
+pub fn handle_monitor_or_dpi_changed(window: &tauri::WebviewWindow) -> Result<(), Box<dyn std::error::Error>> {
+    // Only update bounds and region if the window is currently visible!
+    // NEVER show or unhide a hidden window (e.g. in D3D fullscreen or presentation mode)
+    let is_visible = window.is_visible().unwrap_or(false);
+    if !is_visible {
+        return Ok(());
+    }
+
+    if let Some(monitor) = window.current_monitor().ok().flatten() {
+        let scale_factor = monitor.scale_factor();
+        let monitor_size = monitor.size();
+        let monitor_pos = monitor.position();
+
+        let stage_phys_width = (STAGE_WIDTH * scale_factor).round() as u32;
+        let stage_phys_height = (STAGE_HEIGHT * scale_factor).round() as u32;
+        let offset_x = CURRENT_OFFSET_X.load(Ordering::Relaxed);
+        let x = calculate_clamped_x(
+            monitor_pos.x,
+            monitor_size.width,
+            stage_phys_width,
+            offset_x,
+            scale_factor,
+        );
+        let y = monitor_pos.y;
+
+        set_window_bounds(window, x, y, stage_phys_width, stage_phys_height);
+
+        // Reapply hit region for current bounds safely
+        if let Some(r) = CURRENT_HIT_REGION.lock().unwrap().as_ref() {
+            let (l, t, r_right, b) = calculate_hit_region_physical(r.0, r.1, r.2, r.3, scale_factor);
+            if let Ok(hwnd) = window.hwnd() {
+                #[cfg(windows)]
+                unsafe {
+                    let hrgn = CreateRectRgn(l, t, r_right, b);
+                    let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), true);
+                }
+            }
         }
     }
     Ok(())

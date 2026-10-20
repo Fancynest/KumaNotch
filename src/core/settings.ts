@@ -4,9 +4,7 @@ export interface AppSettings {
   timeFormat: 'auto' | '12h' | '24h'
   language: 'auto' | 'en' | 'id'
   autostart: boolean
-  autoDroplet: boolean
-  inactivitySeconds: number
-  dwellSeconds: number
+  hideOnFullscreen: boolean
   autoCollapseExpanded: boolean
   autoCollapseSeconds: number
   personalityEnabled: boolean
@@ -27,9 +25,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   timeFormat: 'auto',
   language: 'auto',
   autostart: false,
-  autoDroplet: true,
-  inactivitySeconds: 10,
-  dwellSeconds: 2,
+  hideOnFullscreen: false,
   autoCollapseExpanded: true,
   autoCollapseSeconds: 10,
   personalityEnabled: true,

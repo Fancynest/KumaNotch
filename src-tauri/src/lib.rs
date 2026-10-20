@@ -91,6 +91,20 @@ pub fn run() {
             let handle = app.handle();
             let _ = window::setup_window(handle);
             let _ = tray::create_tray(handle);
+
+            if let Some(main_win) = app.get_webview_window("main") {
+                let w_clone = main_win.clone();
+                main_win.on_window_event(move |event| {
+                    match event {
+                        tauri::WindowEvent::ScaleFactorChanged { .. }
+                        | tauri::WindowEvent::Moved(_) => {
+                            let _ = window::handle_monitor_or_dpi_changed(&w_clone);
+                        }
+                        _ => {}
+                    }
+                });
+            }
+
             detector::start_detector(handle.clone());
             media::init_media(handle.clone());
             fresh_file::init_fresh_file_watcher(handle.clone());

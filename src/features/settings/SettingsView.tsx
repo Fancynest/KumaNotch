@@ -367,61 +367,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose }) => {
 
             <div className="border-t border-white/10 pt-1" />
 
-            {/* Auto-Droplet Mode Toggle */}
+            {/* Hide on Fullscreen Apps Toggle */}
             <div className="flex items-center justify-between">
               <div className="max-w-[210px]">
-                <span className="text-xs font-medium text-white block">{t.autoDroplet}</span>
-                <span className="text-[10px] text-white/40 block leading-tight">{t.autoDropletDesc}</span>
+                <span className="text-xs font-medium text-white block">{t.hideOnFullscreen}</span>
+                <span className="text-[10px] text-white/40 block leading-tight">{t.hideOnFullscreenDesc}</span>
               </div>
               <button
                 type="button"
                 role="switch"
-                aria-checked={settings.autoDroplet}
-                onClick={() => updateSetting('autoDroplet', !settings.autoDroplet)}
+                aria-checked={settings.hideOnFullscreen}
+                onClick={() => updateSetting('hideOnFullscreen', !settings.hideOnFullscreen)}
                 className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  settings.autoDroplet ? 'bg-amber-500' : 'bg-white/20'
+                  settings.hideOnFullscreen ? 'bg-amber-500' : 'bg-white/20'
                 }`}
               >
                 <span
                   className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    settings.autoDroplet ? 'translate-x-4' : 'translate-x-0'
+                    settings.hideOnFullscreen ? 'translate-x-4' : 'translate-x-0'
                   }`}
                 />
               </button>
-            </div>
-
-            {/* Inactivity Timeout Slider */}
-            <div className="space-y-1 pt-1">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-white/80">{t.inactivityTimeout}</span>
-                <span className="font-mono text-amber-400 font-semibold">{settings.inactivitySeconds} {t.secondsUnit}</span>
-              </div>
-              <input
-                type="range"
-                min="5"
-                max="30"
-                step="1"
-                value={settings.inactivitySeconds}
-                onChange={(e) => updateSetting('inactivitySeconds', parseInt(e.target.value, 10))}
-                className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
-              />
-            </div>
-
-            {/* Dwell Timeout Slider */}
-            <div className="space-y-1 pt-1">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-white/80">{t.dwellTimeout}</span>
-                <span className="font-mono text-amber-400 font-semibold">{settings.dwellSeconds} {t.secondsUnit}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                step="0.5"
-                value={settings.dwellSeconds}
-                onChange={(e) => updateSetting('dwellSeconds', parseFloat(e.target.value))}
-                className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
-              />
             </div>
           </div>
         )}

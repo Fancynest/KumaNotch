@@ -64,8 +64,7 @@ export const Shell: React.FC<ShellProps> = ({
       animate={{
         width: shellConfig.width,
         height: shellConfig.height,
-        borderRadius: shellConfig.borderRadius,
-        y: nudge ? [shellConfig.y - 6, shellConfig.y] : shellConfig.y,
+        y: nudge ? [shellConfig.y + 4, shellConfig.y] : shellConfig.y,
       }}
       transition={activeSpring}
       onClick={onClick}
@@ -76,28 +75,62 @@ export const Shell: React.FC<ShellProps> = ({
       onPointerCancel={onPointerCancel}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      onScroll={(e) => {
-        e.currentTarget.scrollLeft = 0
-        e.currentTarget.scrollTop = 0
-      }}
       style={{
         boxShadow: shellConfig.boxShadow,
       }}
-      className={`bg-black border overflow-hidden select-none relative shrink-0 ${
+      className={`bg-transparent select-none relative shrink-0 z-40 ${
         isDragging
-          ? 'cursor-grabbing ring-1 ring-amber-400/40'
+          ? 'cursor-grabbing'
           : currentView === 'idle'
-          ? 'cursor-grab'
+          ? 'cursor-pointer'
           : 'cursor-default'
-      } ${
-        currentView === 'alert'
-          ? 'border-amber-500/50'
-          : currentView === 'dropTarget'
-          ? 'border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-          : 'border-white/10'
       }`}
     >
-      {children}
+      {/* Left Concave Shoulder Fillet (Outer arc connecting notch to top screen bezel) */}
+      <div
+        className="absolute top-0 pointer-events-none z-30"
+        style={{
+          left: -12,
+          width: 12,
+          height: 12,
+          background:
+            'radial-gradient(circle at 0 100%, transparent 11px, rgba(255, 255, 255, 0.12) 11.5px, #000 12.5px)',
+        }}
+      />
+      {/* Right Concave Shoulder Fillet (Outer arc connecting notch to top screen bezel) */}
+      <div
+        className="absolute top-0 pointer-events-none z-30"
+        style={{
+          right: -12,
+          width: 12,
+          height: 12,
+          background:
+            'radial-gradient(circle at 100% 100%, transparent 11px, rgba(255, 255, 255, 0.12) 11.5px, #000 12.5px)',
+        }}
+      />
+
+      {/* Main Body with bottom corner squircle and borderless top edge */}
+      <div
+        className={`w-full h-full bg-black border-x border-b border-t-0 overflow-hidden relative flex flex-col items-center justify-start ${
+          currentView === 'alert'
+            ? 'border-amber-500/50'
+            : currentView === 'dropTarget'
+            ? 'border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+            : 'border-white/10'
+        }`}
+        style={{
+          borderBottomLeftRadius: shellConfig.borderRadius,
+          borderBottomRightRadius: shellConfig.borderRadius,
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
+        }}
+        onScroll={(e) => {
+          e.currentTarget.scrollLeft = 0
+          e.currentTarget.scrollTop = 0
+        }}
+      >
+        {children}
+      </div>
     </motion.div>
   )
 }

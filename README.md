@@ -4,7 +4,7 @@
 
 [![Release](https://img.shields.io/github/v/release/Fancynest/KumaNotch?color=amber)](https://github.com/Fancynest/KumaNotch/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6.svg)](#system-requirements)
+[![Platform](https://img.shields.io/badge/platform-Windows%2011%20(x64)-0078D6.svg)](#system-requirements)
 [![Offline](https://img.shields.io/badge/privacy-100%25%20offline-emerald.svg)](#-privasi--100-offline)
 
 <p align="center">
@@ -16,8 +16,8 @@
 ## 💻 Persyaratan Sistem
 <a id="system-requirements"></a>
 
-- **Sistem Operasi**: Windows 10 (versi 20H2 atau lebih baru) / Windows 11 (64-bit).
-- **Runtime**: Microsoft Edge WebView2 (sudah terpasang secara bawaan di Windows 11 dan pembaruan Windows 10).
+- **Sistem Operasi**: Windows 11 (64-bit, teruji penuh & direkomendasikan). *Catatan: Windows 10 belum diverifikasi secara resmi.*
+- **Runtime**: Microsoft Edge WebView2 (terpasang bawaan di Windows 11).
 - **Arsitektur**: x64 (AMD64 / Intel 64-bit).
 
 ---

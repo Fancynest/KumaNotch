@@ -1,10 +1,9 @@
 import { create } from 'zustand'
 
-export type DisplayState = 'capsule' | 'droplet'
+export type DisplayState = 'capsule'
 export type ExpandedActivity = 'home' | 'timer' | 'music' | 'settings' | 'freshFile' | null
 export type SystemMode = 'desktop' | 'app' | 'hidden'
 export type IslandView =
-  | 'droplet'
   | 'idle'
   | 'home'
   | 'expandedTimer'

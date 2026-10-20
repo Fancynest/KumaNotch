@@ -411,7 +411,7 @@ This document records architectural choices, deviations from the initial spec, a
      - Added `watch_process` Tauri command.
      - Added interactive Process Watcher section in `HomePager.tsx` with search filter, post-action selector, and one-click "Watch" button.
 
-## Decision 009: Fase 8b Spike — Fixed Window Stage with Win32 SetWindowRgn
+## Decision 026: Fase 8b Spike — Fixed Window Stage with Win32 SetWindowRgn
 - **Date**: 2026-10-20
 - **Context**: In Fase 8b of `KUMANOTCH_SPEC.md`, dynamic window resizing (`SetWindowPos` per state change) caused frame-time stutter (~24-32ms per frame), WebView2 swapchain reallocation jitter, and ghost clipping artifacts during collapse. A fixed window stage (~460×320 at $y = 0$) using Win32 `SetWindowRgn` (`CreateRectRgn`) was proposed to clip render and input dynamically without resizing the underlying OS window.
 - **Spike Findings & Verification**:
