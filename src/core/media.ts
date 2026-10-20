@@ -61,7 +61,7 @@ export class MediaEngine {
     // Steady background sync to catch external player state changes (Spotify, Chrome YouTube, etc.)
     setInterval(() => {
       this.poll()
-    }, 1000)
+    }, 200)
   }
 
   private handleStateUpdate(raw: RawMediaState) {

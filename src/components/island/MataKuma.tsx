@@ -231,29 +231,29 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   const idleSpontaneousEmotion = isBusy ? null : rawSpontaneousEmotion
 
   // 2. Derive base context emotion
-  // Precedence: Magnet Snap (Surprised) > Olivia > Process Running (Focus) > Device Connect > Timer Done > Fresh File > Timer Running (Thinking) > Hovered > Music > Sleepy > Spontaneous
+  // Precedence: Magnet Snap (Surprised) > Olivia > Music (Happy) > Process Running (Focus) > Device Connect > Timer Done > Fresh File > Timer Running (Thinking) > Hovered > Sleepy > Spontaneous
   const contextualEmotion = useMemo<KumaEmotion>(() => {
     if (isMagnetSnapped) return 'surprised'
     if (isOlivia) return 'happy'
+    if (isMusic) return 'happy'
     if (isProcessRunning) return 'focus'
     if (isDeviceConnected) return 'surprised'
     if (isTimerDone) return 'happy'
     if (isFresh) return 'curious'
     if (isTimerRunning) return 'thinking'
     if (isHovered) return 'happy'
-    if (isMusic) return 'happy'
     if (isDeepSleepy) return 'sleepy'
     return idleSpontaneousEmotion || 'neutral'
   }, [
     isMagnetSnapped,
     isOlivia,
+    isMusic,
     isProcessRunning,
     isDeviceConnected,
     isTimerDone,
     isFresh,
     isTimerRunning,
     isHovered,
-    isMusic,
     isDeepSleepy,
     idleSpontaneousEmotion,
   ])
@@ -566,10 +566,11 @@ export const MataKuma: React.FC<MataKumaProps> = ({
                 rotate: [-2, 2, -2, 2, -2],
                 scale: [1, 1.05, 1, 1.03, 1],
               }
-            : isMusic
+            : isMusic || currentEmotion === 'happy'
             ? {
-                y: [0, -2.0, 0],
-                rotate: [-1, 1, -1],
+                y: [0, -2.6, 0, -1.4, 0],
+                rotate: [-2, 2, -2, 2, -2],
+                scale: [1, 1.04, 1, 1.02, 1],
               }
             : isHappyMood
             ? {
@@ -581,8 +582,8 @@ export const MataKuma: React.FC<MataKumaProps> = ({
         transition={
           isOlivia
             ? { duration: 1.1, repeat: Infinity, ease: 'easeInOut' }
-            : isMusic
-            ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
+            : isMusic || currentEmotion === 'happy'
+            ? { duration: 1.15, repeat: Infinity, ease: 'easeInOut' }
             : isHappyMood
             ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }
             : { duration: 0.3 }

@@ -159,7 +159,7 @@ pub fn init_media(app_handle: AppHandle) {
 
         thread::spawn(move || {
             loop {
-                thread::sleep(std::time::Duration::from_millis(800));
+                thread::sleep(std::time::Duration::from_millis(150));
                 sync_session_listeners(
                     &sm_heartbeat,
                     &app_heartbeat,

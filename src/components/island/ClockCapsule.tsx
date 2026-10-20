@@ -60,6 +60,12 @@ const ClockCapsuleComponent: React.FC<ClockCapsuleProps> = ({
 
     const handleActivity = () => {
       idleSinceRef.current = Date.now()
+      clearTimeout(timerId)
+      setIsPersonalityIdle(false)
+      timerId = setTimeout(() => {
+        setIsPersonalityIdle(true)
+        idleSinceRef.current = Date.now()
+      }, idleDelayMs)
     }
 
     window.addEventListener('mousemove', handleActivity)
@@ -90,10 +96,12 @@ const ClockCapsuleComponent: React.FC<ClockCapsuleProps> = ({
   }, [isPersonalityIdle])
 
   // Show eyes strictly according to KUMANOTCH_SPEC.md Fase 8a:
-  // "Isi poni: jam kecil redup secara default. Mata Kuma tampil di dalam poni setelah idle lama."
+  // "Isi poni: jam kecil redup secara default. Mata Kuma tampil di dalam poni setelah idle lama, musik, atau timer."
   const showEyes =
     (isEligible && isPersonalityIdle) ||
     (isEligible && isFavArtist) ||
+    (isEligible && isMusicPlaying) ||
+    (isEligible && isTimerRunning) ||
     (isEligible && isMagnetSnapped) ||
     (isEligible && isHovered)
 
