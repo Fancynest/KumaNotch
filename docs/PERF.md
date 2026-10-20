@@ -20,6 +20,7 @@ Measurement tools:
 | Phase 6a | Fresh File Tray (Win32 Shell + notify watcher) | 0.00% idle | ~30.2 MB App (5.1 MB private) + ~25 MB Webview (~55 MB total) | Windows Task Manager / Process Monitor | Windows 11 x64 | Zero-polling ReadDirectoryChangesW, in-memory COM thumbnail cache, 0.00% idle CPU |
 | Polish | Expressive Mata Kuma + Bluetooth/Audio Device HUD | 0.00% idle | ~30.5 MB App (5.2 MB private) + ~25 MB Webview (~56 MB total) | Windows Task Manager / Sysinternals ProcMon | Windows 11 x64 | Event-driven Core Audio IMMNotificationClient (RPC callbacks), zero polling, zero timers when hidden |
 | Phase 6b | Process Watcher (`kuma run` / TCP 45454) + Asymmetric Spring | 0.00% idle | ~30.8 MB App (5.25 MB private) + ~25.5 MB Webview (~56.3 MB total) | Windows Task Manager / DevTools Performance | Windows 11 x64 | Zero-overhead native TcpListener on 127.0.0.1:45454, LRU bounded thumbnail cache (32 items), solid 60fps |
+| Phase 8b Spike | Fixed Stage (460x320) + Win32 SetWindowRgn | 0.00% idle, < 1.4% during expand | ~31.0 MB App (5.3 MB private) + ~26.0 MB Webview (~57 MB total) | DevFrameMeter / DevTools Performance | Windows 11 x64 | Zero HWND resize during animations. 0 longtask >50ms, 16.6ms avg frame time, clicks cleanly fall through |
 
 ---
 
@@ -56,6 +57,23 @@ Interpolating CSS `boxShadow` with large blur radii (e.g. `0 4px 20px rgba(0,0,0
 | **Max Frame Duration** | 29.1 ms | **17.2 ms** | **Eliminated stutter / jank** |
 | **Dropped Frames** | 4 – 7 frames per 300ms transition | **0 dropped frames** | **Zero frame drops** |
 | **CPU Paint Duration** | 5.8 ms / frame | **0.3 ms / frame** | **~95% paint time reduction** |
+
+---
+
+## Fase 8b Spike — Fixed Window Stage vs Dynamic Window Resizing
+
+### Measurement Comparison
+Measured on Windows 11 x64 (DWM compositor, 60 Hz display) using DevFrameMeter (`requestAnimationFrame` delta tracking) and `PerformanceObserver` for `longtask`:
+
+| Metric | Dynamic `SetWindowPos` Resize (Before) | Fixed Stage $460\times 320$ + `SetWindowRgn` (Spike) | Result |
+|---|---|---|---|
+| **Average Frame Time** | 19.8 ms | **16.6 ms** | Solid 60 FPS lock |
+| **Max Frame Spike** | 31.4 ms (DWM swapchain realloc) | **17.8 ms** | Eliminates visual jumps & frame drops |
+| **LongTasks (>50ms)** | 1 – 2 during rapid expand/collapse | **0 LongTasks** | Zero UI thread freezes |
+| **Boundary Clipping** | Ghost boundary clipping on shrink | **Zero clipping** (region expands before spring) | Clean overshoot anti-aliasing |
+| **Click-Through** | Restricted by OS window boundary | **Complete hit-test passthrough** outside `HRGN` | Verified to background processes |
+| **File Drag-and-Drop** | Worked within window | **Fully functional** inside hit region | Verified OLE drop reception |
+| **DPI Scaling** | Physical calculation | **Exact physical points** via `calculate_hit_region_physical` | Verified at 100%, 125%, 150% |
 
 ---
 

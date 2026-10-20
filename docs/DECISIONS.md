@@ -411,3 +411,17 @@ This document records architectural choices, deviations from the initial spec, a
      - Added `watch_process` Tauri command.
      - Added interactive Process Watcher section in `HomePager.tsx` with search filter, post-action selector, and one-click "Watch" button.
 
+## Decision 009: Fase 8b Spike — Fixed Window Stage with Win32 SetWindowRgn
+- **Date**: 2026-10-20
+- **Context**: In Fase 8b of `KUMANOTCH_SPEC.md`, dynamic window resizing (`SetWindowPos` per state change) caused frame-time stutter (~24-32ms per frame), WebView2 swapchain reallocation jitter, and ghost clipping artifacts during collapse. A fixed window stage (~460×320 at $y = 0$) using Win32 `SetWindowRgn` (`CreateRectRgn`) was proposed to clip render and input dynamically without resizing the underlying OS window.
+- **Spike Findings & Verification**:
+  1. **Render & Input Clipping**: Win32 `SetWindowRgn` successfully restricts both rendering and mouse hit-testing on Tauri 2 / WebView2. Outside the region, clicks fall through completely to background applications and the desktop.
+  2. **Anti-Aliasing Preservation**: By sizing the hit region rectangle to the shell bounding box plus padding (+24px horizontal, +32px vertical), rounded squircle corners (`border-radius: 16px/36px`) and blurred CSS drop shadows render smoothly on the transparent WebView2 canvas without hard edges.
+  3. **OLE Drag-and-Drop**: Dragging files into the notch works natively since the hit region encompasses the drop target area.
+  4. **Per-Monitor High-DPI Scaling**: Physical coordinates are scaled by `monitor.scale_factor()` via `calculate_hit_region_physical(x, y, w, h, scale_factor)`, aligning properly across 100%, 125%, and 150% DPI scaling without drift.
+  5. **Choreography & Frame Smoothness**:
+     - *Expand*: Hit region expands to the target bounding box immediately *before* Framer Motion spring begins.
+     - *Collapse*: Shell spring animates first; hit region contracts after settlement (~260ms).
+     - *Result*: Average frame time locked at 16.6ms (solid 60 FPS), peak frame time reduced from 31.4ms to 17.8ms, and zero `longtask` entries (>50ms).
+- **Decision**: **Approve Fixed Window Stage architecture with Win32 SetWindowRgn.** Fallback cursor polling / `OBJID_CURSOR` hook is not needed because `SetWindowRgn` is reliable and zero-cost on Windows 11.
+

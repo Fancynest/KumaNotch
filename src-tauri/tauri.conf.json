@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "KumaNotch",
-        "width": 130,
-        "height": 58,
+        "width": 460,
+        "height": 320,
         "visible": false,
         "decorations": false,
         "transparent": true,

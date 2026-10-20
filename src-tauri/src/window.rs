@@ -4,29 +4,20 @@ use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize};
 static CURRENT_OFFSET_X: AtomicI32 = AtomicI32::new(0);
 
 #[cfg(windows)]
-unsafe extern "system" {
-    fn SetWindowPos(
-        hwnd: isize,
-        hwnd_insert_after: isize,
-        x: i32,
-        y: i32,
-        cx: i32,
-        cy: i32,
-        flags: u32,
-    ) -> i32;
-}
-
-const SWP_NOZORDER: u32 = 0x0004;
-const SWP_NOACTIVATE: u32 = 0x0010;
+use windows::Win32::Foundation::HWND;
+#[cfg(windows)]
+use windows::Win32::Graphics::Gdi::{CreateRectRgn, SetWindowRgn};
+#[cfg(windows)]
+use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
 
 pub fn set_window_bounds(window: &tauri::WebviewWindow, x: i32, y: i32, width: u32, height: u32) {
     #[cfg(windows)]
     {
         if let Ok(hwnd) = window.hwnd() {
             unsafe {
-                SetWindowPos(
-                    hwnd.0 as isize,
-                    0,
+                let _ = SetWindowPos(
+                    HWND(hwnd.0 as _),
+                    None,
                     x,
                     y,
                     width as i32,
@@ -59,37 +50,64 @@ fn calculate_clamped_x(
     }
 }
 
+pub fn calculate_hit_region_physical(
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    scale_factor: f64,
+) -> (i32, i32, i32, i32) {
+    let phys_left = (x as f64 * scale_factor).round() as i32;
+    let phys_top = (y as f64 * scale_factor).round() as i32;
+    let phys_right = ((x + width) as f64 * scale_factor).round() as i32;
+    let phys_bottom = ((y + height) as f64 * scale_factor).round() as i32;
+    (phys_left, phys_top, phys_right, phys_bottom)
+}
+
 #[tauri::command]
-pub fn resize_island(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        let monitor = window
-            .current_monitor()
-            .ok()
-            .flatten()
-            .or_else(|| window.primary_monitor().ok().flatten())
-            .or_else(|| window.available_monitors().ok().and_then(|m| m.into_iter().next()));
+pub fn set_hit_region(
+    app: AppHandle,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        if let Some(window) = app.get_webview_window("main") {
+            if let Ok(hwnd) = window.hwnd() {
+                let scale_factor = window
+                    .current_monitor()
+                    .ok()
+                    .flatten()
+                    .map(|m| m.scale_factor())
+                    .unwrap_or(1.0);
 
-        if let Some(monitor) = monitor {
-            let scale_factor = monitor.scale_factor();
-            let monitor_size = monitor.size();
-            let monitor_pos = monitor.position();
+                unsafe {
+                    if width <= 0 || height <= 0 {
+                        // Passing None resets window region (unclipped)
+                        let _ = SetWindowRgn(HWND(hwnd.0 as _), None, true);
+                    } else {
+                        let (phys_left, phys_top, phys_right, phys_bottom) =
+                            calculate_hit_region_physical(x, y, width, height, scale_factor);
 
-            let target_width = (width * scale_factor).round() as u32;
-            let target_height = (height * scale_factor).round() as u32;
-
-            let offset_x = CURRENT_OFFSET_X.load(Ordering::Relaxed);
-            let x = calculate_clamped_x(
-                monitor_pos.x,
-                monitor_size.width,
-                target_width,
-                offset_x,
-                scale_factor,
-            );
-            let y = monitor_pos.y + (8.0 * scale_factor).round() as i32;
-
-            set_window_bounds(&window, x, y, target_width, target_height);
+                        let hrgn = CreateRectRgn(phys_left, phys_top, phys_right, phys_bottom);
+                        // Windows OS takes ownership of hrgn when passed to SetWindowRgn
+                        let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), true);
+                    }
+                }
+            }
         }
     }
+    Ok(())
+}
+
+pub const STAGE_WIDTH: f64 = 460.0;
+pub const STAGE_HEIGHT: f64 = 320.0;
+
+#[tauri::command]
+pub fn resize_island(_app: AppHandle, _width: f64, _height: f64) -> Result<(), String> {
+    // Fixed stage architecture (Fase 8b): window is not resized per transition
     Ok(())
 }
 
@@ -111,18 +129,19 @@ pub fn set_island_offset(app: AppHandle, offset_x: f64) -> Result<(), String> {
             let scaled_offset = (offset_x * scale_factor).round() as i32;
             CURRENT_OFFSET_X.store(scaled_offset, Ordering::Relaxed);
 
-            if let Ok(size) = window.inner_size() {
-                let x = calculate_clamped_x(
-                    monitor_pos.x,
-                    monitor_size.width,
-                    size.width,
-                    scaled_offset,
-                    scale_factor,
-                );
-                let y = monitor_pos.y + (8.0 * scale_factor).round() as i32;
+            let stage_phys_width = (STAGE_WIDTH * scale_factor).round() as u32;
+            let stage_phys_height = (STAGE_HEIGHT * scale_factor).round() as u32;
 
-                set_window_bounds(&window, x, y, size.width, size.height);
-            }
+            let x = calculate_clamped_x(
+                monitor_pos.x,
+                monitor_size.width,
+                stage_phys_width,
+                scaled_offset,
+                scale_factor,
+            );
+            let y = monitor_pos.y;
+
+            set_window_bounds(&window, x, y, stage_phys_width, stage_phys_height);
         }
     }
     Ok(())
@@ -186,24 +205,107 @@ pub fn setup_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             let monitor_size = monitor.size();
             let monitor_pos = monitor.position();
 
-            let initial_width = (130.0 * scale_factor).round() as u32;
-            let initial_height = (58.0 * scale_factor).round() as u32;
+            let stage_phys_width = (STAGE_WIDTH * scale_factor).round() as u32;
+            let stage_phys_height = (STAGE_HEIGHT * scale_factor).round() as u32;
             let offset_x = CURRENT_OFFSET_X.load(Ordering::Relaxed);
             let x = calculate_clamped_x(
                 monitor_pos.x,
                 monitor_size.width,
-                initial_width,
+                stage_phys_width,
                 offset_x,
                 scale_factor,
             );
-            let y = monitor_pos.y + (8.0 * scale_factor).round() as i32;
+            let y = monitor_pos.y;
 
-            set_window_bounds(&window, x, y, initial_width, initial_height);
+            set_window_bounds(&window, x, y, stage_phys_width, stage_phys_height);
+
+            // Initial hit region: centered idle capsule bbox (width ~136, height ~58)
+            let init_w = 136.0;
+            let init_h = 58.0;
+            let init_x = (STAGE_WIDTH - init_w) / 2.0;
+            let init_y = 0.0;
+
+            if let Ok(hwnd) = window.hwnd() {
+                #[cfg(windows)]
+                unsafe {
+                    let phys_left = (init_x * scale_factor).round() as i32;
+                    let phys_top = (init_y * scale_factor).round() as i32;
+                    let phys_right = ((init_x + init_w) * scale_factor).round() as i32;
+                    let phys_bottom = ((init_y + init_h) * scale_factor).round() as i32;
+
+                    let hrgn = CreateRectRgn(phys_left, phys_top, phys_right, phys_bottom);
+                    let _ = SetWindowRgn(HWND(hwnd.0 as _), Some(hrgn), true);
+                }
+            }
+
             let _ = window.show();
         } else {
             let _ = window.show();
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_hit_region_physical_100_percent() {
+        let (l, t, r, b) = calculate_hit_region_physical(162, 0, 136, 58, 1.0);
+        assert_eq!(l, 162);
+        assert_eq!(t, 0);
+        assert_eq!(r, 298);
+        assert_eq!(b, 58);
+    }
+
+    #[test]
+    fn test_calculate_hit_region_physical_125_percent() {
+        let (l, t, r, b) = calculate_hit_region_physical(162, 0, 136, 58, 1.25);
+        assert_eq!(l, 203);
+        assert_eq!(t, 0);
+        assert_eq!(r, 373);
+        assert_eq!(b, 73);
+    }
+
+    #[test]
+    fn test_calculate_hit_region_physical_150_percent() {
+        let (l, t, r, b) = calculate_hit_region_physical(162, 0, 136, 58, 1.5);
+        assert_eq!(l, 243);
+        assert_eq!(t, 0);
+        assert_eq!(r, 447);
+        assert_eq!(b, 87);
+    }
+
+    #[test]
+    fn test_calculate_clamped_x_bounds() {
+        // Monitor 1920x1080 at x=0, window width 460
+        let centered = calculate_clamped_x(0, 1920, 460, 0, 1.0);
+        assert_eq!(centered, (1920 - 460) / 2);
+
+        // Offsets
+        let right_offset = calculate_clamped_x(0, 1920, 460, 100, 1.0);
+        assert_eq!(right_offset, (1920 - 460) / 2 + 100);
+
+        // Clamp to right margin
+        let extreme_right = calculate_clamped_x(0, 1920, 460, 5000, 1.0);
+        assert_eq!(extreme_right, (1920 - 460) - 8);
+
+        // Clamp to left margin
+        let extreme_left = calculate_clamped_x(0, 1920, 460, -5000, 1.0);
+        assert_eq!(extreme_left, 8);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_win32_create_rect_rgn_validity() {
+        unsafe {
+            let hrgn = CreateRectRgn(0, 0, 200, 100);
+            assert!(!hrgn.is_invalid(), "CreateRectRgn must return a valid HRGN handle");
+            use windows::Win32::Graphics::Gdi::DeleteObject;
+            let res = DeleteObject(windows::Win32::Graphics::Gdi::HGDIOBJ(hrgn.0));
+            assert!(res.as_bool(), "HRGN must be deletable when not owned by window");
+        }
+    }
 }
 

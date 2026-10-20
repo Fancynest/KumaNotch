@@ -133,6 +133,24 @@ export const SHELL_CONFIGS: Record<string, ShellConfig> = {
   },
 }
 
+export async function setHitRegion(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Promise<void> {
+  try {
+    await invoke('set_hit_region', {
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.round(width),
+      height: Math.round(height),
+    })
+  } catch (err) {
+    console.debug('set_hit_region dev fallback:', err)
+  }
+}
+
 export async function resizeWindow(width: number, height: number): Promise<void> {
   try {
     await invoke('resize_island', { width, height })

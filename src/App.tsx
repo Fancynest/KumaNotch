@@ -4,12 +4,12 @@ import { UploadCloud, Sparkles, Pause } from 'lucide-react'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
+import { DevFrameMeter } from './ui/DevFrameMeter'
 import {
   WINDOW_SIZES,
   SHELL_CONFIGS,
-  resizeWindow,
+  setHitRegion,
   setIslandOffset,
-  type WindowSize,
 } from './core/windowSizing'
 import {
   globalTimerEngine,
@@ -354,9 +354,6 @@ export default function App() {
     hasFresh,
     Boolean(processAlert?.post_action),
   )
-  const currentWindowSizeRef = useRef<WindowSize>(dims.win)
-  const targetWinWidth = dims.win.width
-  const targetWinHeight = dims.win.height
 
   // Track growing vs shrinking for asymmetric spring physics
   // Melebar (stiffness 380, damping 26, mass 1) vs Menciut (stiffness 200, damping 28, mass 1)
@@ -388,15 +385,40 @@ export default function App() {
     }
   }, [processAlert?.id, deviceNotification?.id, timerData?.status, freshFile?.id])
 
+  // Window Stage Hit Region Choreography (Fase 8b Spike)
+  // Stage width = 460, height = 320 (pinned at y = 0)
+  const STAGE_WIDTH = 460
+  const STAGE_HEIGHT = 320
+  const hitRegionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
-    if (
-      currentWindowSizeRef.current.width !== targetWinWidth ||
-      currentWindowSizeRef.current.height !== targetWinHeight
-    ) {
-      currentWindowSizeRef.current = { width: targetWinWidth, height: targetWinHeight }
-      resizeWindow(targetWinWidth, targetWinHeight)
+    const shellW = dims.shell.width
+    const shellH = dims.shell.height
+    // Margin for rounded squircle antialiasing, CSS drop shadow & spring overshoot
+    const marginX = 24
+    const marginY = 32
+
+    const bboxW = Math.min(STAGE_WIDTH, shellW + marginX * 2)
+    const bboxH = Math.min(STAGE_HEIGHT, shellH + marginY)
+    const bboxX = (STAGE_WIDTH - bboxW) / 2
+    const bboxY = 0
+
+    if (hitRegionTimerRef.current) {
+      clearTimeout(hitRegionTimerRef.current)
+      hitRegionTimerRef.current = null
     }
-  }, [targetWinWidth, targetWinHeight])
+
+    if (isGrowing) {
+      // Melebar: expand hit region FIRST, then animate shell
+      setHitRegion(bboxX, bboxY, bboxW, bboxH)
+    } else {
+      // Menciut: animate shell FIRST, shrink hit region after spring settlement
+      hitRegionTimerRef.current = setTimeout(() => {
+        setHitRegion(bboxX, bboxY, bboxW, bboxH)
+        hitRegionTimerRef.current = null
+      }, 260)
+    }
+  }, [dims.shell.width, dims.shell.height, isGrowing])
 
   // Hover Dwell (2s) and Auto-Collapse handlers
   const hoverDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -406,6 +428,10 @@ export default function App() {
   // Cleanup timers on unmount to prevent orphan callbacks
   useEffect(() => {
     return () => {
+      if (hitRegionTimerRef.current) {
+        clearTimeout(hitRegionTimerRef.current)
+        hitRegionTimerRef.current = null
+      }
       if (hoverDwellTimerRef.current) {
         clearTimeout(hoverDwellTimerRef.current)
         hoverDwellTimerRef.current = null
@@ -1529,6 +1555,7 @@ export default function App() {
           </button>
         </div>
       )}
+      {import.meta.env.DEV && <DevFrameMeter />}
     </div>
   )
 }
