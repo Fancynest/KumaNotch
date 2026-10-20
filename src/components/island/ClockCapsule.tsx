@@ -16,9 +16,7 @@ interface ClockCapsuleProps {
   isMusicPlaying?: boolean
   isTimerRunning?: boolean
   isTimerCompleted?: boolean
-  freshFileDetected?: boolean
   deviceConnected?: boolean
-  isProcessRunning?: boolean
   isMagnetSnapped?: boolean
   mediaData?: MediaData | null
   isTransitioning?: boolean
@@ -34,9 +32,7 @@ const ClockCapsuleComponent: React.FC<ClockCapsuleProps> = ({
   isMusicPlaying,
   isTimerRunning,
   isTimerCompleted,
-  freshFileDetected,
   deviceConnected,
-  isProcessRunning,
   isMagnetSnapped,
   mediaData,
   isTransitioning,
@@ -128,9 +124,7 @@ const ClockCapsuleComponent: React.FC<ClockCapsuleProps> = ({
                 isMusicPlaying,
                 isTimerRunning,
                 isTimerCompleted,
-                freshFileDetected,
                 deviceConnected,
-                isProcessRunning,
                 isMagnetSnapped,
                 idleDurationMs,
                 isOliviaRodrigo: isFavArtist,

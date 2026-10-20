@@ -18,9 +18,7 @@ import { Shell } from './components/island/Shell'
 import { LeftBubble } from './components/island/LeftBubble'
 import { RightBubble } from './components/island/RightBubble'
 import { IslandContent } from './components/island/IslandContent'
-import { globalFreshFileEngine, type FreshFileInfo } from './core/freshFile'
 import { globalAudioDeviceEngine, type AudioDeviceNotification } from './core/audioDevice'
-import { globalProcessWatcherEngine, type ProcessEvent } from './core/processWatcher'
 import { useSystemClock } from './hooks/useSystemClock'
 import { useIslandDrag } from './hooks/useIslandDrag'
 import { useIslandEvents } from './hooks/useIslandEvents'
@@ -77,15 +75,7 @@ export default function App() {
     })
   }, [])
 
-  // 4. Fresh File Engine subscription (Fase 6a)
-  const [freshFile, setFreshFile] = useState<FreshFileInfo | null>(() => globalFreshFileEngine.getActiveFile())
-  useEffect(() => {
-    return globalFreshFileEngine.subscribe((active) => {
-      setFreshFile(active ? { ...active } : null)
-    })
-  }, [])
-
-  // 5. Audio & Bluetooth Device Engine subscription
+  // 4. Audio & Bluetooth Device Engine subscription
   const [deviceNotification, setDeviceNotification] = useState<AudioDeviceNotification | null>(
     () => globalAudioDeviceEngine.getActiveNotification(),
   )
@@ -95,51 +85,32 @@ export default function App() {
     })
   }, [])
 
-  // 6. Process Watcher Engine subscription (Fase 6b)
-  const [activeProcess, setActiveProcess] = useState<ProcessEvent | null>(() =>
-    globalProcessWatcherEngine.getActiveProcess(),
-  )
-  const [processAlert, setProcessAlert] = useState<ProcessEvent | null>(() =>
-    globalProcessWatcherEngine.getLatestAlert(),
-  )
-  useEffect(() => {
-    return globalProcessWatcherEngine.subscribe((state) => {
-      setActiveProcess(state.activeProcess ? { ...state.activeProcess } : null)
-      setProcessAlert(state.latestAlert ? { ...state.latestAlert } : null)
-    })
-  }, [])
-
-  // 7. System Clock hook
+  // 5. System Clock hook
   const { timeStr, dateStr } = useSystemClock(settings.timeFormat, settings.language)
 
-  // 8. Multi-activity & dynamic view calculation
+  // 6. Multi-activity & dynamic view calculation
   const isTimerActive = allTimers.some((t) => t.status === 'running' || t.status === 'paused')
   const isMediaActive = mediaData !== null && mediaData.isActive
-  const isFreshActive = freshFile !== null && settings.freshFileEnabled
   const isExpanded = expandedActivity !== null || timerData?.status === 'completed'
   const hasMusic = isMediaActive && !isExpanded && !isDragOver
   const hasTimer = isTimerActive && !isExpanded && !isDragOver
-  const hasFresh = isFreshActive && !isExpanded && !isDragOver
-  const hasLeftAux = hasMusic || (hasTimer && hasFresh)
-  const hasRightAux = hasTimer || (!hasMusic && hasFresh)
+  const hasLeftAux = hasMusic
+  const hasRightAux = hasTimer
 
   const currentView = getIslandView(
     expandedActivity,
     timerData,
     isDragOver,
     deviceNotification,
-    processAlert,
   )
   const dims = getDynamicDimensions(
     currentView,
     showCustomInput,
     hasMusic,
     hasTimer,
-    hasFresh,
-    Boolean(processAlert?.post_action),
   )
 
-  // 9. Asymmetric Spring Physics tracking (Melebar vs Menciut)
+  // 7. Asymmetric Spring Physics tracking (Melebar vs Menciut)
   const [prevShell, setPrevShell] = useState(dims.shell)
   const [isGrowing, setIsGrowing] = useState(false)
 
@@ -148,16 +119,14 @@ export default function App() {
     setPrevShell(dims.shell)
   }
 
-  // 10. Downward physical nudge (+4px) on new events
+  // 8. Downward physical nudge (+4px) on new events
   const [nudge, setNudge] = useState(false)
   const lastNudgeKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     const currentNudgeKey =
-      processAlert?.id ||
       deviceNotification?.id ||
       (timerData?.status === 'completed' ? 'timer-alert' : null) ||
-      freshFile?.id ||
       null
 
     if (currentNudgeKey && currentNudgeKey !== lastNudgeKeyRef.current) {
@@ -166,7 +135,7 @@ export default function App() {
       const timer = setTimeout(() => setNudge(false), 320)
       return () => clearTimeout(timer)
     }
-  }, [processAlert?.id, deviceNotification?.id, timerData?.status, freshFile?.id])
+  }, [deviceNotification?.id, timerData?.status])
 
   // 11. Window Stage Hit Region Choreography & Motion Polishing (Fase 8b & 8c)
   // Stage width = 460, height = 420 (pinned at y = 0)
@@ -253,7 +222,7 @@ export default function App() {
     }
   }, [])
 
-  const handleBubblePointerEnter = useCallback((type: 'timer' | 'music' | 'freshFile') => {
+  const handleBubblePointerEnter = useCallback((type: 'timer' | 'music') => {
     if (leaveCollapseTimerRef.current) {
       clearTimeout(leaveCollapseTimerRef.current)
       leaveCollapseTimerRef.current = null
@@ -289,9 +258,7 @@ export default function App() {
   const handleExpandedPointerLeave = useCallback(() => {
     if (
       openedViaHoverRef.current &&
-      (expandedActivity === 'timer' ||
-        expandedActivity === 'music' ||
-        expandedActivity === 'freshFile')
+      (expandedActivity === 'timer' || expandedActivity === 'music')
     ) {
       leaveCollapseTimerRef.current = setTimeout(() => {
         setExpandedActivity(null)
@@ -360,28 +327,20 @@ export default function App() {
         className="flex items-start justify-center z-40 gap-2.5 pt-0 relative"
         onPointerDown={handleBackdropPointerDown}
       >
-        {/* LEFT BUBBLE: MUSIC (PRIMARY) OR FRESH FILE (WHEN TIMER IS OCCUPYING RIGHT) */}
+        {/* LEFT BUBBLE: MUSIC (PRIMARY) */}
         <LeftBubble
           isExpanded={isExpanded}
           isDragOver={isDragOver}
           isMediaActive={isMediaActive}
-          isFreshActive={isFreshActive}
-          isTimerActive={isTimerActive}
           mediaData={mediaData}
-          freshFile={freshFile}
           hoveredTarget={hoveredTarget}
           musicTitle={t.music}
-          freshFileTitle={t.freshFile}
           clickToOpenTitle={t.clickToOpen}
           onBubblePointerEnter={handleBubblePointerEnter}
           onBubblePointerLeave={handleBubblePointerLeave}
           onOpenMedia={() => {
             openedViaHoverRef.current = false
             setExpandedActivity('music')
-          }}
-          onOpenFreshFile={() => {
-            openedViaHoverRef.current = false
-            setExpandedActivity('freshFile')
           }}
         />
 
@@ -419,15 +378,11 @@ export default function App() {
             isDragOver={isDragOver}
             showCustomInput={showCustomInput}
             setShowCustomInput={setShowCustomInput}
-            freshFile={freshFile}
             deviceNotification={deviceNotification}
-            processAlert={processAlert}
-            activeProcess={activeProcess}
             isMagnetSnapped={isMagnetSnapped}
             settings={settings}
             dropFilesHereText={t.dropFilesHere}
             isTimerActive={isTimerActive}
-            isFreshActive={isFreshActive}
             systemMode={systemMode}
             onClose={collapseAll}
             onOpenSettings={() => setExpandedActivity('settings')}
@@ -443,29 +398,22 @@ export default function App() {
           />
         </Shell>
 
-        {/* RIGHT BUBBLE: TIMER OR FRESH FILE */}
+        {/* RIGHT BUBBLE: TIMER */}
         <RightBubble
           isExpanded={isExpanded}
           isDragOver={isDragOver}
           isTimerActive={isTimerActive}
-          isFreshActive={isFreshActive}
           timerData={timerData}
           allTimers={allTimers}
           remainingSeconds={remainingSeconds}
-          freshFile={freshFile}
           hoveredTarget={hoveredTarget}
-          timerTitle="Timer"
-          freshFileTitle={t.freshFile}
+          timerTitle={t.timer}
           clickToOpenTitle={t.clickToOpen}
           onBubblePointerEnter={handleBubblePointerEnter}
           onBubblePointerLeave={handleBubblePointerLeave}
           onOpenTimer={() => {
             openedViaHoverRef.current = false
             setExpandedActivity('timer')
-          }}
-          onOpenFreshFile={() => {
-            openedViaHoverRef.current = false
-            setExpandedActivity('freshFile')
           }}
         />
 

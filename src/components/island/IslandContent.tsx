@@ -4,21 +4,16 @@ import { UploadCloud } from 'lucide-react'
 import type { IslandView, SystemMode } from '../../core/islandStore'
 import type { TimerData } from '../../core/timer'
 import type { MediaData } from '../../core/media'
-import type { FreshFileInfo } from '../../core/freshFile'
 import type { AudioDeviceNotification } from '../../core/audioDevice'
-import type { ProcessEvent } from '../../core/processWatcher'
 import type { AppSettings } from '../../core/settings'
 import { globalTimerEngine } from '../../core/timer'
 import { globalAudioDeviceEngine } from '../../core/audioDevice'
-import { globalProcessWatcherEngine } from '../../core/processWatcher'
 import { ClockCapsule } from './ClockCapsule'
 import { HomePager } from './HomePager'
 import { TimerCard } from './TimerCard'
 import { AlertCard } from './AlertCard'
-import { FreshFileCard } from './FreshFileCard'
 import { ExpandedMusic } from '../../features/media/ExpandedMusic'
 import { DeviceNotificationCard } from './DeviceNotificationCard'
-import { ProcessNotificationCard } from './ProcessNotificationCard'
 import { SettingsView } from '../../features/settings/SettingsView'
 import { useIslandStore } from '../../core/islandStore'
 
@@ -35,15 +30,11 @@ interface IslandContentProps {
   isDragOver: boolean
   showCustomInput: boolean
   setShowCustomInput: (show: boolean) => void
-  freshFile: FreshFileInfo | null
   deviceNotification: AudioDeviceNotification | null
-  processAlert: ProcessEvent | null
-  activeProcess: ProcessEvent | null
   isMagnetSnapped: boolean
   settings: AppSettings
   dropFilesHereText: string
   isTimerActive: boolean
-  isFreshActive: boolean
   systemMode: SystemMode
   onClose: () => void
   onOpenSettings: () => void
@@ -65,15 +56,11 @@ const IslandContentComponent: React.FC<IslandContentProps> = ({
   isDragOver,
   showCustomInput,
   setShowCustomInput,
-  freshFile,
   deviceNotification,
-  processAlert,
-  activeProcess,
   isMagnetSnapped,
   settings,
   dropFilesHereText,
   isTimerActive,
-  isFreshActive,
   systemMode,
   onClose,
   onOpenSettings,
@@ -131,10 +118,6 @@ const IslandContentComponent: React.FC<IslandContentProps> = ({
           />
         )}
 
-        {currentView === 'expandedFreshFile' && freshFile && (
-          <FreshFileCard file={freshFile} onClose={onClose} />
-        )}
-
         {currentView === 'expandedMusic' && (
           <div
             className="absolute inset-0 px-5 pt-3.5 pb-2.5 flex flex-col justify-between text-white cursor-default overflow-hidden"
@@ -156,13 +139,6 @@ const IslandContentComponent: React.FC<IslandContentProps> = ({
           />
         )}
 
-        {currentView === 'processAlert' && processAlert && (
-          <ProcessNotificationCard
-            event={processAlert}
-            onDismiss={() => globalProcessWatcherEngine.dismissAlert()}
-          />
-        )}
-
         {currentView === 'idle' && (
           <ClockCapsule
             timeStr={timeStr}
@@ -174,9 +150,7 @@ const IslandContentComponent: React.FC<IslandContentProps> = ({
             isMusicPlaying={mediaData?.playbackStatus === 'playing'}
             isTimerRunning={isTimerActive}
             isTimerCompleted={timerData?.status === 'completed'}
-            freshFileDetected={isFreshActive}
             deviceConnected={deviceNotification?.event_type === 'connected'}
-            isProcessRunning={activeProcess !== null}
             isMagnetSnapped={isMagnetSnapped}
             mediaData={mediaData}
             isTransitioning={isTransitioning}

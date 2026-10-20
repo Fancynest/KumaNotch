@@ -119,6 +119,11 @@ export const translations = {
     mouse: 'Mouse',
     phone: 'Smartphone',
     audioDevice: 'Audio',
+    timer: 'Timer',
+    addTimer: 'Tambah Timer',
+    deleteTimer: 'Hapus timer ini',
+    enabled: 'Aktif',
+    disabled: 'Nonaktif',
   },
   en: {
     quickTimer: 'Quick Timer',
@@ -229,6 +234,11 @@ export const translations = {
     mouse: 'Mouse',
     phone: 'Smartphone',
     audioDevice: 'Audio',
+    timer: 'Timer',
+    addTimer: 'Add Timer',
+    deleteTimer: 'Remove this timer',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
   },
 }
 

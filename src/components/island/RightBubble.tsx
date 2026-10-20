@@ -1,8 +1,7 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Pause } from 'lucide-react'
+import { Pause } from 'lucide-react'
 import type { TimerData } from '../../core/timer'
-import type { FreshFileInfo } from '../../core/freshFile'
 import { formatTimeDisplay } from '../../core/timer'
 
 function formatCompactRemaining(secs: number): string {
@@ -18,38 +17,30 @@ interface RightBubbleProps {
   isExpanded: boolean
   isDragOver: boolean
   isTimerActive: boolean
-  isFreshActive: boolean
   timerData: TimerData | null
   allTimers?: TimerData[]
   remainingSeconds: number
-  freshFile: FreshFileInfo | null
   hoveredTarget: string | null
   timerTitle: string
-  freshFileTitle: string
   clickToOpenTitle: string
-  onBubblePointerEnter: (type: 'timer' | 'music' | 'freshFile') => void
+  onBubblePointerEnter: (type: 'timer' | 'music') => void
   onBubblePointerLeave: () => void
   onOpenTimer: () => void
-  onOpenFreshFile: () => void
 }
 
 const RightBubbleComponent: React.FC<RightBubbleProps> = ({
   isExpanded,
   isDragOver,
   isTimerActive,
-  isFreshActive,
   timerData,
   allTimers,
   remainingSeconds,
-  freshFile,
   hoveredTarget,
   timerTitle,
-  freshFileTitle,
   clickToOpenTitle,
   onBubblePointerEnter,
   onBubblePointerLeave,
   onOpenTimer,
-  onOpenFreshFile,
 }) => {
   const activeCount = (allTimers || []).filter(
     (t) => t.status === 'running' || t.status === 'paused'
@@ -157,73 +148,6 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
               animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
               transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
               className="absolute inset-0 rounded-full border-2 border-amber-400 pointer-events-none"
-            />
-          )}
-        </motion.div>
-      ) : !isExpanded && !isDragOver && isFreshActive ? (
-        <motion.div
-          key="bubble-fresh-right"
-          initial={{
-            x: -38,
-            scaleX: 1.55,
-            scaleY: 0.6,
-            scale: 0.35,
-            opacity: 0,
-          }}
-          animate={{
-            x: 0,
-            scaleX: 1,
-            scaleY: 1,
-            scale: 1,
-            opacity: 1,
-          }}
-          exit={{
-            x: -38,
-            scaleX: 1.4,
-            scaleY: 0.6,
-            scale: 0.2,
-            opacity: 0,
-            transition: { duration: 0.22, ease: 'easeIn' },
-          }}
-          transition={{
-            type: 'spring',
-            stiffness: 320,
-            damping: 20,
-            mass: 0.75,
-          }}
-          whileHover={{ scale: 1.14 }}
-          whileTap={{ scale: 0.94 }}
-          onPointerEnter={() => onBubblePointerEnter('freshFile')}
-          onPointerLeave={onBubblePointerLeave}
-          onClick={(e) => {
-            e.stopPropagation()
-            onBubblePointerLeave()
-            onOpenFreshFile()
-          }}
-          style={{
-            width: 32,
-            height: 32,
-            transformOrigin: 'left center',
-          }}
-          className="relative rounded-full bg-black border border-sky-400/60 shadow-[0_2px_12px_rgba(56,189,248,0.35)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
-          title={`${freshFile?.name || freshFileTitle} • ${clickToOpenTitle}`}
-        >
-          {freshFile?.thumbnail ? (
-            <img
-              src={freshFile.thumbnail}
-              alt={freshFile.name}
-              className="w-full h-full object-cover rounded-full"
-            />
-          ) : (
-            <Sparkles className="w-4 h-4 text-sky-400 animate-pulse" />
-          )}
-
-          {hoveredTarget === 'freshFile' && (
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
-              transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute inset-0 rounded-full border-2 border-sky-400 pointer-events-none"
             />
           )}
         </motion.div>

@@ -1,13 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Settings, ChevronDown, Hourglass, Music2, Clock, Terminal, Search } from 'lucide-react'
+import { Settings, ChevronDown, Hourglass, Music2, Clock, Brain } from 'lucide-react'
 import { FileShelf } from '../../features/shelf/FileShelf'
 import { ExpandedMusic } from '../../features/media/ExpandedMusic'
 import { globalTimerEngine, formatTimeDisplay, calculateRemainingSeconds, type TimerData } from '../../core/timer'
 import type { MediaData } from '../../core/media'
 import { getT } from '../../core/i18n'
 import { globalSettingsEngine } from '../../core/settings'
-import { globalProcessWatcherEngine, type PostActionState } from '../../core/processWatcher'
 
 interface HomePagerProps {
   homePage: number
@@ -56,49 +55,6 @@ export const HomePager: React.FC<HomePagerProps> = ({
       customMinsInputRef.current.select()
     }
   }, [showCustomInput])
-
-  const [postActionState, setPostActionState] = useState<PostActionState | null>(() =>
-    globalProcessWatcherEngine.getPostAction()
-  )
-  const [showProcessWatch, setShowProcessWatch] = useState(false)
-  const [processList, setProcessList] = useState<Array<{ pid: number; name: string }>>([])
-  const [processSearch, setProcessSearch] = useState('')
-  const [selectedPostAction, setSelectedPostAction] = useState<string>('none')
-
-  useEffect(() => {
-    return globalProcessWatcherEngine.subscribe(({ postAction }) => {
-      setPostActionState(postAction)
-    })
-  }, [])
-
-  useEffect(() => {
-    if (showProcessWatch) {
-      if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-        import('@tauri-apps/api/core').then(({ invoke }) => {
-          invoke<Array<{ pid: number; name: string }>>('get_running_processes')
-            .then((list) => setProcessList(list))
-            .catch((err) => console.error('Failed to load processes:', err))
-        })
-      }
-    }
-  }, [showProcessWatch])
-
-  const handleWatchProcess = async (pid: number, name: string) => {
-    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-      try {
-        const { invoke } = await import('@tauri-apps/api/core')
-        await invoke('watch_process', {
-          pid,
-          name,
-          postAction: selectedPostAction === 'none' ? null : selectedPostAction,
-        })
-        setShowProcessWatch(false)
-        onClose()
-      } catch (err) {
-        console.error('Failed to watch process:', err)
-      }
-    }
-  }
 
   // Wheel and swipe gesture handling
   const lastWheelTime = useRef<number>(0)
@@ -259,18 +215,6 @@ export const HomePager: React.FC<HomePagerProps> = ({
 
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => setShowProcessWatch(!showProcessWatch)}
-                    className={`p-1 rounded-full transition-colors active:scale-95 ${
-                      showProcessWatch
-                        ? 'text-amber-300 bg-amber-500/20'
-                        : 'text-white/40 hover:text-white hover:bg-white/10'
-                    }`}
-                    title="Pantau Proses (Mode A)"
-                    aria-label="Pantau Proses"
-                  >
-                    <Terminal className="w-3.5 h-3.5" />
-                  </button>
-                  <button
                     onClick={onOpenSettings}
                     className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
                     title={t.settings}
@@ -289,106 +233,17 @@ export const HomePager: React.FC<HomePagerProps> = ({
                 </div>
               </div>
 
-              {/* Active Post-Action Countdown Banner (Cancels even if card was closed) */}
-              {postActionState && !postActionState.isCancelled && postActionState.countdown > 0 && (
-                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-cyan-500/15 border border-cyan-500/30 my-1">
-                  <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                    <Clock className="w-3.5 h-3.5 text-cyan-300 shrink-0 animate-pulse" />
-                    <span className="text-xs font-mono font-bold text-cyan-200 truncate">
-                      {postActionState.action.toUpperCase()} ({postActionState.countdown}s)
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      globalProcessWatcherEngine.cancelPostAction()
-                    }}
-                    className="px-2 py-0.5 rounded-lg bg-rose-500/25 hover:bg-rose-500/40 text-rose-200 hover:text-white text-[10px] font-bold border border-rose-500/40 transition-transform active:scale-95 shrink-0"
-                  >
-                    Batal
-                  </button>
-                </div>
-              )}
-
-              {showProcessWatch ? (
-                <div className="flex flex-col gap-1.5 pt-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <div className="relative flex-1">
-                      <Search className="w-3 h-3 absolute left-2 top-2 text-white/40" />
-                      <input
-                        type="text"
-                        value={processSearch}
-                        onChange={(e) => setProcessSearch(e.target.value)}
-                        placeholder="Cari PID atau nama..."
-                        className="w-full bg-white/10 border border-white/15 rounded-lg pl-7 pr-2 py-1 text-[11px] text-white placeholder-white/40 focus:outline-none focus:border-amber-400 font-mono"
-                        autoFocus
-                      />
-                    </div>
-                    <select
-                      value={selectedPostAction}
-                      onChange={(e) => setSelectedPostAction(e.target.value)}
-                      className="bg-white/10 border border-white/15 rounded-lg px-1.5 py-1 text-[10px] text-white font-medium focus:outline-none focus:border-amber-400"
-                    >
-                      <option value="none" className="bg-[#1a1a1a] text-white">Tanpa Aksi</option>
-                      <option value="sleep" className="bg-[#1a1a1a] text-white">Tidur (Sleep)</option>
-                      <option value="lock" className="bg-[#1a1a1a] text-white">Kunci (Lock)</option>
-                      <option value="shutdown" className="bg-[#1a1a1a] text-white">Matikan</option>
-                    </select>
-                  </div>
-
-                  <div className="overflow-y-auto max-h-[82px] space-y-1 custom-scrollbar pr-0.5">
-                    {processList
-                      .filter(
-                        (p) =>
-                          p.name.toLowerCase().includes(processSearch.toLowerCase()) ||
-                          p.pid.toString().includes(processSearch)
-                      )
-                      .slice(0, 35)
-                      .map((p) => (
-                        <div
-                          key={p.pid}
-                          className="flex items-center justify-between px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-colors"
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                            <span className="text-[11px] font-mono font-medium text-white/90 truncate max-w-[120px]">
-                              {p.name}
-                            </span>
-                            <span className="text-[9px] font-mono text-white/40">
-                              #{p.pid}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleWatchProcess(p.pid, p.name)}
-                            className="px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-black text-[9px] font-bold transition-transform active:scale-95 shrink-0"
-                          >
-                            Watch
-                          </button>
-                        </div>
-                      ))}
-                    {processList.length === 0 && (
-                      <div className="text-[10px] text-white/40 text-center py-3">
-                        Memuat proses...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div
-                    onClick={onClose}
-                    className="text-3xl font-bold tracking-tight text-white/95 mt-1 font-mono cursor-pointer hover:text-amber-300 transition-colors inline-block"
-                    title={t.clickToCollapse}
-                  >
-                    {timeStr}
-                  </div>
-                </>
-              )}
+              <div
+                onClick={onClose}
+                className="text-3xl font-bold tracking-tight text-white/95 mt-1 font-mono cursor-pointer hover:text-amber-300 transition-colors inline-block"
+                title={t.clickToCollapse}
+              >
+                {timeStr}
+              </div>
             </div>
 
             {/* Active Running Timer Banner if timer is ticking */}
-            {!showProcessWatch && isTimerActive && (
+            {isTimerActive && (
               activeTimersList.length > 1 ? (
                 <div className="flex flex-col gap-1 my-0.5 max-h-24 overflow-y-auto no-scrollbar">
                   {activeTimersList.map((item) => {
@@ -404,7 +259,11 @@ export const HomePager: React.FC<HomePagerProps> = ({
                         className="flex items-center justify-between px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <span className="text-[10px] shrink-0">{item.isPomodoro ? '🎯' : '⏱️'}</span>
+                          {item.isPomodoro ? (
+                            <Brain className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+                          ) : (
+                            <Clock className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+                          )}
                           <span className="text-[11px] font-semibold text-amber-200/90 truncate max-w-[85px]">
                             {item.label}
                           </span>
@@ -432,7 +291,7 @@ export const HomePager: React.FC<HomePagerProps> = ({
                               globalTimerEngine.reset(item.id)
                             }}
                             className="px-1.5 py-0.5 rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-300 text-[9px] font-medium transition-colors"
-                            title="Hapus"
+                            title={t.remove}
                           >
                             ✕
                           </button>
@@ -488,10 +347,8 @@ export const HomePager: React.FC<HomePagerProps> = ({
               )
             )}
 
-            {/* Active Media Banner & Quick Timer Presets (Hidden when watching process) */}
-            {!showProcessWatch && (
-              <>
-                {isMediaActive && mediaData && (
+            {/* Active Media Banner & Quick Timer Presets */}
+            {isMediaActive && mediaData && (
                   <div
                     onClick={(e) => {
                       e.stopPropagation()
@@ -525,7 +382,7 @@ export const HomePager: React.FC<HomePagerProps> = ({
                       }}
                       className="px-2.5 py-0.5 rounded-lg bg-[#1ed760] hover:bg-[#1ed760]/90 text-black text-[10px] font-bold transition-transform active:scale-95 shrink-0"
                     >
-                      {t.openFile}
+                      {t.openMusic}
                     </button>
                   </div>
                 )}
@@ -654,9 +511,7 @@ export const HomePager: React.FC<HomePagerProps> = ({
                     </form>
                   )}
                 </div>
-              </>
-            )}
-          </div>
+              </div>
 
           {/* Page 2: Dedicated File Shelf (Kanan) */}
           <div className="w-1/3 h-full px-5 pt-3.5 pb-1 flex flex-col justify-between shrink-0">

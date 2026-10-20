@@ -2,7 +2,6 @@ import { invoke } from '@tauri-apps/api/core'
 import type { IslandView, ExpandedActivity } from './islandStore'
 import type { TimerData } from './timer'
 import type { AudioDeviceNotification } from './audioDevice'
-import type { ProcessEvent } from './processWatcher'
 
 export interface WindowSize {
   width: number
@@ -177,15 +176,12 @@ export function getIslandView(
   timerData: TimerData | null,
   isDragOver: boolean,
   deviceNotification: AudioDeviceNotification | null,
-  processAlert: ProcessEvent | null,
 ): IslandView {
   if (timerData?.status === 'completed') return 'alert'
-  if (processAlert !== null) return 'processAlert'
   if (expandedActivity === 'settings') return 'settings'
   if (expandedActivity === 'music') return 'expandedMusic'
   if (expandedActivity === 'home') return 'home'
   if (expandedActivity === 'timer') return 'expandedTimer'
-  if (expandedActivity === 'freshFile') return 'expandedFreshFile'
   if (isDragOver) return 'dropTarget'
   if (deviceNotification !== null) return 'deviceNotification'
   return 'idle'
@@ -196,14 +192,12 @@ export function getDynamicDimensions(
   isCustom: boolean,
   musicActive: boolean,
   timerActive: boolean,
-  freshFileActive: boolean = false,
-  hasPostAction: boolean = false,
 ) {
-  const baseShell = { ...SHELL_CONFIGS[view] }
-  const baseWin = { ...WINDOW_SIZES[view] }
+  const baseShell = { ...(SHELL_CONFIGS[view] || SHELL_CONFIGS.idle) }
+  const baseWin = { ...(WINDOW_SIZES[view] || WINDOW_SIZES.idle) }
 
   if (view === 'idle') {
-    const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
+    const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0)
     if (auxCount >= 2) {
       baseWin.width = 200
     } else if (auxCount === 1) {
@@ -213,12 +207,9 @@ export function getDynamicDimensions(
     }
   }
 
-  if (view === 'deviceNotification' || view === 'processAlert') {
-    const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0) + (freshFileActive ? 1 : 0)
-    if (view === 'processAlert' && hasPostAction) {
-      baseShell.width = 340
-      baseWin.width = 370
-    } else if (auxCount >= 2) {
+  if (view === 'deviceNotification') {
+    const auxCount = (musicActive ? 1 : 0) + (timerActive ? 1 : 0)
+    if (auxCount >= 2) {
       baseWin.width = 380
     } else if (auxCount === 1) {
       baseWin.width = 340

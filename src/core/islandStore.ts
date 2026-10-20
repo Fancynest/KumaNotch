@@ -1,19 +1,17 @@
 import { create } from 'zustand'
 
 export type DisplayState = 'capsule'
-export type ExpandedActivity = 'home' | 'timer' | 'music' | 'settings' | 'freshFile' | null
+export type ExpandedActivity = 'home' | 'timer' | 'music' | 'settings' | null
 export type SystemMode = 'desktop' | 'app' | 'hidden'
 export type IslandView =
   | 'idle'
   | 'home'
   | 'expandedTimer'
   | 'expandedMusic'
-  | 'expandedFreshFile'
   | 'alert'
   | 'dropTarget'
   | 'settings'
   | 'deviceNotification'
-  | 'processAlert'
 
 interface IslandStoreState {
   displayState: DisplayState
@@ -21,7 +19,7 @@ interface IslandStoreState {
   homePage: number // 0 = Music, 1 = Clock/Timer, 2 = Shelf
   systemMode: SystemMode
   isDwelling: boolean
-  hoveredTarget: 'timer' | 'music' | 'freshFile' | 'process' | null
+  hoveredTarget: 'timer' | 'music' | null
   isDragOver: boolean
   showCustomInput: boolean
   isTransitioning: boolean
@@ -31,7 +29,7 @@ interface IslandStoreState {
   setHomePage: (page: number) => void
   setSystemMode: (mode: SystemMode) => void
   setIsDwelling: (dwelling: boolean) => void
-  setHoveredTarget: (target: 'timer' | 'music' | 'freshFile' | 'process' | null) => void
+  setHoveredTarget: (target: 'timer' | 'music' | null) => void
   setIsDragOver: (isDragOver: boolean) => void
   setShowCustomInput: (show: boolean) => void
   setIsTransitioning: (isTransitioning: boolean) => void

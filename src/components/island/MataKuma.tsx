@@ -211,35 +211,29 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   const isMusic = Boolean(context?.isMusicPlaying)
   const isTimerDone = Boolean(context?.isTimerCompleted)
   const isTimerRunning = Boolean(context?.isTimerRunning)
-  const isFresh = Boolean(context?.freshFileDetected)
   const isDeviceConnected = Boolean(context?.deviceConnected)
-  const isProcessRunning = Boolean(context?.isProcessRunning)
   const isMagnetSnapped = Boolean(context?.isMagnetSnapped)
   const isHovered = Boolean(context?.isHovered)
   const isDeepSleepy = Boolean(context?.idleDurationMs && context.idleDurationMs > 35000)
 
-  // Only run spontaneous mood cycles when idle (no active music/timer/device/process/magnet)
+  // Only run spontaneous mood cycles when idle (no active music/timer/device/magnet)
   const isBusy =
     isOlivia ||
     isMusic ||
     isTimerRunning ||
     isTimerDone ||
-    isFresh ||
     isDeviceConnected ||
-    isProcessRunning ||
     isMagnetSnapped
   const idleSpontaneousEmotion = isBusy ? null : rawSpontaneousEmotion
 
   // 2. Derive base context emotion
-  // Precedence: Magnet Snap (Surprised) > Olivia > Music (Happy) > Process Running (Focus) > Device Connect > Timer Done > Fresh File > Timer Running (Thinking) > Hovered > Sleepy > Spontaneous
+  // Precedence: Magnet Snap (Surprised) > Olivia > Music (Happy) > Device Connect > Timer Done > Timer Running (Thinking) > Hovered > Sleepy > Spontaneous
   const contextualEmotion = useMemo<KumaEmotion>(() => {
     if (isMagnetSnapped) return 'surprised'
     if (isOlivia) return 'happy'
     if (isMusic) return 'happy'
-    if (isProcessRunning) return 'focus'
     if (isDeviceConnected) return 'surprised'
     if (isTimerDone) return 'happy'
-    if (isFresh) return 'curious'
     if (isTimerRunning) return 'thinking'
     if (isHovered) return 'happy'
     if (isDeepSleepy) return 'sleepy'
@@ -248,10 +242,8 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     isMagnetSnapped,
     isOlivia,
     isMusic,
-    isProcessRunning,
     isDeviceConnected,
     isTimerDone,
-    isFresh,
     isTimerRunning,
     isHovered,
     isDeepSleepy,
@@ -536,26 +528,6 @@ export const MataKuma: React.FC<MataKumaProps> = ({
 
   return (
     <div className="relative flex items-center justify-center select-none py-1">
-      {/* Thinking Floating Thought Charm - positioned inside bounds */}
-      {currentEmotion === 'thinking' && !isOlivia && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.4 }}
-          animate={{
-            opacity: [0.7, 1, 0.7],
-            scale: [0.95, 1.15, 0.95],
-            y: [-1, -3, -1],
-          }}
-          transition={{
-            duration: 1.9,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-          className="absolute -top-1.5 right-1 flex items-center pointer-events-none"
-        >
-          <span className="text-amber-300 font-bold text-[9px] drop-shadow-[0_0_5px_rgba(252,211,77,0.8)]">💭</span>
-        </motion.div>
-      )}
-
       {/* Main Face Container with Vibrant Joyful Bobbing when Favorite Artist / Music is playing */}
       <motion.div
         key={`${currentEmotion}-${isOlivia}-${isMusic}`}
@@ -589,23 +561,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
             : { duration: 0.3 }
         }
         className="flex items-center justify-center gap-1.5 relative px-1"
-        title={isOlivia ? '💜 Favorite Artist Mode: Kuma senang banget!' : undefined}
       >
-        {/* Left Side Charm: Dancing Purple Heart for Olivia */}
-        {isOlivia && (
-          <motion.span
-            animate={{
-              y: [0, -2.5, 0],
-              scale: [0.95, 1.25, 0.95],
-              rotate: [-12, 12, -12],
-            }}
-            transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
-            className="text-[10px] text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.9)] pointer-events-none select-none shrink-0"
-          >
-            💜
-          </motion.span>
-        )}
-
         {/* Left Eye with Outer Cheek Blush */}
         <div className="relative shrink-0 flex items-center justify-center">
           {eyeConfig.blush && (
@@ -662,21 +618,6 @@ export const MataKuma: React.FC<MataKumaProps> = ({
             />
           )}
         </div>
-
-        {/* Right Side Charm: Subtle Dancing Note exclusively for Olivia Rodrigo celebration */}
-        {isOlivia ? (
-          <motion.span
-            animate={{
-              y: [-2.5, 1, -2.5],
-              scale: [1.0, 1.3, 1.0],
-              rotate: [12, -12, 12],
-            }}
-            transition={{ duration: 0.85, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }}
-            className="text-[11px] font-bold text-pink-300 drop-shadow-[0_0_8px_rgba(244,114,182,0.9)] pointer-events-none select-none shrink-0"
-          >
-            ♪
-          </motion.span>
-        ) : null}
       </motion.div>
     </div>
   )
