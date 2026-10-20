@@ -20,6 +20,7 @@ interface RightBubbleProps {
   isTimerActive: boolean
   isFreshActive: boolean
   timerData: TimerData | null
+  allTimers?: TimerData[]
   remainingSeconds: number
   freshFile: FreshFileInfo | null
   hoveredTarget: string | null
@@ -38,6 +39,7 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
   isTimerActive,
   isFreshActive,
   timerData,
+  allTimers,
   remainingSeconds,
   freshFile,
   hoveredTarget,
@@ -49,6 +51,10 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
   onOpenTimer,
   onOpenFreshFile,
 }) => {
+  const activeCount = (allTimers || []).filter(
+    (t) => t.status === 'running' || t.status === 'paused'
+  ).length
+
   const timerProgress =
     timerData && timerData.totalDurationSeconds > 0
       ? Math.min(1, Math.max(0, remainingSeconds / timerData.totalDurationSeconds))
@@ -133,6 +139,15 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
           ) : (
             <span className="text-[9px] font-mono font-bold text-amber-300 tracking-tighter relative z-10 leading-none">
               {formatCompactRemaining(remainingSeconds)}
+            </span>
+          )}
+
+          {activeCount > 1 && (
+            <span
+              className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-amber-400 text-black font-extrabold text-[7.5px] flex items-center justify-center pointer-events-none z-20 shadow-sm leading-none"
+              title={`${activeCount} timer berjalan`}
+            >
+              {activeCount}
             </span>
           )}
 

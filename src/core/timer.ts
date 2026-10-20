@@ -20,41 +20,9 @@ export interface TimerData {
   pomodoroCycle?: number // 1..4
 }
 
-const STORAGE_KEY = 'kumanotch_timer_state'
-
-export function loadPersistedTimer(): TimerData | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const data: TimerData = JSON.parse(raw)
-    const now = Date.now()
-
-    if (data.status === 'running') {
-      if (data.endsAt <= now) {
-        // Expired during system sleep or while app was closed
-        return {
-          ...data,
-          status: 'completed',
-        }
-      }
-    }
-    return data
-  } catch {
-    return null
-  }
-}
-
-export function savePersistedTimer(data: TimerData | null): void {
-  try {
-    if (!data || data.status === 'idle') {
-      localStorage.removeItem(STORAGE_KEY)
-    } else {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    }
-  } catch (err) {
-    console.debug('Failed to persist timer state:', err)
-  }
-}
+export const MAX_CONCURRENT_TIMERS = 3
+const STORAGE_KEY_MULTI = 'kumanotch_timers_state'
+const STORAGE_KEY_LEGACY = 'kumanotch_timer_state'
 
 export function calculateRemainingSeconds(data: TimerData | null): number {
   if (!data || data.status === 'idle') return 0
@@ -65,6 +33,69 @@ export function calculateRemainingSeconds(data: TimerData | null): number {
 
   const diffMs = data.endsAt - Date.now()
   return Math.max(0, Math.ceil(diffMs / 1000))
+}
+
+export function loadPersistedTimers(): TimerData[] {
+  try {
+    const rawMulti = localStorage.getItem(STORAGE_KEY_MULTI)
+    let list: TimerData[] = []
+    if (rawMulti) {
+      const parsed = JSON.parse(rawMulti)
+      if (Array.isArray(parsed)) {
+        list = parsed
+      }
+    } else {
+      const rawLegacy = localStorage.getItem(STORAGE_KEY_LEGACY)
+      if (rawLegacy) {
+        const item = JSON.parse(rawLegacy)
+        if (item && item.id) {
+          list = [item]
+        }
+      }
+    }
+
+    const now = Date.now()
+    return list
+      .filter((t) => t && t.id)
+      .slice(0, MAX_CONCURRENT_TIMERS)
+      .map((t) => {
+        if (t.status === 'running' && t.endsAt <= now) {
+          return { ...t, status: 'completed' as TimerStatus }
+        }
+        return t
+      })
+  } catch {
+    return []
+  }
+}
+
+export function savePersistedTimers(timers: TimerData[]): void {
+  try {
+    const valid = timers.filter((t) => t.status !== 'idle').slice(0, MAX_CONCURRENT_TIMERS)
+    if (valid.length === 0) {
+      localStorage.removeItem(STORAGE_KEY_MULTI)
+      localStorage.removeItem(STORAGE_KEY_LEGACY)
+    } else {
+      localStorage.setItem(STORAGE_KEY_MULTI, JSON.stringify(valid))
+      // Legacy backward compatibility
+      localStorage.setItem(STORAGE_KEY_LEGACY, JSON.stringify(valid[0]))
+    }
+  } catch (err) {
+    console.debug('Failed to persist timers:', err)
+  }
+}
+
+// Backward compat
+export function loadPersistedTimer(): TimerData | null {
+  const all = loadPersistedTimers()
+  return all.length > 0 ? all[0] : null
+}
+export function savePersistedTimer(data: TimerData | null): void {
+  if (!data) {
+    savePersistedTimers([])
+  } else {
+    savePersistedTimers([data])
+  }
 }
 
 export function formatTimeDisplay(secs: number): string {
@@ -78,47 +109,88 @@ export function formatTimeDisplay(secs: number): string {
   return `${m}:${s < 10 ? '0' : ''}${s}`
 }
 
+export type TimerListener = (
+  primary: TimerData | null,
+  remaining: number,
+  allTimers: TimerData[]
+) => void
+
 export class TimerEngine {
-  private data: TimerData | null = null
+  private timers: TimerData[] = []
   private intervalId: ReturnType<typeof setInterval> | null = null
-  private listeners: Set<(data: TimerData | null, remaining: number) => void> = new Set()
+  private listeners: Set<TimerListener> = new Set()
 
   constructor() {
-    const persisted = loadPersistedTimer()
-    if (persisted) {
-      this.data = persisted
-      if (this.data.status === 'running') {
-        this.startTick()
-      } else if (this.data.status === 'completed') {
-        this.triggerCompletionAlert()
-      }
+    this.timers = loadPersistedTimers()
+    if (this.timers.some((t) => t.status === 'running')) {
+      this.startTick()
+    }
+    const completed = this.timers.find((t) => t.status === 'completed')
+    if (completed) {
+      this.triggerCompletionAlert(completed)
     }
   }
 
-  public subscribe(listener: (data: TimerData | null, remaining: number) => void): () => void {
+  public subscribe(listener: TimerListener): () => void {
     this.listeners.add(listener)
-    listener(this.data, calculateRemainingSeconds(this.data))
+    const primary = this.getPrimaryTimer()
+    listener(primary, calculateRemainingSeconds(primary), [...this.timers])
     return () => {
       this.listeners.delete(listener)
     }
   }
 
+  public getTimers(): TimerData[] {
+    return [...this.timers]
+  }
+
+  public getPrimaryTimer(): TimerData | null {
+    if (this.timers.length === 0) return null
+
+    // 1. Any timer currently completed (alert ringing)
+    const completed = this.timers.find((t) => t.status === 'completed')
+    if (completed) return completed
+
+    // 2. Running timer with lowest remaining time
+    const running = this.timers.filter((t) => t.status === 'running')
+    if (running.length > 0) {
+      return running.reduce((min, cur) =>
+        calculateRemainingSeconds(cur) < calculateRemainingSeconds(min) ? cur : min
+      )
+    }
+
+    // 3. Paused timer with lowest remaining time
+    const paused = this.timers.filter((t) => t.status === 'paused')
+    if (paused.length > 0) {
+      return paused.reduce((min, cur) =>
+        calculateRemainingSeconds(cur) < calculateRemainingSeconds(min) ? cur : min
+      )
+    }
+
+    return this.timers[0]
+  }
+
   public getData(): TimerData | null {
-    return this.data
+    return this.getPrimaryTimer()
   }
 
-  public getRemainingSeconds(): number {
-    return calculateRemainingSeconds(this.data)
+  public getRemainingSeconds(id?: string): number {
+    if (id) {
+      const found = this.timers.find((t) => t.id === id)
+      return calculateRemainingSeconds(found || null)
+    }
+    return calculateRemainingSeconds(this.getPrimaryTimer())
   }
 
-  public startTimerSeconds(durationSeconds: number, label = 'Timer'): void {
+  public startTimerSeconds(durationSeconds: number, label = 'Timer'): string {
     stopAlarmLoop()
     const validSeconds = Math.max(1, Math.round(durationSeconds))
     const now = Date.now()
     const endsAt = now + validSeconds * 1000
 
-    this.data = {
-      id: 'timer-main',
+    const id = `timer-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    const newTimer: TimerData = {
+      id,
       label,
       totalDurationSeconds: validSeconds,
       startedAt: now,
@@ -127,17 +199,31 @@ export class TimerEngine {
       isPomodoro: false,
     }
 
-    savePersistedTimer(this.data)
+    // If max reached (3), replace any completed timer, or oldest timer
+    if (this.timers.length >= MAX_CONCURRENT_TIMERS) {
+      const completedIdx = this.timers.findIndex((t) => t.status === 'completed')
+      if (completedIdx >= 0) {
+        this.timers[completedIdx] = newTimer
+      } else {
+        // Replace oldest timer
+        this.timers[0] = newTimer
+      }
+    } else {
+      this.timers.push(newTimer)
+    }
+
+    savePersistedTimers(this.timers)
     this.syncActivityRegistry()
     this.startTick()
     this.notify()
+    return id
   }
 
-  public startTimer(durationMinutes: number, label = 'Timer'): void {
-    this.startTimerSeconds(durationMinutes * 60, label)
+  public startTimer(durationMinutes: number, label = 'Timer'): string {
+    return this.startTimerSeconds(durationMinutes * 60, label)
   }
 
-  public startPomodoro(phase: PomodoroPhase = 'focus', cycle = 1): void {
+  public startPomodoro(phase: PomodoroPhase = 'focus', cycle = 1): string {
     stopAlarmLoop()
     const minutes = phase === 'focus' ? 25 : phase === 'shortBreak' ? 5 : 15
     const durationSeconds = minutes * 60
@@ -152,8 +238,8 @@ export class TimerEngine {
           ? t.shortBreak
           : t.longBreak
 
-    this.data = {
-      id: 'timer-main',
+    const pomodoroTimer: TimerData = {
+      id: 'timer-pomodoro',
       label,
       totalDurationSeconds: durationSeconds,
       startedAt: now,
@@ -164,87 +250,117 @@ export class TimerEngine {
       pomodoroCycle: cycle,
     }
 
-    savePersistedTimer(this.data)
+    const existingIdx = this.timers.findIndex((t) => t.isPomodoro || t.id === 'timer-pomodoro')
+    if (existingIdx >= 0) {
+      this.timers[existingIdx] = pomodoroTimer
+    } else if (this.timers.length >= MAX_CONCURRENT_TIMERS) {
+      const completedIdx = this.timers.findIndex((t) => t.status === 'completed')
+      if (completedIdx >= 0) {
+        this.timers[completedIdx] = pomodoroTimer
+      } else {
+        this.timers[0] = pomodoroTimer
+      }
+    } else {
+      this.timers.push(pomodoroTimer)
+    }
+
+    savePersistedTimers(this.timers)
+    this.syncActivityRegistry()
+    this.startTick()
+    this.notify()
+    return 'timer-pomodoro'
+  }
+
+  public pause(id?: string): void {
+    const target = id ? this.timers.find((t) => t.id === id) : this.getPrimaryTimer()
+    if (!target || target.status !== 'running') return
+
+    const remaining = calculateRemainingSeconds(target)
+    target.status = 'paused'
+    target.pausedRemainingSeconds = remaining
+
+    savePersistedTimers(this.timers)
+    this.syncActivityRegistry()
+    this.notify()
+  }
+
+  public resume(id?: string): void {
+    const target = id ? this.timers.find((t) => t.id === id) : this.getPrimaryTimer()
+    if (!target || target.status !== 'paused') return
+
+    const remaining = target.pausedRemainingSeconds || 0
+    target.status = 'running'
+    target.endsAt = Date.now() + remaining * 1000
+    target.pausedRemainingSeconds = undefined
+
+    savePersistedTimers(this.timers)
     this.syncActivityRegistry()
     this.startTick()
     this.notify()
   }
 
-  public pause(): void {
-    if (!this.data || this.data.status !== 'running') return
-    const remaining = calculateRemainingSeconds(this.data)
-    this.stopTick()
-
-    this.data = {
-      ...this.data,
-      status: 'paused',
-      pausedRemainingSeconds: remaining,
-    }
-
-    savePersistedTimer(this.data)
-    this.syncActivityRegistry()
-    this.notify()
-  }
-
-  public resume(): void {
-    if (!this.data || this.data.status !== 'paused') return
-    const remaining = this.data.pausedRemainingSeconds || 0
-    const now = Date.now()
-
-    this.data = {
-      ...this.data,
-      status: 'running',
-      endsAt: now + remaining * 1000,
-      pausedRemainingSeconds: undefined,
-    }
-
-    savePersistedTimer(this.data)
-    this.syncActivityRegistry()
-    this.startTick()
-    this.notify()
-  }
-
-  public addOneMinute(): void {
-    if (!this.data || this.data.status === 'idle') {
+  public addOneMinute(id?: string): void {
+    const target = id ? this.timers.find((t) => t.id === id) : this.getPrimaryTimer()
+    if (!target || target.status === 'idle') {
       this.startTimer(1)
       return
     }
 
-    if (this.data.status === 'paused' && this.data.pausedRemainingSeconds !== undefined) {
-      this.data = {
-        ...this.data,
-        totalDurationSeconds: this.data.totalDurationSeconds + 60,
-        pausedRemainingSeconds: this.data.pausedRemainingSeconds + 60,
-      }
-    } else if (this.data.status === 'running') {
-      this.data = {
-        ...this.data,
-        totalDurationSeconds: this.data.totalDurationSeconds + 60,
-        endsAt: this.data.endsAt + 60 * 1000,
-      }
+    if (target.status === 'paused' && target.pausedRemainingSeconds !== undefined) {
+      target.totalDurationSeconds += 60
+      target.pausedRemainingSeconds += 60
+    } else if (target.status === 'running') {
+      target.totalDurationSeconds += 60
+      target.endsAt += 60 * 1000
     }
 
-    savePersistedTimer(this.data)
+    savePersistedTimers(this.timers)
     this.syncActivityRegistry()
     this.notify()
   }
 
-  public reset(): void {
-    stopAlarmLoop()
-    this.stopTick()
-    this.data = null
-    savePersistedTimer(null)
-    globalActivityRegistry.remove('timer')
-    globalActivityRegistry.remove('timer-alert')
+  public reset(id?: string): void {
+    if (id) {
+      this.timers = this.timers.filter((t) => t.id !== id)
+    } else {
+      this.timers = []
+    }
+
+    if (this.timers.length === 0 || !this.timers.some((t) => t.status === 'completed')) {
+      stopAlarmLoop()
+      globalActivityRegistry.remove('timer-alert')
+    }
+
+    if (!this.timers.some((t) => t.status === 'running')) {
+      this.stopTick()
+    }
+
+    savePersistedTimers(this.timers)
+    this.syncActivityRegistry()
     this.notify()
   }
 
-  public dismissAlert(): void {
-    stopAlarmLoop()
-    globalActivityRegistry.remove('timer-alert')
-    if (this.data && this.data.status === 'completed') {
-      this.reset()
+  public dismissAlert(id?: string): void {
+    if (id) {
+      this.timers = this.timers.filter((t) => t.id !== id)
+    } else {
+      // Dismiss the completed timer
+      const completedIdx = this.timers.findIndex((t) => t.status === 'completed')
+      if (completedIdx >= 0) {
+        this.timers.splice(completedIdx, 1)
+      }
     }
+
+    const anyCompletedRemaining = this.timers.some((t) => t.status === 'completed')
+    if (!anyCompletedRemaining) {
+      stopAlarmLoop()
+      globalActivityRegistry.remove('timer-alert')
+    }
+
+    savePersistedTimers(this.timers)
+    this.syncActivityRegistry()
+    this.notify()
+
     // Refresh media state repeatedly in case audio was paused/ducked during alarm chime
     ;[150, 400, 800, 1500].forEach((delay) => {
       setTimeout(() => {
@@ -256,23 +372,30 @@ export class TimerEngine {
   private startTick(): void {
     this.stopTick()
     this.intervalId = setInterval(() => {
-      if (!this.data || this.data.status !== 'running') {
+      let anyRunning = false
+      let changed = false
+
+      this.timers.forEach((timer) => {
+        if (timer.status === 'running') {
+          anyRunning = true
+          const remaining = calculateRemainingSeconds(timer)
+          if (remaining <= 0) {
+            timer.status = 'completed'
+            changed = true
+            this.triggerCompletionAlert(timer)
+          }
+        }
+      })
+
+      if (!anyRunning && !this.timers.some((t) => t.status === 'completed')) {
         this.stopTick()
-        return
       }
 
-      const remaining = calculateRemainingSeconds(this.data)
-      if (remaining <= 0) {
-        this.stopTick()
-        this.data = {
-          ...this.data,
-          status: 'completed',
-        }
-        savePersistedTimer(this.data)
-        this.triggerCompletionAlert()
-      } else {
-        this.notify()
+      if (changed) {
+        savePersistedTimers(this.timers)
       }
+
+      this.notify()
     }, 1000)
   }
 
@@ -283,21 +406,20 @@ export class TimerEngine {
     }
   }
 
-  private triggerCompletionAlert(): void {
-    // Start repeating alarm chime if enabled in settings
+  private triggerCompletionAlert(completedTimer: TimerData): void {
     const settings = globalSettingsEngine.getSettings()
     if (settings.timerChimeEnabled) {
       startAlarmLoop(2400, (settings.timerChimeVolume || 80) / 100)
     }
 
     const t = getT(settings.language)
-    // Register high-priority Alert activity (100)
-    // Persists with 10-minute safety limit if user walks away
     globalActivityRegistry.register({
       id: 'timer-alert',
       kind: 'alert',
       priority: ACTIVITY_PRIORITIES.alert,
-      title: this.data?.isPomodoro ? `${this.data.label} ${t.completedSuffix}` : t.timeUp,
+      title: completedTimer.isPomodoro
+        ? `${completedTimer.label} ${t.completedSuffix}`
+        : `${completedTimer.label}: ${t.timeUp}`,
       updatedAt: Date.now(),
       expiresAt: Date.now() + 600000,
     })
@@ -306,7 +428,14 @@ export class TimerEngine {
   }
 
   private syncActivityRegistry(): void {
-    if (!this.data || this.data.status === 'idle') {
+    const runningOrPaused = this.timers.filter((t) => t.status === 'running' || t.status === 'paused')
+    if (runningOrPaused.length === 0) {
+      globalActivityRegistry.remove('timer')
+      return
+    }
+
+    const primary = this.getPrimaryTimer()
+    if (!primary) {
       globalActivityRegistry.remove('timer')
       return
     }
@@ -315,21 +444,24 @@ export class TimerEngine {
       id: 'timer',
       kind: 'timer',
       priority: ACTIVITY_PRIORITIES.timer,
-      title: this.data.label,
+      title: primary.label,
       updatedAt: Date.now(),
       metadata: {
-        status: this.data.status,
-        remainingSeconds: calculateRemainingSeconds(this.data),
-        totalDurationSeconds: this.data.totalDurationSeconds,
-        isPomodoro: this.data.isPomodoro,
-        pomodoroPhase: this.data.pomodoroPhase,
+        status: primary.status,
+        remainingSeconds: calculateRemainingSeconds(primary),
+        totalDurationSeconds: primary.totalDurationSeconds,
+        isPomodoro: primary.isPomodoro,
+        pomodoroPhase: primary.pomodoroPhase,
+        activeTimerCount: runningOrPaused.length,
       },
     })
   }
 
   private notify(): void {
-    const remaining = calculateRemainingSeconds(this.data)
-    this.listeners.forEach((l) => l(this.data, remaining))
+    const primary = this.getPrimaryTimer()
+    const remaining = calculateRemainingSeconds(primary)
+    const timersCopy = [...this.timers]
+    this.listeners.forEach((l) => l(primary, remaining, timersCopy))
   }
 }
 

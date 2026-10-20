@@ -55,10 +55,12 @@ export default function App() {
   // 2. Timer Engine subscription
   const [timerData, setTimerData] = useState<TimerData | null>(() => globalTimerEngine.getData())
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() => globalTimerEngine.getRemainingSeconds())
+  const [allTimers, setAllTimers] = useState<TimerData[]>(() => globalTimerEngine.getTimers())
   useEffect(() => {
-    return globalTimerEngine.subscribe((data, remaining) => {
+    return globalTimerEngine.subscribe((data, remaining, timers) => {
       setTimerData(data ? { ...data } : null)
       setRemainingSeconds(remaining)
+      setAllTimers(timers ? timers.map((t) => ({ ...t })) : [])
       if (data?.status === 'completed') {
         useIslandStore.getState().setExpandedActivity(null)
       } else {
@@ -111,7 +113,7 @@ export default function App() {
   const { timeStr, dateStr } = useSystemClock(settings.timeFormat, settings.language)
 
   // 8. Multi-activity & dynamic view calculation
-  const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
+  const isTimerActive = allTimers.some((t) => t.status === 'running' || t.status === 'paused')
   const isMediaActive = mediaData !== null && mediaData.isActive
   const isFreshActive = freshFile !== null && settings.freshFileEnabled
   const isExpanded = expandedActivity !== null || timerData?.status === 'completed'
@@ -411,6 +413,7 @@ export default function App() {
             dateStr={dateStr}
             timeStr={timeStr}
             timerData={timerData}
+            allTimers={allTimers}
             remainingSeconds={remainingSeconds}
             mediaData={mediaData}
             isDragOver={isDragOver}
@@ -447,6 +450,7 @@ export default function App() {
           isTimerActive={isTimerActive}
           isFreshActive={isFreshActive}
           timerData={timerData}
+          allTimers={allTimers}
           remainingSeconds={remainingSeconds}
           freshFile={freshFile}
           hoveredTarget={hoveredTarget}

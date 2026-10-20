@@ -29,6 +29,7 @@ interface IslandContentProps {
   dateStr: string
   timeStr: string
   timerData: TimerData | null
+  allTimers?: TimerData[]
   remainingSeconds: number
   mediaData: MediaData | null
   isDragOver: boolean
@@ -58,6 +59,7 @@ const IslandContentComponent: React.FC<IslandContentProps> = ({
   dateStr,
   timeStr,
   timerData,
+  allTimers,
   remainingSeconds,
   mediaData,
   isDragOver,
@@ -98,6 +100,7 @@ const IslandContentComponent: React.FC<IslandContentProps> = ({
             dateStr={dateStr}
             timeStr={timeStr}
             timerData={timerData}
+            allTimers={allTimers}
             remainingSeconds={remainingSeconds}
             mediaData={mediaData}
             isDragOver={isDragOver}
@@ -112,6 +115,7 @@ const IslandContentComponent: React.FC<IslandContentProps> = ({
         {currentView === 'expandedTimer' && timerData && (
           <TimerCard
             timerData={timerData}
+            allTimers={allTimers}
             remainingSeconds={remainingSeconds}
             mediaData={mediaData}
             onClose={onClose}

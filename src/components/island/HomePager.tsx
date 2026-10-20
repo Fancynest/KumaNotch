@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Settings, ChevronDown, Hourglass, Music2, Clock, Terminal, Search } from 'lucide-react'
 import { FileShelf } from '../../features/shelf/FileShelf'
 import { ExpandedMusic } from '../../features/media/ExpandedMusic'
-import { globalTimerEngine, formatTimeDisplay, type TimerData } from '../../core/timer'
+import { globalTimerEngine, formatTimeDisplay, calculateRemainingSeconds, type TimerData } from '../../core/timer'
 import type { MediaData } from '../../core/media'
 import { getT } from '../../core/i18n'
 import { globalSettingsEngine } from '../../core/settings'
@@ -15,6 +15,7 @@ interface HomePagerProps {
   dateStr: string
   timeStr: string
   timerData: TimerData | null
+  allTimers?: TimerData[]
   remainingSeconds: number
   mediaData: MediaData | null
   isDragOver: boolean
@@ -31,6 +32,7 @@ export const HomePager: React.FC<HomePagerProps> = ({
   dateStr,
   timeStr,
   timerData,
+  allTimers = [],
   remainingSeconds,
   mediaData,
   isDragOver,
@@ -197,8 +199,11 @@ export const HomePager: React.FC<HomePagerProps> = ({
     }
   }
 
-  const isTimerActive = timerData !== null && (timerData.status === 'running' || timerData.status === 'paused')
-  const isTimerRunning = timerData?.status === 'running'
+  const activeTimersList = (allTimers.length > 0 ? allTimers : (timerData ? [timerData] : [])).filter(
+    (item) => item.status === 'running' || item.status === 'paused'
+  )
+  const isTimerActive = activeTimersList.length > 0
+  const isTimerRunning = activeTimersList.some((t) => t.status === 'running')
   const isMediaActive = mediaData !== null && mediaData.isActive
 
   return (
@@ -384,49 +389,103 @@ export const HomePager: React.FC<HomePagerProps> = ({
 
             {/* Active Running Timer Banner if timer is ticking */}
             {!showProcessWatch && isTimerActive && (
-              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 my-0.5">
-                <div className="flex items-center gap-2">
-                  <motion.div
-                    animate={isTimerRunning ? { rotate: [0, 0, 180, 180, 360] } : { rotate: 0 }}
-                    transition={{
-                      duration: 5.0,
-                      times: [0, 0.38, 0.5, 0.88, 1.0],
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                    className="text-amber-400"
-                  >
-                    <Hourglass className="w-3.5 h-3.5 fill-amber-400/20" />
-                  </motion.div>
-                  <span className="text-xs font-mono font-bold text-amber-300">
-                    {formatTimeDisplay(remainingSeconds)}
-                  </span>
+              activeTimersList.length > 1 ? (
+                <div className="flex flex-col gap-1 my-0.5 max-h-24 overflow-y-auto no-scrollbar">
+                  {activeTimersList.map((item) => {
+                    const rem = item.id === timerData?.id ? remainingSeconds : calculateRemainingSeconds(item)
+                    const isRunning = item.status === 'running'
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onOpenTimer()
+                        }}
+                        className="flex items-center justify-between px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className="text-[10px] shrink-0">{item.isPomodoro ? '🎯' : '⏱️'}</span>
+                          <span className="text-[11px] font-semibold text-amber-200/90 truncate max-w-[85px]">
+                            {item.label}
+                          </span>
+                          <span className="text-xs font-mono font-bold text-amber-300">
+                            {formatTimeDisplay(rem)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (isRunning) {
+                                globalTimerEngine.pause(item.id)
+                              } else {
+                                globalTimerEngine.resume(item.id)
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-white text-[9px] font-medium transition-colors"
+                          >
+                            {isRunning ? t.pause : t.resume}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              globalTimerEngine.reset(item.id)
+                            }}
+                            className="px-1.5 py-0.5 rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-300 text-[9px] font-medium transition-colors"
+                            title="Hapus"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (isTimerRunning) {
-                        globalTimerEngine.pause()
-                      } else {
-                        globalTimerEngine.resume()
-                      }
-                    }}
-                    className="px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-medium transition-colors"
-                  >
-                    {isTimerRunning ? t.pause : t.resume}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onOpenTimer()
-                    }}
-                    className="px-2.5 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-bold transition-transform active:scale-95"
-                  >
-                    {t.openTimer}
-                  </button>
+              ) : (
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 my-0.5">
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      animate={isTimerRunning ? { rotate: [0, 0, 180, 180, 360] } : { rotate: 0 }}
+                      transition={{
+                        duration: 5.0,
+                        times: [0, 0.38, 0.5, 0.88, 1.0],
+                        repeat: Infinity,
+                        ease: 'easeInOut',
+                      }}
+                      className="text-amber-400"
+                    >
+                      <Hourglass className="w-3.5 h-3.5 fill-amber-400/20" />
+                    </motion.div>
+                    <span className="text-xs font-mono font-bold text-amber-300">
+                      {formatTimeDisplay(remainingSeconds)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (isTimerRunning) {
+                          globalTimerEngine.pause()
+                        } else {
+                          globalTimerEngine.resume()
+                        }
+                      }}
+                      className="px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-medium transition-colors"
+                    >
+                      {isTimerRunning ? t.pause : t.resume}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpenTimer()
+                      }}
+                      className="px-2.5 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-bold transition-transform active:scale-95"
+                    >
+                      {t.openTimer}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )
             )}
 
             {/* Active Media Banner & Quick Timer Presets (Hidden when watching process) */}
