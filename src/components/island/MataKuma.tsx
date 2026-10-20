@@ -167,19 +167,14 @@ const BearNose: React.FC<BearNoseProps> = React.memo(({ opacity, isHappy }) => {
         <ellipse cx="4.6" cy="2.2" rx="0.9" ry="0.5" fill="#ffffff" />
 
         {isHappy ? (
-          /* Cheerful open kawaii smiling mouth with pink tongue */
-          <g>
-            <path
-              d="M 3.6 5.2 C 3.6 5.2, 3.6 8.4, 6 8.4 C 8.4 8.4, 8.4 5.2, 8.4 5.2 Z"
-              fill="#fb7185"
-              stroke="rgba(255, 255, 255, 0.9)"
-              strokeWidth="0.8"
-            />
-            <path
-              d="M 4.4 7.2 C 5.0 6.6, 7.0 6.6, 7.6 7.2 C 7.2 8.1, 4.8 8.1, 4.4 7.2 Z"
-              fill="#fda4af"
-            />
-          </g>
+          /* Subtle clean kawaii smiling bear snout (w) */
+          <path
+            d="M 3.8 6.0 Q 4.9 7.4 6 5.8 Q 7.1 7.4 8.2 6.0"
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.9)"
+            strokeWidth="0.9"
+            strokeLinecap="round"
+          />
         ) : (
           /* Vertical philtrum seam */
           <line
@@ -660,7 +655,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
           />
         )}
 
-        {/* Right Side Charm: Dancing Note for Olivia or generic Music */}
+        {/* Right Side Charm: Subtle Dancing Note exclusively for Olivia Rodrigo celebration */}
         {isOlivia ? (
           <motion.span
             animate={{
@@ -670,18 +665,6 @@ export const MataKuma: React.FC<MataKumaProps> = ({
             }}
             transition={{ duration: 0.85, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }}
             className="text-[11px] font-bold text-pink-300 drop-shadow-[0_0_8px_rgba(244,114,182,0.9)] pointer-events-none select-none shrink-0"
-          >
-            ♪
-          </motion.span>
-        ) : isMusic ? (
-          <motion.span
-            animate={{
-              y: [-2, 1, -2],
-              scale: [0.95, 1.2, 0.95],
-              rotate: [8, -8, 8],
-            }}
-            transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
-            className="text-[10px] text-[#1ed760] drop-shadow-[0_0_6px_rgba(30,215,96,0.8)] pointer-events-none select-none shrink-0"
           >
             ♪
           </motion.span>

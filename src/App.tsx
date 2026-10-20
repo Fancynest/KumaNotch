@@ -172,13 +172,19 @@ export default function App() {
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    const shellW = dims.shell.width
-    const shellH = dims.shell.height
-    const marginX = 24
+    // Total row width must include LeftBubble and RightBubble (plus symmetry balancer) when active
+    const leftWidth = hasLeftAux ? 44 : (hasRightAux ? 40 : 0)
+    const rightWidth = hasRightAux ? 44 : (hasLeftAux ? 40 : 0)
+    const totalContentW =
+      !isExpanded && !isDragOver
+        ? dims.shell.width + leftWidth + rightWidth
+        : dims.shell.width
+
+    const marginX = 28
     const marginY = 32
 
-    const bboxW = Math.min(STAGE_WIDTH, shellW + marginX * 2)
-    const bboxH = Math.min(STAGE_HEIGHT, shellH + marginY)
+    const bboxW = Math.min(STAGE_WIDTH, totalContentW + marginX * 2)
+    const bboxH = Math.min(STAGE_HEIGHT, dims.shell.height + marginY)
     const bboxX = (STAGE_WIDTH - bboxW) / 2
     const bboxY = 0
 
@@ -205,7 +211,16 @@ export default function App() {
         hitRegionTimerRef.current = null
       }, 260)
     }
-  }, [dims.shell.width, dims.shell.height, isGrowing, setIsTransitioning])
+  }, [
+    dims.shell.width,
+    dims.shell.height,
+    hasLeftAux,
+    hasRightAux,
+    isExpanded,
+    isDragOver,
+    isGrowing,
+    setIsTransitioning,
+  ])
 
   // 12. Hover Dwell (2s) and Auto-Collapse handlers
   const hoverDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)

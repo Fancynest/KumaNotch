@@ -89,23 +89,11 @@ const ClockCapsuleComponent: React.FC<ClockCapsuleProps> = ({
     return () => clearInterval(interval)
   }, [isPersonalityIdle])
 
-  // Show eyes if:
-  // 1. Idle threshold reached
-  // 2. OR Favorite Artist is playing (celebration mode!)
-  // 3. OR Timer is active (Kuma thinking/concentrating!)
-  // 4. OR Fresh file detected (Kuma curious side-glance!)
-  // 5. OR Device connected (Kuma surprised eyes!)
-  // 6. OR Process running (Kuma focus mode!)
-  // 7. OR Magnet snapped to center (Kuma surprised mode!)
-  // 8. OR user is hovering over the droplet/capsule
+  // Show eyes strictly according to KUMANOTCH_SPEC.md Fase 8a:
+  // "Isi poni: jam kecil redup secara default. Mata Kuma tampil di dalam poni setelah idle lama."
   const showEyes =
     (isEligible && isPersonalityIdle) ||
     (isEligible && isFavArtist) ||
-    (isEligible && isMusicPlaying) ||
-    (isEligible && isTimerRunning) ||
-    (isEligible && freshFileDetected) ||
-    (isEligible && deviceConnected) ||
-    (isEligible && isProcessRunning) ||
     (isEligible && isMagnetSnapped) ||
     (isEligible && isHovered)
 

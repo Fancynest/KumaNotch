@@ -226,9 +226,9 @@ pub fn setup_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 
             set_window_bounds(&window, x, y, stage_phys_width, stage_phys_height);
 
-            // Initial hit region: centered idle capsule bbox (width ~136, height ~58)
-            let init_w = 136.0;
-            let init_h = 58.0;
+            // Initial hit region: centered idle capsule bbox with bubble margin (width ~280, height ~60)
+            let init_w = 280.0;
+            let init_h = 60.0;
             let init_x = (STAGE_WIDTH - init_w) / 2.0;
             let init_y = 0.0;
 
