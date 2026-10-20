@@ -159,7 +159,7 @@ pub fn init_media(app_handle: AppHandle) {
 
         thread::spawn(move || {
             loop {
-                thread::sleep(std::time::Duration::from_millis(1500));
+                thread::sleep(std::time::Duration::from_millis(800));
                 sync_session_listeners(
                     &sm_heartbeat,
                     &app_heartbeat,
@@ -449,6 +449,7 @@ pub fn trigger_refresh() {
 
 #[tauri::command]
 pub fn media_get_state() -> MediaState {
+    trigger_refresh();
     if let Some(holder) = MEDIA_MANAGER.get() {
         if let Ok(lock) = holder.lock() {
             if let Some(ref mgr) = *lock {

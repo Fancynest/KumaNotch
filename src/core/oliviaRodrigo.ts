@@ -9,15 +9,20 @@ export function isFavoriteArtistMedia(
   media: MediaData | null | undefined,
   favoriteArtist?: string
 ): boolean {
-  if (!media || !media.isActive || media.playbackStatus !== 'playing') {
+  if (!media || !media.isActive) {
+    return false
+  }
+
+  const status = (media.playbackStatus || '').toLowerCase()
+  if (status !== 'playing') {
     return false
   }
 
   const rawTarget = (favoriteArtist || '').trim().toLowerCase()
   const targets = rawTarget
     ? rawTarget
-        .split(/[,;]/)
-        .map((s) => s.trim())
+        .split(/[,;\n|]/)
+        .map((s) => s.trim().toLowerCase())
         .filter((s) => s.length > 0)
     : []
 
@@ -30,7 +35,7 @@ export function isFavoriteArtistMedia(
   const title = (media.title || '').trim().toLowerCase()
   const album = (media.album || '').trim().toLowerCase()
 
-  return targets.some((t) => artist.includes(t) || title.includes(t) || album.includes(t))
+  return targets.some((t) => t.length > 0 && (artist.includes(t) || title.includes(t) || album.includes(t)))
 }
 
 /**

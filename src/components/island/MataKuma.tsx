@@ -571,6 +571,11 @@ export const MataKuma: React.FC<MataKumaProps> = ({
                 y: [0, -2.0, 0],
                 rotate: [-1, 1, -1],
               }
+            : isHappyMood
+            ? {
+                y: [0, -1.5, 0],
+                rotate: [-1, 1, -1],
+              }
             : { y: 0 }
         }
         transition={
@@ -578,6 +583,8 @@ export const MataKuma: React.FC<MataKumaProps> = ({
             ? { duration: 1.1, repeat: Infinity, ease: 'easeInOut' }
             : isMusic
             ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
+            : isHappyMood
+            ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }
             : { duration: 0.3 }
         }
         className="flex items-center justify-center gap-1.5 relative px-1"

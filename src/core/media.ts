@@ -57,6 +57,11 @@ export class MediaEngine {
     } catch (e) {
       console.debug('Failed to listen to media_state_changed:', e)
     }
+
+    // Steady background sync to catch external player state changes (Spotify, Chrome YouTube, etc.)
+    setInterval(() => {
+      this.poll()
+    }, 1000)
   }
 
   private handleStateUpdate(raw: RawMediaState) {
@@ -130,10 +135,17 @@ export class MediaEngine {
     } catch {}
   }
 
+  private triggerMultiPoll(): void {
+    const delays = [80, 250, 600, 1200]
+    delays.forEach((delay) => {
+      setTimeout(() => this.poll(), delay)
+    })
+  }
+
   public async play(): Promise<boolean> {
     try {
       const res = await invoke<boolean>('media_play')
-      setTimeout(() => this.poll(), 60)
+      this.triggerMultiPoll()
       return res
     } catch {
       return false
@@ -143,7 +155,7 @@ export class MediaEngine {
   public async pause(): Promise<boolean> {
     try {
       const res = await invoke<boolean>('media_pause')
-      setTimeout(() => this.poll(), 60)
+      this.triggerMultiPoll()
       return res
     } catch {
       return false
@@ -153,7 +165,7 @@ export class MediaEngine {
   public async togglePlayPause(): Promise<boolean> {
     try {
       const res = await invoke<boolean>('media_toggle_play_pause')
-      setTimeout(() => this.poll(), 60)
+      this.triggerMultiPoll()
       return res
     } catch {
       return false
@@ -163,7 +175,7 @@ export class MediaEngine {
   public async next(): Promise<boolean> {
     try {
       const res = await invoke<boolean>('media_next')
-      setTimeout(() => this.poll(), 100)
+      this.triggerMultiPoll()
       return res
     } catch {
       return false
@@ -173,7 +185,7 @@ export class MediaEngine {
   public async previous(): Promise<boolean> {
     try {
       const res = await invoke<boolean>('media_prev')
-      setTimeout(() => this.poll(), 100)
+      this.triggerMultiPoll()
       return res
     } catch {
       return false

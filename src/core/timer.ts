@@ -245,10 +245,12 @@ export class TimerEngine {
     if (this.data && this.data.status === 'completed') {
       this.reset()
     }
-    // Refresh media state in case audio was ducked or paused during alarm chime
-    setTimeout(() => {
-      globalMediaEngine.poll()
-    }, 150)
+    // Refresh media state repeatedly in case audio was paused/ducked during alarm chime
+    ;[150, 400, 800, 1500].forEach((delay) => {
+      setTimeout(() => {
+        globalMediaEngine.poll()
+      }, delay)
+    })
   }
 
   private startTick(): void {

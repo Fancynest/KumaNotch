@@ -102,7 +102,7 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
             height: 32,
             transformOrigin: 'left center',
           }}
-          className="relative rounded-full bg-black border border-amber-500/40 shadow-[0_2px_12px_rgba(245,158,11,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+          className="relative rounded-full bg-black border border-amber-500/50 flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
           title={`${timerData?.label || timerTitle}: ${formatTimeDisplay(remainingSeconds)} • ${clickToOpenTitle}`}
         >
           <svg className="w-6 h-6 -rotate-90 absolute" viewBox="0 0 24 24">

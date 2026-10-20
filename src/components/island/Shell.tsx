@@ -76,7 +76,11 @@ export const Shell: React.FC<ShellProps> = ({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       style={{
-        boxShadow: shellConfig.boxShadow,
+        borderBottomLeftRadius: shellConfig.borderRadius,
+        borderBottomRightRadius: shellConfig.borderRadius,
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+        overflow: 'hidden',
       }}
       className={`bg-transparent select-none relative shrink-0 z-40 ${
         isDragging
@@ -86,40 +90,14 @@ export const Shell: React.FC<ShellProps> = ({
           : 'cursor-default'
       }`}
     >
-      {/* Concave Shoulder Fillets only for attached idle notch, pure black blending into bezel */}
-      {currentView === 'idle' && (
-        <>
-          <div
-            className="absolute top-0 pointer-events-none z-30"
-            style={{
-              left: -10,
-              width: 10,
-              height: 10,
-              background:
-                'radial-gradient(circle at 0 100%, transparent 9.5px, #000 10px)',
-            }}
-          />
-          <div
-            className="absolute top-0 pointer-events-none z-30"
-            style={{
-              right: -10,
-              width: 10,
-              height: 10,
-              background:
-                'radial-gradient(circle at 100% 100%, transparent 9.5px, #000 10px)',
-            }}
-          />
-        </>
-      )}
-
       {/* Main Body with bottom corner squircle and borderless top edge */}
       <div
-        className={`w-full h-full bg-black border-x border-b border-t-0 overflow-hidden relative flex flex-col items-center justify-start ${
+        className={`w-full h-full bg-black overflow-hidden relative flex flex-col items-center justify-start ${
           currentView === 'alert'
-            ? 'border-amber-500/50'
+            ? 'border border-amber-500/50'
             : currentView === 'dropTarget'
-            ? 'border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-            : 'border-transparent'
+            ? 'border border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+            : 'border-0'
         }`}
         style={{
           borderBottomLeftRadius: shellConfig.borderRadius,

@@ -90,7 +90,7 @@ const LeftBubbleComponent: React.FC<LeftBubbleProps> = ({
             height: 32,
             transformOrigin: 'right center',
           }}
-          className="relative rounded-full bg-black border border-[#1ed760]/40 shadow-[0_2px_12px_rgba(30,215,96,0.25)] flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+          className="relative rounded-full bg-black border border-[#1ed760]/50 flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
           title={`${mediaData?.title || musicTitle} • ${clickToOpenTitle}`}
         >
           {mediaData?.thumbnailBase64 ? (
