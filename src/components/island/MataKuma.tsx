@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { motion, type Variants } from 'framer-motion'
+import { motion } from 'framer-motion'
 
 // ─── Emotion Types ────────────────────────────────────────────────
 export type KumaEmotion =
@@ -530,35 +530,36 @@ export const MataKuma: React.FC<MataKumaProps> = ({
 
   const isHappyMood = currentEmotion === 'happy' || currentEmotion === 'wink' || isDancing
 
-  const danceVariants: Variants = {
-    dancing: {
-      y: [0, -1.5, 0],
-      rotate: [-1.5, 1.5],
-      scale: [1, 1.02, 1],
-      transition: {
-        duration: 1.3,
-        repeat: Infinity,
-        repeatType: 'mirror',
-        ease: 'easeInOut',
-      },
-    },
-    still: {
-      y: 0,
-      rotate: 0,
-      scale: 1,
-      transition: {
-        duration: 0.25,
-        ease: 'easeOut',
-      },
-    },
-  }
-
   return (
     <div className="relative flex items-center justify-center select-none py-1">
       {/* Main Face Container: Dances when supported artist is playing, enters still calm pose when paused */}
       <motion.div
-        variants={danceVariants}
-        animate={isDancing ? 'dancing' : 'still'}
+        key={isDancing ? 'kuma-dancing' : 'kuma-still'}
+        animate={
+          isDancing
+            ? {
+                y: [0, -5.0, 1.0, -3.2, 0],
+                rotate: [-6, 6, -4, 4, -6],
+                scale: [1, 1.08, 0.96, 1.04, 1],
+              }
+            : {
+                y: 0,
+                rotate: 0,
+                scale: 1,
+              }
+        }
+        transition={
+          isDancing
+            ? {
+                duration: 0.92,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }
+            : {
+                duration: 0.25,
+                ease: 'easeOut',
+              }
+        }
         className="flex items-center justify-center gap-1.5 relative px-1 origin-center"
       >
         {/* Left Eye with Outer Cheek Blush */}
