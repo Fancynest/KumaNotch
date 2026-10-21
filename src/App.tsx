@@ -153,12 +153,12 @@ export default function App() {
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    // Total row width must include LeftBubble and RightBubble (plus symmetry balancer) when active
-    const leftWidth = hasLeftAux ? 44 : (hasRightAux ? 40 : 0)
-    const rightWidth = hasRightAux ? 44 : (hasLeftAux ? 40 : 0)
+    // Total row width must include LeftBubble and RightBubble when active
+    const hasAux = hasLeftAux || hasRightAux
+    const auxPadding = hasAux ? 84 : 0
     const totalContentW =
       !isExpanded && !isDragOver
-        ? dims.shell.width + leftWidth + rightWidth
+        ? dims.shell.width + auxPadding
         : dims.shell.width
 
     const marginX = 28
@@ -333,103 +333,100 @@ export default function App() {
     >
       {/* CENTERED CONTAINER FOR ATTACHED PONI (Y=0) AND MULTI-BUBBLE 3-TASK ISLAND */}
       <div
-        className="flex items-start justify-center z-40 gap-2.5 pt-0 relative"
+        className="relative flex items-start justify-center z-40 pt-0"
         onPointerDown={handleBackdropPointerDown}
       >
-        {/* LEFT BUBBLE: MUSIC (PRIMARY) */}
-        <LeftBubble
-          isExpanded={isExpanded}
-          isDragOver={isDragOver}
-          isMediaActive={isMusicIndicatorVisible}
-          mediaData={mediaData}
-          hoveredTarget={hoveredTarget}
-          musicTitle={t.music}
-          clickToOpenTitle={t.clickToOpen}
-          onBubblePointerEnter={handleBubblePointerEnter}
-          onBubblePointerLeave={handleBubblePointerLeave}
-          onOpenMedia={() => {
-            openedViaHoverRef.current = false
-            setExpandedActivity('music')
-          }}
-        />
+        {/* SHELL WRAPPER - Centered on screen, contains Shell and side-anchored auxiliary bubbles */}
+        <div className="relative flex items-start justify-center">
+          {/* LEFT BUBBLE: Anchored to the left of the Shell */}
+          <div className="absolute right-full top-0 mr-2.5 flex items-center justify-end pointer-events-auto">
+            <LeftBubble
+              isExpanded={isExpanded}
+              isDragOver={isDragOver}
+              isMediaActive={isMusicIndicatorVisible}
+              mediaData={mediaData}
+              hoveredTarget={hoveredTarget}
+              musicTitle={t.music}
+              clickToOpenTitle={t.clickToOpen}
+              onBubblePointerEnter={handleBubblePointerEnter}
+              onBubblePointerLeave={handleBubblePointerLeave}
+              onOpenMedia={() => {
+                openedViaHoverRef.current = false
+                setExpandedActivity('music')
+              }}
+            />
+          </div>
 
-        {/* SYMMETRY BALANCER: If only right aux is active, balance left side so capsule stays centered */}
-        {!isExpanded && !isDragOver && !hasLeftAux && hasRightAux && (
-          <div style={{ width: 28, height: 28 }} className="invisible shrink-0 pointer-events-none" />
-        )}
-
-        {/* SINGLE PERSISTENT SHELL (ATTACHED PONI AT Y=0) */}
-        <Shell
-          shellConfig={dims.shell}
-          currentView={currentView}
-          growing={isGrowing}
-          nudge={nudge}
-          isDragging={isDragging}
-          onClick={handleShellClick}
-          onDoubleClick={handleShellDoubleClick}
-          onPointerDown={handleShellPointerDown}
-          onPointerMove={handleShellPointerMove}
-          onPointerUp={handleShellPointerUp}
-          onPointerCancel={handleShellPointerCancel}
-          onMouseEnter={handleExpandedPointerEnter}
-          onMouseLeave={handleExpandedPointerLeave}
-        >
-          <IslandContent
+          {/* SINGLE PERSISTENT SHELL (ATTACHED PONI AT Y=0) */}
+          <Shell
+            shellConfig={dims.shell}
             currentView={currentView}
-            homePage={homePage}
-            setHomePage={setHomePage}
-            dateStr={dateStr}
-            timeStr={timeStr}
-            timerData={timerData}
-            allTimers={allTimers}
-            remainingSeconds={remainingSeconds}
-            mediaData={mediaData}
-            isDragOver={isDragOver}
-            showCustomInput={showCustomInput}
-            setShowCustomInput={setShowCustomInput}
-            deviceNotification={deviceNotification}
-            isMagnetSnapped={isMagnetSnapped}
-            settings={settings}
-            dropFilesHereText={t.dropFilesHere}
-            isTimerActive={isTimerActive}
-            systemMode={systemMode}
-            onClose={collapseAll}
-            onOpenSettings={() => setExpandedActivity('settings')}
-            onOpenTimer={() => setExpandedActivity('timer')}
-            onOpenMusic={() => {
-              setExpandedActivity('home')
-              setHomePage(0)
-            }}
-            onOpenFileShelf={() => {
-              setExpandedActivity('home')
-              setHomePage(2)
-            }}
-          />
-        </Shell>
+            growing={isGrowing}
+            nudge={nudge}
+            isDragging={isDragging}
+            onClick={handleShellClick}
+            onDoubleClick={handleShellDoubleClick}
+            onPointerDown={handleShellPointerDown}
+            onPointerMove={handleShellPointerMove}
+            onPointerUp={handleShellPointerUp}
+            onPointerCancel={handleShellPointerCancel}
+            onMouseEnter={handleExpandedPointerEnter}
+            onMouseLeave={handleExpandedPointerLeave}
+          >
+            <IslandContent
+              currentView={currentView}
+              homePage={homePage}
+              setHomePage={setHomePage}
+              dateStr={dateStr}
+              timeStr={timeStr}
+              timerData={timerData}
+              allTimers={allTimers}
+              remainingSeconds={remainingSeconds}
+              mediaData={mediaData}
+              isDragOver={isDragOver}
+              showCustomInput={showCustomInput}
+              setShowCustomInput={setShowCustomInput}
+              deviceNotification={deviceNotification}
+              isMagnetSnapped={isMagnetSnapped}
+              settings={settings}
+              dropFilesHereText={t.dropFilesHere}
+              isTimerActive={isTimerActive}
+              systemMode={systemMode}
+              onClose={collapseAll}
+              onOpenSettings={() => setExpandedActivity('settings')}
+              onOpenTimer={() => setExpandedActivity('timer')}
+              onOpenMusic={() => {
+                setExpandedActivity('home')
+                setHomePage(0)
+              }}
+              onOpenFileShelf={() => {
+                setExpandedActivity('home')
+                setHomePage(2)
+              }}
+            />
+          </Shell>
 
-        {/* RIGHT BUBBLE: TIMER */}
-        <RightBubble
-          isExpanded={isExpanded}
-          isDragOver={isDragOver}
-          isTimerActive={isTimerActive}
-          timerData={timerData}
-          allTimers={allTimers}
-          remainingSeconds={remainingSeconds}
-          hoveredTarget={hoveredTarget}
-          timerTitle={t.timer}
-          clickToOpenTitle={t.clickToOpen}
-          onBubblePointerEnter={handleBubblePointerEnter}
-          onBubblePointerLeave={handleBubblePointerLeave}
-          onOpenTimer={() => {
-            openedViaHoverRef.current = false
-            setExpandedActivity('timer')
-          }}
-        />
-
-        {/* SYMMETRY BALANCER: If only left aux is active, balance right side so capsule stays centered */}
-        {!isExpanded && !isDragOver && hasLeftAux && !hasRightAux && (
-          <div style={{ width: 28, height: 28 }} className="invisible shrink-0 pointer-events-none" />
-        )}
+          {/* RIGHT BUBBLE: Anchored to the right of the Shell */}
+          <div className="absolute left-full top-0 ml-2.5 flex items-center justify-start pointer-events-auto">
+            <RightBubble
+              isExpanded={isExpanded}
+              isDragOver={isDragOver}
+              isTimerActive={isTimerActive}
+              timerData={timerData}
+              allTimers={allTimers}
+              remainingSeconds={remainingSeconds}
+              hoveredTarget={hoveredTarget}
+              timerTitle={t.timer}
+              clickToOpenTitle={t.clickToOpen}
+              onBubblePointerEnter={handleBubblePointerEnter}
+              onBubblePointerLeave={handleBubblePointerLeave}
+              onOpenTimer={() => {
+                openedViaHoverRef.current = false
+                setExpandedActivity('timer')
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Dev Controls */}

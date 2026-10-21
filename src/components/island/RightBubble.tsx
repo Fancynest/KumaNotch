@@ -36,12 +36,7 @@ const D_CIRCLE =
 const D_RIGHT_MERGED =
   'M 16.00 0.50 C 21.54 0.50, 26.65 3.45, 29.42 8.25 C 32.19 13.05, 32.19 18.95, 29.42 23.75 C 26.65 28.55, 21.54 31.50, 16.00 31.50 C 6.00 22.50, -6.00 22.50, -14.00 29.00 C -16.00 22.00, -16.00 10.00, -14.00 3.00 C -6.00 9.50, 6.00 9.50, 16.00 0.50 Z'
 
-const liquidSpring = {
-  type: 'spring' as const,
-  stiffness: 250,
-  damping: 23,
-  mass: 0.85,
-}
+const liquidEase = [0.22, 1, 0.36, 1] as const
 
 const RightBubbleComponent: React.FC<RightBubbleProps> = ({
   isExpanded,
@@ -73,25 +68,22 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
         <motion.div
           key="bubble-timer"
           initial={{
-            x: -24,
-            scaleX: 1.08,
-            scaleY: 0.94,
+            scale: 0.88,
             opacity: 0,
           }}
           animate={{
-            x: 0,
-            scaleX: 1,
-            scaleY: 1,
+            scale: 1,
             opacity: 1,
           }}
           exit={{
-            x: -24,
-            scaleX: 1.06,
-            scaleY: 0.95,
+            scale: 0.88,
             opacity: 0,
-            transition: { duration: 0.28, ease: [0.32, 0, 0.67, 0] },
+            transition: { duration: 0.18, ease: 'easeOut' },
           }}
-          transition={liquidSpring}
+          transition={{
+            duration: 0.38,
+            ease: liquidEase,
+          }}
           whileHover={{ scale: 1.14 }}
           whileTap={{ scale: 0.94 }}
           onPointerEnter={() => onBubblePointerEnter('timer')}
@@ -118,7 +110,7 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
               initial={{ d: D_RIGHT_MERGED }}
               animate={{ d: D_CIRCLE }}
               exit={{ d: D_RIGHT_MERGED }}
-              transition={liquidSpring}
+              transition={{ duration: 0.38, ease: liquidEase }}
               fill="#000000"
             />
           </svg>
