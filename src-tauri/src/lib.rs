@@ -77,6 +77,8 @@ pub fn run() {
             media::media_stop,
             sound::play_system_sound,
             sound::stop_system_sound,
+            sound::start_audio_ducking,
+            sound::stop_audio_ducking,
             tray::autostart_is_enabled,
             tray::autostart_set,
             tray::tray_set_personality,

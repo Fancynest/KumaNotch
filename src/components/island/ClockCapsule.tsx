@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SystemMode } from '../../core/islandStore'
 import { MataKuma } from './MataKuma'
-import { isFavoriteArtistMedia } from '../../core/oliviaRodrigo'
+import { isSupportedArtist } from '../../core/oliviaRodrigo'
 import type { MediaData } from '../../core/media'
 
 interface ClockCapsuleProps {
@@ -42,7 +42,8 @@ const ClockCapsuleComponent: React.FC<ClockCapsuleProps> = ({
   const idleSinceRef = useRef<number | null>(null)
 
   const isEligible = isIdleView && personalityEnabled && systemMode !== 'hidden'
-  const isFavArtist = isFavoriteArtistMedia(mediaData, favoriteArtist)
+  const isSupported = isSupportedArtist(mediaData, favoriteArtist)
+  const isPlayingNow = (mediaData?.playbackStatus === 'playing') || Boolean(isMusicPlaying)
 
   // Trigger Mata Kuma eyes after inactivity delay when in idle mode
   useEffect(() => {
@@ -95,8 +96,8 @@ const ClockCapsuleComponent: React.FC<ClockCapsuleProps> = ({
   // "Isi poni: jam kecil redup secara default. Mata Kuma tampil di dalam poni setelah idle lama, musik, atau timer."
   const showEyes =
     (isEligible && isPersonalityIdle) ||
-    (isEligible && isFavArtist) ||
-    (isEligible && isMusicPlaying) ||
+    (isEligible && isSupported) ||
+    (isEligible && isPlayingNow) ||
     (isEligible && isTimerRunning) ||
     (isEligible && isMagnetSnapped) ||
     (isEligible && isHovered)
@@ -121,13 +122,13 @@ const ClockCapsuleComponent: React.FC<ClockCapsuleProps> = ({
             <MataKuma
               isVisible
               context={{
-                isMusicPlaying,
+                isMusicPlaying: isPlayingNow,
                 isTimerRunning,
                 isTimerCompleted,
                 deviceConnected,
                 isMagnetSnapped,
                 idleDurationMs,
-                isOliviaRodrigo: isFavArtist,
+                isOliviaRodrigo: isSupported,
                 isHovered,
                 isTransitioning,
               }}

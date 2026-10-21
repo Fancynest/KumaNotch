@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 
 // ─── Emotion Types ────────────────────────────────────────────────
 export type KumaEmotion =
@@ -216,6 +216,9 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   const isHovered = Boolean(context?.isHovered)
   const isDeepSleepy = Boolean(context?.idleDurationMs && context.idleDurationMs > 35000)
 
+  // Strictly define dancing: ONLY when a supported artist is actively playing!
+  const isDancing = isOlivia && isMusic
+
   // Only run spontaneous mood cycles when idle (no active music/timer/device/magnet)
   const isBusy =
     isOlivia ||
@@ -227,23 +230,24 @@ export const MataKuma: React.FC<MataKumaProps> = ({
   const idleSpontaneousEmotion = isBusy ? null : rawSpontaneousEmotion
 
   // 2. Derive base context emotion
-  // Precedence: Magnet Snap (Surprised) > Olivia > Music (Happy) > Device Connect > Timer Done > Timer Running (Thinking) > Hovered > Sleepy > Spontaneous
+  // Precedence: Magnet Snap (Surprised) > Timer Done > Dancing (Happy) > Supported Paused (Content) > Device Connect > Timer Running (Thinking) > Hovered > Sleepy > Spontaneous
   const contextualEmotion = useMemo<KumaEmotion>(() => {
     if (isMagnetSnapped) return 'surprised'
-    if (isOlivia) return 'happy'
-    if (isMusic) return 'happy'
-    if (isDeviceConnected) return 'surprised'
     if (isTimerDone) return 'happy'
+    if (isDancing) return 'happy'
+    if (isOlivia && !isMusic) return 'content'
+    if (isDeviceConnected) return 'surprised'
     if (isTimerRunning) return 'thinking'
     if (isHovered) return 'happy'
     if (isDeepSleepy) return 'sleepy'
     return idleSpontaneousEmotion || 'neutral'
   }, [
     isMagnetSnapped,
+    isTimerDone,
+    isDancing,
     isOlivia,
     isMusic,
     isDeviceConnected,
-    isTimerDone,
     isTimerRunning,
     isHovered,
     isDeepSleepy,
@@ -524,33 +528,38 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     ? '0 0 5px rgba(192, 132, 252, 0.7)'
     : '0 0 5px rgba(251, 113, 133, 0.5)'
 
-  const isHappyMood = currentEmotion === 'happy' || isOlivia || currentEmotion === 'wink'
-  const isGrooving = isOlivia || isMusic || currentEmotion === 'happy' || isHappyMood
+  const isHappyMood = currentEmotion === 'happy' || currentEmotion === 'wink' || isDancing
+
+  const danceVariants: Variants = {
+    dancing: {
+      y: [0, -1.5, 0],
+      rotate: [-1.5, 1.5],
+      scale: [1, 1.02, 1],
+      transition: {
+        duration: 1.3,
+        repeat: Infinity,
+        repeatType: 'mirror',
+        ease: 'easeInOut',
+      },
+    },
+    still: {
+      y: 0,
+      rotate: 0,
+      scale: 1,
+      transition: {
+        duration: 0.25,
+        ease: 'easeOut',
+      },
+    },
+  }
 
   return (
     <div className="relative flex items-center justify-center select-none py-1">
-      {/* Main Face Container with Subtle Joyful Bobbing when Music/Happy is active */}
+      {/* Main Face Container: Dances when supported artist is playing, enters still calm pose when paused */}
       <motion.div
-        animate={
-          isGrooving
-            ? {
-                y: [0, -1.5, 0],
-                rotate: [-1.5, 1.5],
-                scale: [1, 1.02, 1],
-              }
-            : { y: 0, rotate: 0, scale: 1 }
-        }
-        transition={
-          isGrooving
-            ? {
-                duration: 1.3,
-                repeat: Infinity,
-                repeatType: 'mirror',
-                ease: 'easeInOut',
-              }
-            : { duration: 0.25 }
-        }
-        className="flex items-center justify-center gap-1.5 relative px-1"
+        variants={danceVariants}
+        animate={isDancing ? 'dancing' : 'still'}
+        className="flex items-center justify-center gap-1.5 relative px-1 origin-center"
       >
         {/* Left Eye with Outer Cheek Blush */}
         <div className="relative shrink-0 flex items-center justify-center">

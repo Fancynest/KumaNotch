@@ -99,6 +99,31 @@ export async function stopNativeAlert(): Promise<boolean> {
 }
 
 /**
+ * Temporarily ducks active media sessions (Spotify, YouTube, video players)
+ * down to 20% so the timer chime rings loud and clear above any background audio.
+ */
+export async function startAudioDucking(duckFactor = 0.20): Promise<boolean> {
+  try {
+    return await invoke<boolean>('start_audio_ducking', { duckFactor })
+  } catch (err) {
+    console.debug('start_audio_ducking dev fallback:', err)
+    return false
+  }
+}
+
+/**
+ * Restores all ducked audio sessions back to their exact original volume levels.
+ */
+export async function stopAudioDucking(): Promise<boolean> {
+  try {
+    return await invoke<boolean>('stop_audio_ducking')
+  } catch (err) {
+    console.debug('stop_audio_ducking dev fallback:', err)
+    return false
+  }
+}
+
+/**
  * Starts repeating alarm sound until stopAlarmLoop() is called or autoStop timeout triggers (30-60s).
  * Default interval: 2.4s between strikes for continuous rhythmic alert.
  * Auto-stops automatically after 45s (clamped to 30-60s) to prevent infinite ringing.
@@ -112,6 +137,9 @@ export function startAlarmLoop(
 ): void {
   stopAlarmLoop()
   isNativeAlarmActive = useNativeSound
+
+  // Temporarily duck background audio sessions so timer chime is loud and distinct
+  startAudioDucking(0.20)
 
   if (useNativeSound) {
     playNativeAlert('alarm')
@@ -133,9 +161,13 @@ export function startAlarmLoop(
 }
 
 /**
- * Stops repeating alarm sound immediately, cancels auto-stop timeout, and fades active gain.
+ * Stops repeating alarm sound immediately, cancels auto-stop timeout, fades active gain,
+ * and restores all background media volume to its original level.
  */
 export function stopAlarmLoop(): void {
+  // Always restore ducked media volume back to normal immediately
+  stopAudioDucking()
+
   if (alarmAutoStopTimeoutId) {
     clearTimeout(alarmAutoStopTimeoutId)
     alarmAutoStopTimeoutId = null
@@ -161,4 +193,11 @@ export function stopAlarmLoop(): void {
 
 export function isAlarmPlaying(): boolean {
   return alarmIntervalId !== null
+}
+
+// Ensure audio ducking is always undone if the window unloads or reloads during an alarm
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    stopAudioDucking()
+  })
 }
