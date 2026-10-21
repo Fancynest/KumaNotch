@@ -28,6 +28,21 @@ interface RightBubbleProps {
   onOpenTimer: () => void
 }
 
+// 6-segment cubic Bezier path for a perfect 32x32 circle (R=15.5, center=(16, 16))
+const D_CIRCLE =
+  'M 16.00 0.50 C 21.54 0.50, 26.65 3.45, 29.42 8.25 C 32.19 13.05, 32.19 18.95, 29.42 23.75 C 26.65 28.55, 21.54 31.50, 16.00 31.50 C 10.46 31.50, 5.35 28.55, 2.58 23.75 C -0.19 18.95, -0.19 13.05, 2.58 8.25 C 5.35 3.45, 10.46 0.50, 16.00 0.50 Z'
+
+// 6-segment morph path: circle with an organic liquid neck stretching leftward into the Shell
+const D_RIGHT_MERGED =
+  'M 16.00 0.50 C 21.54 0.50, 26.65 3.45, 29.42 8.25 C 32.19 13.05, 32.19 18.95, 29.42 23.75 C 26.65 28.55, 21.54 31.50, 16.00 31.50 C 6.00 22.50, -6.00 22.50, -14.00 29.00 C -16.00 22.00, -16.00 10.00, -14.00 3.00 C -6.00 9.50, 6.00 9.50, 16.00 0.50 Z'
+
+const liquidSpring = {
+  type: 'spring' as const,
+  stiffness: 250,
+  damping: 23,
+  mass: 0.85,
+}
+
 const RightBubbleComponent: React.FC<RightBubbleProps> = ({
   isExpanded,
   isDragOver,
@@ -58,25 +73,25 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
         <motion.div
           key="bubble-timer"
           initial={{
-            scale: 0.35,
+            x: -24,
+            scaleX: 1.08,
+            scaleY: 0.94,
             opacity: 0,
-            clipPath: 'circle(0% at 50% 50%)',
           }}
           animate={{
-            scale: 1,
+            x: 0,
+            scaleX: 1,
+            scaleY: 1,
             opacity: 1,
-            clipPath: 'circle(100% at 50% 50%)',
           }}
           exit={{
-            scale: 0.3,
+            x: -24,
+            scaleX: 1.06,
+            scaleY: 0.95,
             opacity: 0,
-            clipPath: 'circle(0% at 50% 50%)',
-            transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] },
+            transition: { duration: 0.28, ease: [0.32, 0, 0.67, 0] },
           }}
-          transition={{
-            duration: 0.52,
-            ease: [0.16, 1, 0.3, 1],
-          }}
+          transition={liquidSpring}
           whileHover={{ scale: 1.14 }}
           whileTap={{ scale: 0.94 }}
           onPointerEnter={() => onBubblePointerEnter('timer')}
@@ -91,23 +106,39 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
             height: 32,
             transformOrigin: 'center center',
           }}
-          className="relative rounded-full bg-black border border-amber-500/50 flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
+          className="relative flex items-center justify-center cursor-pointer shrink-0"
           title={`${timerData?.label || timerTitle}: ${formatTimeDisplay(remainingSeconds)} • ${clickToOpenTitle}`}
         >
-          {/* Gentle water-parting liquid ripple expanding outward from center on reveal */}
+          {/* 1. True SVG Path Liquid Morphing Background (separates from & merges into Shell) */}
+          <svg
+            viewBox="-22 0 54 32"
+            className="absolute top-0 -left-[22px] w-[54px] h-[32px] overflow-visible pointer-events-none z-0"
+          >
+            <motion.path
+              initial={{ d: D_RIGHT_MERGED }}
+              animate={{ d: D_CIRCLE }}
+              exit={{ d: D_RIGHT_MERGED }}
+              transition={liquidSpring}
+              fill="#000000"
+            />
+          </svg>
+
+          {/* 2. Delicate circular outline border (reveals fluidly as the circle finishes forming) */}
           <motion.div
-            initial={{ scale: 0.15, opacity: 0.85 }}
-            animate={{ scale: 1.45, opacity: 0 }}
-            transition={{ duration: 0.58, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-0 rounded-full border border-amber-400/60 pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, delay: 0.12 }}
+            className="absolute inset-0 rounded-full border border-amber-500/50 pointer-events-none z-10"
           />
 
-          {/* Inner content revealed fluidly from center */}
+          {/* 3. Inner countdown ring and timer display */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.88 }}
+            initial={{ opacity: 0, scale: 0.82 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.42, delay: 0.05, ease: 'easeOut' }}
-            className="w-full h-full flex items-center justify-center overflow-hidden rounded-full relative"
+            exit={{ opacity: 0, scale: 0.82 }}
+            transition={{ duration: 0.32, delay: 0.08, ease: 'easeOut' }}
+            className="w-full h-full flex items-center justify-center overflow-hidden rounded-full relative z-20"
           >
             <svg className="w-6 h-6 -rotate-90 absolute" viewBox="0 0 24 24">
               <circle
@@ -141,21 +172,23 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
             )}
           </motion.div>
 
+          {/* 4. Active timer count badge */}
           {activeCount > 1 && (
             <span
-              className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-amber-400 text-black font-extrabold text-[7.5px] flex items-center justify-center pointer-events-none z-20 shadow-sm leading-none"
+              className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-amber-400 text-black font-extrabold text-[7.5px] flex items-center justify-center pointer-events-none z-30 shadow-sm leading-none"
               title={`${activeCount} timer berjalan`}
             >
               {activeCount}
             </span>
           )}
 
+          {/* 5. Hover glowing aura */}
           {hoveredTarget === 'timer' && (
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1.25, opacity: [0.4, 0.9, 0.4] }}
               transition={{ duration: 1.0, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute inset-0 rounded-full border-2 border-amber-400 pointer-events-none"
+              className="absolute inset-0 rounded-full border-2 border-amber-400 pointer-events-none z-40"
             />
           )}
         </motion.div>
