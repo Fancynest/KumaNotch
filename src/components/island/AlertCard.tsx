@@ -23,7 +23,7 @@ export const AlertCard: React.FC<AlertCardProps> = ({ timerData, onDismiss }) =>
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center animate-bounce shrink-0">
+          <div className="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-400/30 flex items-center justify-center shrink-0">
             <Bell className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div>

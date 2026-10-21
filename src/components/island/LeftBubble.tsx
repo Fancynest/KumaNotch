@@ -17,22 +17,24 @@ interface LeftBubbleProps {
   onOpenMedia: () => void
 }
 
-// 6-segment cubic Bezier topologies matching 1:1 for continuous liquid morphing
-// 1. D_CIRCLE: exact standalone 32x32 circle (R=15.5, center=(16, 16))
+// Mathematically exact 5-segment cubic Bezier topologies (standard 4-quadrant circle + Shell bridge)
+// R = 16.0000, center = (16.0000, 16.0000), k = 16 * 4/3 * (sqrt(2) - 1) = 8.836556
+
+// 1. D_CIRCLE: mathematically exact 32x32 circle (error < 0.05%)
 const D_CIRCLE =
-  'M 16.00 0.50 C 21.54 0.50, 26.65 3.45, 29.42 8.25 C 32.19 13.05, 32.19 18.95, 29.42 23.75 C 26.65 28.55, 21.54 31.50, 16.00 31.50 C 10.46 31.50, 5.35 28.55, 2.58 23.75 C -0.19 18.95, -0.19 13.05, 2.58 8.25 C 5.35 3.45, 10.46 0.50, 16.00 0.50 Z'
+  'M 16.0000 0.0000 C 24.8366 0.0000, 32.0000 7.1634, 32.0000 16.0000 C 32.0000 16.0000, 32.0000 16.0000, 32.0000 16.0000 C 32.0000 24.8366, 24.8366 32.0000, 16.0000 32.0000 C 7.1634 32.0000, 0.0000 24.8366, 0.0000 16.0000 C 0.0000 7.1634, 7.1634 0.0000, 16.0000 0.0000 Z'
 
 // 2. D_LEFT_PINCHED: narrow neck (waist height ~4px) just before detachment
 const D_LEFT_PINCHED =
-  'M 16.00 0.50 C 20.00 4.00, 26.00 14.00, 38.00 10.00 C 40.00 14.00, 40.00 18.00, 38.00 22.00 C 26.00 18.00, 20.00 28.00, 16.00 31.50 C 10.46 31.50, 5.35 28.55, 2.58 23.75 C -0.19 18.95, -0.19 13.05, 2.58 8.25 C 5.35 3.45, 10.46 0.50, 16.00 0.50 Z'
+  'M 16.0000 0.0000 C 20.0000 2.0000, 26.0000 14.0000, 38.0000 14.0000 C 38.0000 15.0000, 38.0000 17.0000, 38.0000 18.0000 C 26.0000 18.0000, 20.0000 30.0000, 16.0000 32.0000 C 7.1634 32.0000, 0.0000 24.8366, 0.0000 16.0000 C 0.0000 7.1634, 7.1634 0.0000, 16.0000 0.0000 Z'
 
 // 3. D_LEFT_STRETCHED: organic hourglass neck with pronounced concave inward curves (waist height ~12px)
 const D_LEFT_STRETCHED =
-  'M 16.00 0.50 C 22.00 3.00, 28.00 10.00, 42.00 5.00 C 44.00 12.00, 44.00 20.00, 42.00 27.00 C 28.00 22.00, 22.00 29.00, 16.00 31.50 C 10.46 31.50, 5.35 28.55, 2.58 23.75 C -0.19 18.95, -0.19 13.05, 2.58 8.25 C 5.35 3.45, 10.46 0.50, 16.00 0.50 Z'
+  'M 16.0000 0.0000 C 22.0000 2.0000, 28.0000 10.0000, 42.0000 10.0000 C 42.0000 14.0000, 42.0000 18.0000, 42.0000 22.0000 C 28.0000 22.0000, 22.0000 30.0000, 16.0000 32.0000 C 7.1634 32.0000, 0.0000 24.8366, 0.0000 16.0000 C 0.0000 7.1634, 7.1634 0.0000, 16.0000 0.0000 Z'
 
 // 4. D_LEFT_MERGED: wide, seamless liquid connection flowing directly into the Shell body (height ~26px)
 const D_LEFT_MERGED =
-  'M 16.00 0.50 C 26.00 1.00, 36.00 2.00, 46.00 3.00 C 48.00 11.00, 48.00 21.00, 46.00 29.00 C 36.00 30.00, 26.00 31.00, 16.00 31.50 C 10.46 31.50, 5.35 28.55, 2.58 23.75 C -0.19 18.95, -0.19 13.05, 2.58 8.25 C 5.35 3.45, 10.46 0.50, 16.00 0.50 Z'
+  'M 16.0000 0.0000 C 26.0000 1.0000, 36.0000 2.0000, 46.0000 3.0000 C 46.0000 11.0000, 46.0000 21.0000, 46.0000 29.0000 C 36.0000 30.0000, 26.0000 31.0000, 16.0000 32.0000 C 7.1634 32.0000, 0.0000 24.8366, 0.0000 16.0000 C 0.0000 7.1634, 7.1634 0.0000, 16.0000 0.0000 Z'
 
 const liquidEase = [0.16, 1, 0.3, 1] as const
 
@@ -99,8 +101,8 @@ const LeftBubbleComponent: React.FC<LeftBubbleProps> = ({
         >
           {/* 1. True SVG Continuous Silhouette with organic concave hourglass neck */}
           <svg
-            viewBox="0 0 54 32"
-            className="absolute top-0 left-0 w-[54px] h-[32px] overflow-visible pointer-events-none z-0"
+            viewBox="-2 -2 58 36"
+            className="absolute -top-[2px] -left-[2px] w-[58px] h-[36px] overflow-visible pointer-events-none z-0"
           >
             <motion.path
               initial={{ d: D_LEFT_MERGED }}

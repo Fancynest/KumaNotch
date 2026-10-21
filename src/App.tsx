@@ -127,15 +127,12 @@ export default function App() {
     setPrevShell(dims.shell)
   }
 
-  // 8. Downward physical nudge (+4px) on new events
+  // 8. Downward physical nudge (+4px) on new events (device notifications)
   const [nudge, setNudge] = useState(false)
   const lastNudgeKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
-    const currentNudgeKey =
-      deviceNotification?.id ||
-      (timerData?.status === 'completed' ? 'timer-alert' : null) ||
-      null
+    const currentNudgeKey = deviceNotification?.id || null
 
     if (currentNudgeKey && currentNudgeKey !== lastNudgeKeyRef.current) {
       lastNudgeKeyRef.current = currentNudgeKey
@@ -143,7 +140,7 @@ export default function App() {
       const timer = setTimeout(() => setNudge(false), 320)
       return () => clearTimeout(timer)
     }
-  }, [deviceNotification?.id, timerData?.status])
+  }, [deviceNotification?.id])
 
   // 11. Window Stage Hit Region Choreography & Motion Polishing (Fase 8b & 8c)
   // Stage width = 460, height = 420 (pinned at y = 0)
@@ -326,6 +323,8 @@ export default function App() {
     }
   }
 
+  const isAlertActive = currentView === 'alert' || timerData?.status === 'completed'
+
   return (
     <div
       className="w-full h-full relative select-none overflow-hidden flex flex-col items-center justify-start"
@@ -338,24 +337,26 @@ export default function App() {
       >
         {/* SHELL WRAPPER - Centered on screen, contains Shell and side-anchored auxiliary bubbles */}
         <div className="relative flex items-start justify-center">
-          {/* LEFT BUBBLE: Anchored to the left of the Shell */}
-          <div className="absolute right-full top-0 mr-2.5 flex items-center justify-end pointer-events-auto">
-            <LeftBubble
-              isExpanded={isExpanded}
-              isDragOver={isDragOver}
-              isMediaActive={isMusicIndicatorVisible}
-              mediaData={mediaData}
-              hoveredTarget={hoveredTarget}
-              musicTitle={t.music}
-              clickToOpenTitle={t.clickToOpen}
-              onBubblePointerEnter={handleBubblePointerEnter}
-              onBubblePointerLeave={handleBubblePointerLeave}
-              onOpenMedia={() => {
-                openedViaHoverRef.current = false
-                setExpandedActivity('music')
-              }}
-            />
-          </div>
+          {/* LEFT BUBBLE: Anchored to the left of the Shell (suppressed during alert to remove clutter) */}
+          {!isAlertActive && (
+            <div className="absolute right-full top-0 mr-2.5 flex items-center justify-end pointer-events-auto">
+              <LeftBubble
+                isExpanded={isExpanded}
+                isDragOver={isDragOver}
+                isMediaActive={isMusicIndicatorVisible}
+                mediaData={mediaData}
+                hoveredTarget={hoveredTarget}
+                musicTitle={t.music}
+                clickToOpenTitle={t.clickToOpen}
+                onBubblePointerEnter={handleBubblePointerEnter}
+                onBubblePointerLeave={handleBubblePointerLeave}
+                onOpenMedia={() => {
+                  openedViaHoverRef.current = false
+                  setExpandedActivity('music')
+                }}
+              />
+            </div>
+          )}
 
           {/* SINGLE PERSISTENT SHELL (ATTACHED PONI AT Y=0) */}
           <Shell
@@ -406,26 +407,28 @@ export default function App() {
             />
           </Shell>
 
-          {/* RIGHT BUBBLE: Anchored to the right of the Shell */}
-          <div className="absolute left-full top-0 ml-2.5 flex items-center justify-start pointer-events-auto">
-            <RightBubble
-              isExpanded={isExpanded}
-              isDragOver={isDragOver}
-              isTimerActive={isTimerActive}
-              timerData={timerData}
-              allTimers={allTimers}
-              remainingSeconds={remainingSeconds}
-              hoveredTarget={hoveredTarget}
-              timerTitle={t.timer}
-              clickToOpenTitle={t.clickToOpen}
-              onBubblePointerEnter={handleBubblePointerEnter}
-              onBubblePointerLeave={handleBubblePointerLeave}
-              onOpenTimer={() => {
-                openedViaHoverRef.current = false
-                setExpandedActivity('timer')
-              }}
-            />
-          </div>
+          {/* RIGHT BUBBLE: Anchored to the right of the Shell (suppressed during alert to remove clutter) */}
+          {!isAlertActive && (
+            <div className="absolute left-full top-0 ml-2.5 flex items-center justify-start pointer-events-auto">
+              <RightBubble
+                isExpanded={isExpanded}
+                isDragOver={isDragOver}
+                isTimerActive={isTimerActive}
+                timerData={timerData}
+                allTimers={allTimers}
+                remainingSeconds={remainingSeconds}
+                hoveredTarget={hoveredTarget}
+                timerTitle={t.timer}
+                clickToOpenTitle={t.clickToOpen}
+                onBubblePointerEnter={handleBubblePointerEnter}
+                onBubblePointerLeave={handleBubblePointerLeave}
+                onOpenTimer={() => {
+                  openedViaHoverRef.current = false
+                  setExpandedActivity('timer')
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
