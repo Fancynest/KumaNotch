@@ -22,6 +22,7 @@ Measurement tools:
 | Phase 6b | Process Watcher (`kuma run` / Named Pipe) + Asymmetric Spring | 0.00% idle | ~30.8 MB App (5.25 MB private) + ~25.5 MB Webview (~56.3 MB total) | Windows Task Manager / DevTools Performance | Windows 11 x64 | Zero-overhead native named pipe `\\.\pipe\kumanotch` [USANG: referensi awal TCP 45454 diganti named pipe], LRU bounded cache (32), solid 60fps |
 | Phase 8b Spike | Fixed Stage (460x420) + Win32 SetWindowRgn | 0.00% idle, < 1.4% during expand | ~31.0 MB App (5.3 MB private) + ~26.0 MB Webview (~57 MB total) | Intel PresentMon / DevFrameMeter / DWM Profiler | Windows 11 x64 | Zero HWND resize during animations. 0 longtask >50ms, 16.6ms avg frame time, clicks cleanly fall through |
 | Phase 8c | Code Split & Motion Polish (Memo, Waveform/Eye Pause, Crossfade) | 0.00% idle, < 1.1% during expand | ~31.2 MB App (5.3 MB private) + ~25.8 MB Webview (~57 MB total) | DevFrameMeter / Chrome Performance / PresentMon | Windows 11 x64 | App.tsx cut by 70% (1467->435 lines). 0 frames >20ms at 60Hz. Waveforms and eyes paused during spring. |
+| Phase 8d | Lean Refresh & Adaptive SMTC Heartbeat | 0.00% idle (60s), < 0.4% during playback | ~28.8 MB App (4.8 MB private) + ~24.5 MB Webview (~53.3 MB total) | Windows Task Manager / Sysinternals Process Explorer | Windows 11 x64 | JS 200ms setInterval removed; Rust adaptive heartbeat (1000ms no session, 600ms paused, 250ms playing). Zero idle polling. |
 
 ---
 

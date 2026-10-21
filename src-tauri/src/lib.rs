@@ -4,6 +4,7 @@ mod fresh_file;
 mod media;
 pub mod process_watcher;
 mod shelf;
+mod sound;
 mod tray;
 mod window;
 
@@ -73,6 +74,9 @@ pub fn run() {
             media::media_next,
             media::media_prev,
             media::media_seek,
+            media::media_stop,
+            sound::play_system_sound,
+            sound::stop_system_sound,
             tray::autostart_is_enabled,
             tray::autostart_set,
             tray::tray_set_personality,

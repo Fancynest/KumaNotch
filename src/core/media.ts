@@ -57,11 +57,6 @@ export class MediaEngine {
     } catch (e) {
       console.debug('Failed to listen to media_state_changed:', e)
     }
-
-    // Steady background sync to catch external player state changes (Spotify, Chrome YouTube, etc.)
-    setInterval(() => {
-      this.poll()
-    }, 200)
   }
 
   private handleStateUpdate(raw: RawMediaState) {
@@ -158,6 +153,11 @@ export class MediaEngine {
   }
 
   public async play(): Promise<boolean> {
+    if (this.data && this.data.playbackStatus !== 'playing') {
+      this.data.playbackStatus = 'playing'
+      this.data.lastUpdated = Date.now()
+      this.notify()
+    }
     try {
       const res = await invoke<boolean>('media_play')
       this.triggerMultiPoll()
@@ -168,6 +168,11 @@ export class MediaEngine {
   }
 
   public async pause(): Promise<boolean> {
+    if (this.data && this.data.playbackStatus !== 'paused') {
+      this.data.playbackStatus = 'paused'
+      this.data.lastUpdated = Date.now()
+      this.notify()
+    }
     try {
       const res = await invoke<boolean>('media_pause')
       this.triggerMultiPoll()
@@ -178,8 +183,30 @@ export class MediaEngine {
   }
 
   public async togglePlayPause(): Promise<boolean> {
+    if (this.data) {
+      const nextStatus = this.data.playbackStatus === 'playing' ? 'paused' : 'playing'
+      this.data.playbackStatus = nextStatus
+      this.data.lastUpdated = Date.now()
+      this.notify()
+    }
     try {
       const res = await invoke<boolean>('media_toggle_play_pause')
+      this.triggerMultiPoll()
+      return res
+    } catch {
+      return false
+    }
+  }
+
+  public async stop(): Promise<boolean> {
+    if (this.data) {
+      this.data.playbackStatus = 'stopped'
+      this.data.positionMs = 0
+      this.data.lastUpdated = Date.now()
+      this.notify()
+    }
+    try {
+      const res = await invoke<boolean>('media_stop')
       this.triggerMultiPoll()
       return res
     } catch {

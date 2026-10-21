@@ -11,6 +11,7 @@ export interface AppSettings {
   idleBeforeEyesSeconds: number
   timerChimeEnabled: boolean
   timerChimeVolume: number
+  timerNativeDucking: boolean
   freshFileEnabled: boolean
   freshFileScreenshots: boolean
   freshFileDownloads: boolean
@@ -32,6 +33,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   idleBeforeEyesSeconds: 6,
   timerChimeEnabled: true,
   timerChimeVolume: 80,
+  timerNativeDucking: false,
   freshFileEnabled: true,
   freshFileScreenshots: true,
   freshFileDownloads: true,

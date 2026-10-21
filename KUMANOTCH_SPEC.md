@@ -181,6 +181,10 @@ State tampilan: `capsule` (normal) → `droplet` → `hidden`.
 
 ### Fase 6 — Pembeda (pilih sesuai selera, lihat bagian 12)
 
+> [!NOTE]
+> **Catatan Penyederhanaan Arsitektur**:
+> Fitur eksperimental Process Watcher dan Fresh File telah dihapus dari antarmuka aktif demi menjaga kesederhanaan, keandalan, dan efisiensi CPU 0.00% idle. KumaNotch berfokus penuh pada pilar inti: Dynamic Island squircle, Pemutar Media Windows SMTC, Multi-Timer Pomodoro simultan, File Shelf, dan Bluetooth Device HUD.
+
 ## 7. Budget performa (target, wajib diukur)
 
 - Idle (hanya jam, collapsed): CPU ≈ 0% dalam 60 detik pengamatan di Task Manager.

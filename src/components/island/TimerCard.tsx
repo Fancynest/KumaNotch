@@ -9,7 +9,6 @@ import {
   RotateCcw,
   Pause,
   Play,
-  Plus,
 } from 'lucide-react'
 import {
   globalTimerEngine,
@@ -49,7 +48,6 @@ export const TimerCard: React.FC<TimerCardProps> = ({
   )
 
   const [selectedId, setSelectedId] = useState<string>(timerData.id)
-  const [showAddMenu, setShowAddMenu] = useState(false)
 
   const activeTimer =
     activeTimers.find((item) => item.id === selectedId) || activeTimers[0] || timerData
@@ -173,53 +171,40 @@ export const TimerCard: React.FC<TimerCardProps> = ({
           )
         })}
 
-        {/* Add Timer Button if fewer than 3 timers */}
+        {/* Inline Quick Add Chips if fewer than 3 timers */}
         {activeTimers.length < MAX_CONCURRENT_TIMERS && (
-          <div className="relative shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <button
-              onClick={() => setShowAddMenu(!showAddMenu)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white text-[10px] font-medium border border-dashed border-white/20 transition-all active:scale-95"
-              title={t.addTimer}
+              onClick={() => {
+                const newId = globalTimerEngine.startTimer(5)
+                setSelectedId(newId)
+              }}
+              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white/75 hover:text-white text-[10px] font-medium border border-dashed border-white/20 transition-all active:scale-95 shrink-0"
+              title={`${t.addTimer} 5m`}
             >
-              <Plus className="w-3 h-3" />
-              <span>{t.timer}</span>
+              +5m
             </button>
-
-            {showAddMenu && (
-              <div className="absolute top-full left-0 mt-1 flex items-center gap-1 bg-[#1a1a1a] p-1 rounded-lg border border-white/15 z-50 shadow-lg">
-                <button
-                  onClick={() => {
-                    const newId = globalTimerEngine.startTimer(5)
-                    setSelectedId(newId)
-                    setShowAddMenu(false)
-                  }}
-                  className="px-2 py-0.5 rounded text-[9px] bg-white/10 hover:bg-white/20 text-white"
-                >
-                  5m
-                </button>
-                <button
-                  onClick={() => {
-                    const newId = globalTimerEngine.startTimer(15)
-                    setSelectedId(newId)
-                    setShowAddMenu(false)
-                  }}
-                  className="px-2 py-0.5 rounded text-[9px] bg-white/10 hover:bg-white/20 text-white"
-                >
-                  15m
-                </button>
-                {!activeTimers.some((t) => t.isPomodoro) && (
-                  <button
-                    onClick={() => {
-                      const newId = globalTimerEngine.startPomodoro('focus', 1)
-                      setSelectedId(newId)
-                      setShowAddMenu(false)
-                    }}
-                    className="px-2 py-0.5 rounded text-[9px] bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
-                  >
-                    {t.focus}
-                  </button>
-                )}
-              </div>
+            <button
+              onClick={() => {
+                const newId = globalTimerEngine.startTimer(15)
+                setSelectedId(newId)
+              }}
+              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white/75 hover:text-white text-[10px] font-medium border border-dashed border-white/20 transition-all active:scale-95 shrink-0"
+              title={`${t.addTimer} 15m`}
+            >
+              +15m
+            </button>
+            {!activeTimers.some((t) => t.isPomodoro) && (
+              <button
+                onClick={() => {
+                  const newId = globalTimerEngine.startPomodoro('focus', 1)
+                  setSelectedId(newId)
+                }}
+                className="px-2 py-0.5 rounded-full bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-[10px] font-medium border border-dashed border-amber-400/30 transition-all active:scale-95 shrink-0"
+                title={`${t.addTimer} ${t.focus}`}
+              >
+                +{t.focus}
+              </button>
             )}
           </div>
         )}

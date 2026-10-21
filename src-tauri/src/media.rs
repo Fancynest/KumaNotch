@@ -60,6 +60,8 @@ pub struct MediaManager {
     #[allow(dead_code)]
     last_thumbnail_key: Arc<Mutex<String>>,
     cached_thumbnail: Arc<Mutex<Option<String>>>,
+    track_changed_time: Arc<Mutex<std::time::Instant>>,
+    last_thumb_attempt: Arc<Mutex<std::time::Instant>>,
     #[allow(dead_code)]
     bound_sessions: Arc<Mutex<HashMap<String, SessionBinding>>>,
 }
@@ -70,6 +72,8 @@ pub fn init_media(app_handle: AppHandle) {
     let current_state = Arc::new(Mutex::new(MediaState::default()));
     let last_thumbnail_key = Arc::new(Mutex::new(String::new()));
     let cached_thumbnail = Arc::new(Mutex::new(None));
+    let track_changed_time = Arc::new(Mutex::new(std::time::Instant::now()));
+    let last_thumb_attempt = Arc::new(Mutex::new(std::time::Instant::now()));
     let bound_sessions: Arc<Mutex<HashMap<String, SessionBinding>>> = Arc::new(Mutex::new(HashMap::new()));
 
     let mgr_holder = Arc::new(Mutex::new(None));
@@ -79,6 +83,8 @@ pub fn init_media(app_handle: AppHandle) {
     let current_state_clone = current_state.clone();
     let last_thumb_clone = last_thumbnail_key.clone();
     let cached_thumb_clone = cached_thumbnail.clone();
+    let track_time_clone = track_changed_time.clone();
+    let attempt_clone = last_thumb_attempt.clone();
     let bound_sessions_clone = bound_sessions.clone();
 
     // Dedicated thread for WinRT SMTC session management
@@ -101,6 +107,8 @@ pub fn init_media(app_handle: AppHandle) {
             current_state: current_state_clone.clone(),
             last_thumbnail_key: last_thumb_clone.clone(),
             cached_thumbnail: cached_thumb_clone.clone(),
+            track_changed_time: track_time_clone.clone(),
+            last_thumb_attempt: attempt_clone.clone(),
             bound_sessions: bound_sessions_clone.clone(),
         };
 
@@ -116,9 +124,19 @@ pub fn init_media(app_handle: AppHandle) {
             &current_state_clone,
             &last_thumb_clone,
             &cached_thumb_clone,
+            &track_time_clone,
+            &attempt_clone,
             &bound_sessions_clone,
         );
-        refresh_sessions(&session_manager, &app_handle_clone, &current_state_clone, &last_thumb_clone, &cached_thumb_clone);
+        refresh_sessions(
+            &session_manager,
+            &app_handle_clone,
+            &current_state_clone,
+            &last_thumb_clone,
+            &cached_thumb_clone,
+            &track_time_clone,
+            &attempt_clone,
+        );
 
         // Subscribe to SessionsChanged and CurrentSessionChanged
         let sm_for_sessions = session_manager.clone();
@@ -126,12 +144,31 @@ pub fn init_media(app_handle: AppHandle) {
         let state_s = current_state_clone.clone();
         let thumb_key_s = last_thumb_clone.clone();
         let cached_thumb_s = cached_thumb_clone.clone();
+        let track_time_s = track_time_clone.clone();
+        let attempt_s = attempt_clone.clone();
         let bound_s = bound_sessions_clone.clone();
 
         let _ = session_manager.SessionsChanged(&TypedEventHandler::new(
             move |_, _| {
-                sync_session_listeners(&sm_for_sessions, &app_handle_s, &state_s, &thumb_key_s, &cached_thumb_s, &bound_s);
-                refresh_sessions(&sm_for_sessions, &app_handle_s, &state_s, &thumb_key_s, &cached_thumb_s);
+                sync_session_listeners(
+                    &sm_for_sessions,
+                    &app_handle_s,
+                    &state_s,
+                    &thumb_key_s,
+                    &cached_thumb_s,
+                    &track_time_s,
+                    &attempt_s,
+                    &bound_s,
+                );
+                refresh_sessions(
+                    &sm_for_sessions,
+                    &app_handle_s,
+                    &state_s,
+                    &thumb_key_s,
+                    &cached_thumb_s,
+                    &track_time_s,
+                    &attempt_s,
+                );
                 Ok(())
             },
         ));
@@ -141,31 +178,60 @@ pub fn init_media(app_handle: AppHandle) {
         let state_c = current_state_clone.clone();
         let thumb_key_c = last_thumb_clone.clone();
         let cached_thumb_c = cached_thumb_clone.clone();
+        let track_time_c = track_time_clone.clone();
+        let attempt_c = attempt_clone.clone();
 
         let _ = session_manager.CurrentSessionChanged(&TypedEventHandler::new(
             move |_, _| {
-                refresh_sessions(&sm_for_current, &app_handle_c, &state_c, &thumb_key_c, &cached_thumb_c);
+                refresh_sessions(
+                    &sm_for_current,
+                    &app_handle_c,
+                    &state_c,
+                    &thumb_key_c,
+                    &cached_thumb_c,
+                    &track_time_c,
+                    &attempt_c,
+                );
                 Ok(())
             },
         ));
 
-        // Periodic heartbeat to catch missed SMTC events from third-party players (Spotify, Chrome, etc.)
+        // Adaptive heartbeat: 1000ms when no session or inactive, 600ms when paused, 250ms when playing
         let sm_heartbeat = session_manager.clone();
         let app_heartbeat = app_handle_clone.clone();
         let state_heartbeat = current_state_clone.clone();
         let thumb_key_heartbeat = last_thumb_clone.clone();
         let cached_thumb_heartbeat = cached_thumb_clone.clone();
+        let track_time_heartbeat = track_time_clone.clone();
+        let attempt_heartbeat = attempt_clone.clone();
         let bound_heartbeat = bound_sessions_clone.clone();
 
         thread::spawn(move || {
             loop {
-                thread::sleep(std::time::Duration::from_millis(150));
+                let delay = {
+                    if let Ok(st) = state_heartbeat.lock() {
+                        if st.is_active && st.playback_status == "playing" {
+                            std::time::Duration::from_millis(250)
+                        } else if st.is_active {
+                            std::time::Duration::from_millis(600)
+                        } else {
+                            std::time::Duration::from_millis(1000)
+                        }
+                    } else {
+                        std::time::Duration::from_millis(1000)
+                    }
+                };
+
+                thread::sleep(delay);
+
                 sync_session_listeners(
                     &sm_heartbeat,
                     &app_heartbeat,
                     &state_heartbeat,
                     &thumb_key_heartbeat,
                     &cached_thumb_heartbeat,
+                    &track_time_heartbeat,
+                    &attempt_heartbeat,
                     &bound_heartbeat,
                 );
                 refresh_sessions(
@@ -174,6 +240,8 @@ pub fn init_media(app_handle: AppHandle) {
                     &state_heartbeat,
                     &thumb_key_heartbeat,
                     &cached_thumb_heartbeat,
+                    &track_time_heartbeat,
+                    &attempt_heartbeat,
                 );
             }
         });
@@ -216,6 +284,8 @@ fn sync_session_listeners(
     state: &Arc<Mutex<MediaState>>,
     thumb_key: &Arc<Mutex<String>>,
     cached_thumb: &Arc<Mutex<Option<String>>>,
+    track_changed_time: &Arc<Mutex<std::time::Instant>>,
+    last_thumb_attempt: &Arc<Mutex<std::time::Instant>>,
     bound_sessions: &Arc<Mutex<HashMap<String, SessionBinding>>>,
 ) {
     let mut current_ids = Vec::new();
@@ -237,9 +307,11 @@ fn sync_session_listeners(
                     let st1 = state.clone();
                     let tk1 = thumb_key.clone();
                     let ct1 = cached_thumb.clone();
+                    let tt1 = track_changed_time.clone();
+                    let at1 = last_thumb_attempt.clone();
                     let props_res = session.MediaPropertiesChanged(&TypedEventHandler::new(
                         move |_, _| {
-                            refresh_sessions(&mgr_clone1, &app1, &st1, &tk1, &ct1);
+                            refresh_sessions(&mgr_clone1, &app1, &st1, &tk1, &ct1, &tt1, &at1);
                             Ok(())
                         },
                     ));
@@ -249,9 +321,11 @@ fn sync_session_listeners(
                     let st2 = state.clone();
                     let tk2 = thumb_key.clone();
                     let ct2 = cached_thumb.clone();
+                    let tt2 = track_changed_time.clone();
+                    let at2 = last_thumb_attempt.clone();
                     let playback_res = session.PlaybackInfoChanged(&TypedEventHandler::new(
                         move |_, _| {
-                            refresh_sessions(&mgr_clone2, &app2, &st2, &tk2, &ct2);
+                            refresh_sessions(&mgr_clone2, &app2, &st2, &tk2, &ct2, &tt2, &at2);
                             Ok(())
                         },
                     ));
@@ -261,9 +335,11 @@ fn sync_session_listeners(
                     let st3 = state.clone();
                     let tk3 = thumb_key.clone();
                     let ct3 = cached_thumb.clone();
+                    let tt3 = track_changed_time.clone();
+                    let at3 = last_thumb_attempt.clone();
                     let timeline_res = session.TimelinePropertiesChanged(&TypedEventHandler::new(
                         move |_, _| {
-                            refresh_sessions(&mgr_clone3, &app3, &st3, &tk3, &ct3);
+                            refresh_sessions(&mgr_clone3, &app3, &st3, &tk3, &ct3, &tt3, &at3);
                             Ok(())
                         },
                     ));
@@ -300,12 +376,42 @@ fn sync_session_listeners(
     });
 }
 
+fn extract_thumbnail(
+    props: &windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties,
+) -> Option<String> {
+    if let Ok(thumb_ref) = props.Thumbnail() {
+        if let Ok(stream_op) = thumb_ref.OpenReadAsync() {
+            if let Ok(stream) = stream_op.join() {
+                if let Ok(size) = stream.Size() {
+                    // Max 5MB to handle high-resolution album covers without dropping
+                    if size > 0 && size <= 5 * 1024 * 1024 {
+                        if let Ok(reader) = DataReader::CreateDataReader(&stream) {
+                            if reader.LoadAsync(size as u32).and_then(|op| op.join()).is_ok() {
+                                let mut buf = vec![0u8; size as usize];
+                                if reader.ReadBytes(&mut buf).is_ok() {
+                                    return Some(format!(
+                                        "data:image/jpeg;base64,{}",
+                                        BASE64_STANDARD.encode(&buf)
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 fn refresh_sessions(
     manager: &GlobalSystemMediaTransportControlsSessionManager,
     app_handle: &AppHandle,
     state: &Arc<Mutex<MediaState>>,
     thumb_key: &Arc<Mutex<String>>,
     cached_thumb: &Arc<Mutex<Option<String>>>,
+    track_changed_time: &Arc<Mutex<std::time::Instant>>,
+    last_thumb_attempt: &Arc<Mutex<std::time::Instant>>,
 ) {
     let session_opt = select_best_session(manager);
 
@@ -341,39 +447,41 @@ fn refresh_sessions(
                     let track_key = format!("{}::{}_{}", app_id, title, artist);
                     let mut key_lock = thumb_key.lock().unwrap();
                     let mut cache_lock = cached_thumb.lock().unwrap();
+                    let mut track_time_lock = track_changed_time.lock().unwrap();
+                    let mut attempt_lock = last_thumb_attempt.lock().unwrap();
 
                     let track_changed = *key_lock != track_key;
 
                     if !title.is_empty() {
-                        if track_changed {
+                        let now = std::time::Instant::now();
+                        let should_fetch = if track_changed {
                             *key_lock = track_key;
                             *cache_lock = None;
-
-                            if let Ok(thumb_ref) = props.Thumbnail() {
-                                if let Ok(stream_op) = thumb_ref.OpenReadAsync() {
-                                    if let Ok(stream) = stream_op.join() {
-                                        if let Ok(size) = stream.Size() {
-                                            // Max 5MB to handle high-resolution album covers without dropping
-                                            if size > 0 && size <= 5 * 1024 * 1024 {
-                                                if let Ok(reader) = DataReader::CreateDataReader(&stream) {
-                                                    if reader.LoadAsync(size as u32).and_then(|op| op.join()).is_ok() {
-                                                        let mut buf = vec![0u8; size as usize];
-                                                        if reader.ReadBytes(&mut buf).is_ok() {
-                                                            let encoded = format!("data:image/jpeg;base64,{}", BASE64_STANDARD.encode(&buf));
-                                                            *cache_lock = Some(encoded.clone());
-                                                            thumbnail_b64 = Some(encoded);
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                            *track_time_lock = now;
+                            *attempt_lock = now;
+                            true
+                        } else if cache_lock.is_none() {
+                            // Retry thumbnail fetch every ~500ms, for up to ~5s after track changed
+                            let elapsed = now.duration_since(*track_time_lock);
+                            let attempt_elapsed = now.duration_since(*attempt_lock);
+                            if elapsed <= std::time::Duration::from_millis(5200)
+                                && attempt_elapsed >= std::time::Duration::from_millis(480)
+                            {
+                                *attempt_lock = now;
+                                true
+                            } else {
+                                false
                             }
                         } else {
-                            // Track has not changed; preserve cached thumbnail so frontend always has it
-                            thumbnail_b64 = cache_lock.clone();
+                            false
+                        };
+
+                        if should_fetch {
+                            if let Some(encoded) = extract_thumbnail(&props) {
+                                *cache_lock = Some(encoded);
+                            }
                         }
+                        thumbnail_b64 = cache_lock.clone();
                     }
                 }
             }
@@ -440,6 +548,8 @@ pub fn trigger_refresh() {
                         &mgr.current_state,
                         &mgr.last_thumbnail_key,
                         &mgr.cached_thumbnail,
+                        &mgr.track_changed_time,
+                        &mgr.last_thumb_attempt,
                     );
                 }
             }
@@ -519,6 +629,30 @@ pub async fn media_prev() -> bool {
             session.TrySkipPreviousAsync().and_then(|op| op.join()).unwrap_or(false)
         }).unwrap_or(false)
     }).await.unwrap_or(false)
+}
+
+#[tauri::command]
+pub async fn media_stop() -> bool {
+    let res = tauri::async_runtime::spawn_blocking(|| {
+        with_session(|session| {
+            let can_stop = session
+                .GetPlaybackInfo()
+                .and_then(|info| info.Controls())
+                .and_then(|ctrls| ctrls.IsStopEnabled())
+                .unwrap_or(false);
+
+            if can_stop {
+                session.TryStopAsync().and_then(|op| op.join()).unwrap_or(false)
+            } else {
+                let paused = session.TryPauseAsync().and_then(|op| op.join()).unwrap_or(false);
+                let seeked = session.TryChangePlaybackPositionAsync(0).and_then(|op| op.join()).unwrap_or(false);
+                paused || seeked
+            }
+        }).unwrap_or(false)
+    }).await.unwrap_or(false);
+    thread::sleep(std::time::Duration::from_millis(50));
+    trigger_refresh();
+    res
 }
 
 #[tauri::command]

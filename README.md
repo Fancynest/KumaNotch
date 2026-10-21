@@ -56,7 +56,7 @@ KumaNotch dibangun dengan framework **Tauri 2** yang menggunakan runtime sistem 
 ## 🔒 Privasi & 100% Offline
 
 - **Zero Telemetry / Tanpa Pelacakan**: KumaNotch tidak memiliki analitik, pelacakan data, pengenal perangkat, maupun koneksi internet luar.
-- **100% Berjalan Lokal**: Seluruh pemantauan media Spotify/browser (Windows SMTC), koneksi perangkat audio Bluetooth, berkas baru (*Fresh File*), dan timer Pomodoro diolah sepenuhnya di mesin Anda.
+- **100% Berjalan Lokal**: Seluruh pemantauan media Spotify/browser (Windows SMTC), koneksi perangkat audio Bluetooth, dan timer Pomodoro diolah sepenuhnya di mesin Anda.
 - **Keamanan IPC Terisolasi**: Daemon IPC antarmuka menggunakan Windows Named Pipe (`\\.\pipe\kumanotch`) yang dibatasi oleh kernel Windows DACL (*Discretionary Access Control List*) khusus untuk SID pengguna aktif Anda. Koneksi dari pengguna lain, guest, maupun jaringan remote secara ketat ditolak di level kernel.
 
 ---
@@ -67,7 +67,7 @@ KumaNotch dibangun dengan framework **Tauri 2** yang menggunakan runtime sistem 
 - **Split Island Multitasking**: Ketika beberapa aktivitas berjalan bersamaan (misal Musik + Timer Pomodoro), pulau terbelah rapi menjadi kapsul terpisah tanpa tumpang tindih.
 - **Horizontal 3-Page Home Pager**:
   - **Halaman 0 (Pemutar Musik)**: Integrasi Windows SMTC untuk Spotify, browser, dan pemutar musik lokal dengan kontrol lengkap, bilah durasi lagu, dan sampul album dinamis.
-  - **Halaman 1 (Jam & Timer Cepat)**: Jam real-time format 12j/24j, tombol cepat timer (5m, 15m, 25m, Focus Session Pomodoro), custom durasi picker, dan pintasan Mode A Process Watcher.
+  - **Halaman 1 (Jam & Timer Cepat)**: Jam real-time format 12j/24j, tombol cepat timer (5m, 15m, 25m, Focus Session Pomodoro), pemantauan bersamaan hingga 3 timer aktif, dan custom durasi picker.
   - **Halaman 2 (File Shelf)**: Rak berkas sementara untuk drop file/folder. Tarik langsung keluar ke Explorer, Slack, Discord, atau browser.
 - **Mata Kuma ("Personality")**:
   - Animasi mata beruang Kuma yang hidup, berkedip berkala (interval acak 3–6s), berekspresi senang, fokus, sedih, penasaran, dan kaget.
@@ -82,27 +82,13 @@ KumaNotch dibangun dengan framework **Tauri 2** yang menggunakan runtime sistem 
 
 ---
 
-## ⚡ Kuma CLI (`kuma.exe`) & Process Watcher
+## ⚡ Kuma CLI (`kuma.exe`)
 
 KumaNotch dilengkapi biner CLI Rust mandiri `kuma.exe` tanpa dependensi eksternal, berkomunikasi langsung dengan pulau KumaNotch via Windows Named Pipe (`\\.\pipe\kumanotch`).
 
-### 1. Menambahkan ke PATH
-Buka KumaNotch **Settings** → tab **General**, lalu pada opsi **"Tambahkan kuma ke PATH"** klik **Tambah** dan konfirmasi. Folder instalasi `kuma.exe` akan didaftarkan ke variabel lingkungan PATH pengguna Anda (`HKCU\Environment\Path`) secara aman dengan mempertahankan tipe `REG_EXPAND_SZ`. Buka terminal baru untuk langsung menggunakannya.
-
-### 2. Panduan Penggunaan CLI
+### Panduan Penggunaan CLI
 
 ```powershell
-# Jalankan perintah terminal, teruskan stdio secara langsung, dan beri notifikasi saat selesai
-kuma run cargo build --release
-kuma run npm run build
-
-# Mode A: Pantau proses yang sudah berjalan berdasarkan PID (0% CPU, kernel-driven wait)
-kuma watch 12480 "Training AI Model"
-
-# Aksi otomatis setelah selesai: sleep, lock, atau shutdown
-kuma run --post-action sleep python heavy_training.py
-kuma run --post-action lock ffmpeg -i movie.mkv -c:v libx265 output.mp4
-
 # Tampilkan kartu notifikasi instan di KumaNotch
 kuma notify "Backup Database Selesai" "Semua berkas tersimpan di NAS"
 kuma notify "Build Gagal" --error
@@ -110,11 +96,6 @@ kuma notify "Build Gagal" --error
 # Periksa apakah daemon KumaNotch aktif
 kuma status
 ```
-
-### 3. Keamanan Aksi Setelah Selesai (Post-Action Safety)
-- Aksi sleep/lock/shutdown hanya dieksekusi bila proses berhasil dengan sukses (exit code 0).
-- Muncul hitungan mundur 30 detik di pulau dengan tombol **Batal**.
-- Anda dapat membatalkan aksi kapan saja langsung dari pulau maupun halaman utama Home, bahkan jika kartu notifikasi sudah ditutup.
 
 ---
 

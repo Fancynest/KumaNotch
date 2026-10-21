@@ -525,40 +525,29 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     : '0 0 5px rgba(251, 113, 133, 0.5)'
 
   const isHappyMood = currentEmotion === 'happy' || isOlivia || currentEmotion === 'wink'
+  const isGrooving = isOlivia || isMusic || currentEmotion === 'happy' || isHappyMood
 
   return (
     <div className="relative flex items-center justify-center select-none py-1">
-      {/* Main Face Container with Vibrant Joyful Bobbing when Favorite Artist / Music is playing */}
+      {/* Main Face Container with Subtle Joyful Bobbing when Music/Happy is active */}
       <motion.div
-        key={`${currentEmotion}-${isOlivia}-${isMusic}`}
         animate={
-          isOlivia
+          isGrooving
             ? {
-                y: [0, -6.0, 1.0, -3.8, 0],
-                rotate: [-7, 7, -5, 5, -7],
-                scale: [1, 1.1, 0.94, 1.06, 1],
-              }
-            : isMusic || currentEmotion === 'happy'
-            ? {
-                y: [0, -5.0, 1.0, -3.0, 0],
-                rotate: [-5, 5, -4, 4, -5],
-                scale: [1, 1.08, 0.96, 1.04, 1],
-              }
-            : isHappyMood
-            ? {
-                y: [0, -3.5, 0.5, -2.0, 0],
-                rotate: [-3, 3, -2, 2, -3],
-                scale: [1, 1.05, 0.98, 1.03, 1],
+                y: [0, -1.5, 0],
+                rotate: [-1.5, 1.5],
+                scale: [1, 1.02, 1],
               }
             : { y: 0, rotate: 0, scale: 1 }
         }
         transition={
-          isOlivia
-            ? { duration: 0.92, repeat: Infinity, ease: 'easeInOut' }
-            : isMusic || currentEmotion === 'happy'
-            ? { duration: 0.98, repeat: Infinity, ease: 'easeInOut' }
-            : isHappyMood
-            ? { duration: 1.25, repeat: Infinity, ease: 'easeInOut' }
+          isGrooving
+            ? {
+                duration: 1.3,
+                repeat: Infinity,
+                repeatType: 'mirror',
+                ease: 'easeInOut',
+              }
             : { duration: 0.25 }
         }
         className="flex items-center justify-center gap-1.5 relative px-1"

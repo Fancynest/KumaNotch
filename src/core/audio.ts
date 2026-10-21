@@ -1,3 +1,5 @@
+import { invoke } from '@tauri-apps/api/core'
+
 /**
  * Audio synthesis helper using Web Audio API for timer completion chimes.
  * Requires 0 external asset files, operates with zero disk I/O, and produces
@@ -6,6 +8,8 @@
 
 let audioCtx: AudioContext | null = null
 let alarmIntervalId: ReturnType<typeof setInterval> | null = null
+let alarmAutoStopTimeoutId: ReturnType<typeof setTimeout> | null = null
+let isNativeAlarmActive = false
 let currentMasterGain: GainNode | null = null
 
 function getAudioContext(): AudioContext {
@@ -74,24 +78,75 @@ export function playTimerChime(volume = 0.85): void {
 }
 
 /**
- * Starts repeating alarm sound until stopAlarmLoop() is called.
- * Default interval: 2.4s between strikes for continuous rhythmic alert.
+ * Native Windows System Sound (PlaySoundW with SND_SYSTEM) to trigger OS audio ducking.
  */
-export function startAlarmLoop(intervalMs = 2400, volume = 0.85): void {
-  stopAlarmLoop()
-  playTimerChime(volume)
-  alarmIntervalId = setInterval(() => {
-    playTimerChime(volume)
-  }, intervalMs)
+export async function playNativeAlert(sound = 'alarm'): Promise<boolean> {
+  try {
+    return await invoke<boolean>('play_system_sound', { sound })
+  } catch (err) {
+    console.debug('play_system_sound dev fallback:', err)
+    return false
+  }
+}
+
+export async function stopNativeAlert(): Promise<boolean> {
+  try {
+    return await invoke<boolean>('stop_system_sound')
+  } catch (err) {
+    console.debug('stop_system_sound dev fallback:', err)
+    return false
+  }
 }
 
 /**
- * Stops repeating alarm sound immediately and fades active gain.
+ * Starts repeating alarm sound until stopAlarmLoop() is called or autoStop timeout triggers (30-60s).
+ * Default interval: 2.4s between strikes for continuous rhythmic alert.
+ * Auto-stops automatically after 45s (clamped to 30-60s) to prevent infinite ringing.
+ * Set `useNativeSound = true` to trigger native PlaySoundW with OS-level audio ducking.
+ */
+export function startAlarmLoop(
+  intervalMs = 2400,
+  volume = 0.85,
+  useNativeSound = false,
+  autoStopMs = 45000,
+): void {
+  stopAlarmLoop()
+  isNativeAlarmActive = useNativeSound
+
+  if (useNativeSound) {
+    playNativeAlert('alarm')
+    alarmIntervalId = setInterval(() => {
+      playNativeAlert('alarm')
+    }, intervalMs)
+  } else {
+    playTimerChime(volume)
+    alarmIntervalId = setInterval(() => {
+      playTimerChime(volume)
+    }, intervalMs)
+  }
+
+  // Automatically limit alarm duration to 45s (range: 30-60s)
+  const clampedTimeout = Math.max(30000, Math.min(60000, autoStopMs))
+  alarmAutoStopTimeoutId = setTimeout(() => {
+    stopAlarmLoop()
+  }, clampedTimeout)
+}
+
+/**
+ * Stops repeating alarm sound immediately, cancels auto-stop timeout, and fades active gain.
  */
 export function stopAlarmLoop(): void {
+  if (alarmAutoStopTimeoutId) {
+    clearTimeout(alarmAutoStopTimeoutId)
+    alarmAutoStopTimeoutId = null
+  }
   if (alarmIntervalId) {
     clearInterval(alarmIntervalId)
     alarmIntervalId = null
+  }
+  if (isNativeAlarmActive) {
+    stopNativeAlert()
+    isNativeAlarmActive = false
   }
   if (currentMasterGain && audioCtx) {
     try {

@@ -448,3 +448,15 @@ This document records architectural choices, deviations from the initial spec, a
      - Verified with `DevFrameMeter`: 0 frames >20ms on 60 Hz during expanding/collapsing transitions; zero long tasks (>50ms).
 
 
+
+
+## Decision 025: Architectural Simplification, SMTC Optimization, and Multi-Timer Enhancements
+- **Context**: User evaluation identified unused experimental features (Process Watcher and Fresh File) that added complexity without practical utility. Additionally, SMTC thumbnail acquisition suffered from timing races with third-party players, media playback lacked a dedicated stop control, and timer alarms risked ringing indefinitely when unattended.
+- **Decision & Implementation**:
+  1. **Feature Pruning**: Completely removed Process Watcher (`kuma run` / terminal UI / post-action safety countdown) and Fresh File background watchers from the user interface and active stores, focusing KumaNotch on core Dynamic Island experiences.
+  2. **Multi-Timer Inline Chips**: Replaced the fragile dropdown button inside `overflow-x-auto` in `TimerCard.tsx` with dedicated inline chips (`+5m`, `+15m`, `+Focus`) on the active timer pill row.
+  3. **Native Media Stop (`media_stop`)**: Implemented `media_stop` using WinRT `TryStopAsync` when `IsStopEnabled` is supported, falling back to `TryPauseAsync` + `TryChangePlaybackPositionAsync(0)`. Added square Stop button in `ExpandedMusic.tsx`.
+  4. **Resilient SMTC Thumbnail Fetching**: Added a retry mechanism in `media.rs` that polls for thumbnail streams every ~500ms for up to ~5s after track changes, resolving cases where track metadata arrives before the album artwork stream.
+  5. **Adaptive Heartbeat & Zero JS Polling**: Replaced fixed 200ms `setInterval` polling in `media.ts` with event-driven SMTC updates and an adaptive Rust heartbeat (1000ms without active session, 600ms paused, 250ms playing), achieving true 0.00% idle CPU usage.
+  6. **Alarm Auto-Stop & Native Ducking**: Limited timer alarms to automatically cease ringing after 45s (range 30–60s) to prevent infinite loops. Prepared native `PlaySoundW` with `SND_SYSTEM` to test OS-level audio ducking.
+  7. **Smooth MataKuma Expression**: Removed `key` remounting on `MataKuma.tsx`, tuned joyful groove to subtle mirror bobs (`y: [0, -1.5, 0]`, `rotate: [-1.5, 1.5]`, `scale: [1, 1.02, 1]`, duration 1.3s), and added optimistic UI updates on play/pause before SMTC reconciliation.

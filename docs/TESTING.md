@@ -406,3 +406,43 @@ Create test files in a temporary directory with the following filename patterns:
   - Drag the notch to an offset position (e.g. +200px to the right) and release.
   - Expand to HomePager or play a song on Spotify.
   - **Expected**: The island expands at the new horizontal offset without jumping back to center.
+
+
+---
+
+## 9. Fase 8d: Architectural Simplification, Multi-Timer Chips, SMTC Stop/Thumbnail Retry & Audio Ducking
+
+### 9.1 Multi-Timer Quick Add Chips (`TimerCard.tsx`)
+- [x] **Inline Preset Chips**:
+  - Replaced the previous `absolute` dropdown inside `overflow-x-auto` with inline chips `+5m`, `+15m`, and `+Focus`.
+  - When fewer than 3 timers are active, clicking `+5m` or `+15m` immediately starts a concurrent timer without menu clipping.
+  - Pomodoro focus chip is conditionally displayed when no active Pomodoro session exists.
+
+### 9.2 Media Playback Stop Control (`media_stop` & `ExpandedMusic.tsx`)
+- [x] **Native Stop Command**:
+  - Invokes `TryStopAsync` via WinRT when `IsStopEnabled` is supported.
+  - Automatically falls back to `TryPauseAsync` + `TryChangePlaybackPositionAsync(0)` for players like Spotify Desktop that do not advertise explicit stop controls.
+  - Square vector Stop button rendered in `ExpandedMusic.tsx` alongside play/pause and skip controls.
+
+### 9.3 SMTC Thumbnail Retry Mechanism
+- [x] **Thumbnail Delay Mitigation**:
+  - If a media player emits track title/artist metadata before album artwork streams are available (`cache == None`), the engine retries every ~500ms for up to ~5s after track change.
+  - Avoids dropping high-resolution covers when Spotify/Edge streams take hundreds of milliseconds to hydrate.
+
+### 9.4 Expressive MataKuma Motion Polish
+- [x] **Mirror Bobbing & Optimistic Updates**:
+  - Removed Framer Motion `key` remounting on `MataKuma.tsx` to preserve continuous animation cycles.
+  - Scaled down vertical and rotational bobbing (`y: [0, -1.5, 0]`, `rotate: [-1.5, 1.5]`, `scale: [1, 1.02, 1]`, duration 1.3s with `repeatType: 'mirror'`).
+  - Added optimistic `playbackStatus` updates in `media.ts` on UI button clicks, instantly starting/stopping groove before reconciling with OS SMTC.
+
+### 9.5 Adaptive Heartbeat & Zero JS Polling
+- [x] **Performance Verification**:
+  - Removed fixed 200ms `setInterval` polling in `src/core/media.ts`.
+  - Implemented adaptive Rust SMTC heartbeat: 1000ms when idle/no session, 600ms when paused, 250ms when playing.
+  - Recorded 0.00% idle CPU utilization in `docs/PERF.md`.
+
+### 9.6 Alarm Timer Auto-Stop & Native Audio Ducking
+- [x] **Auto-Stop Timeout**:
+  - `startAlarmLoop` automatically ceases ringing after 45s (clamped to 30–60s) if the user is away from their desk.
+- [x] **Native PlaySoundW Ducking**:
+  - Exposed `play_system_sound` command leveraging Win32 `PlaySoundW` with `SND_SYSTEM | SND_ALIAS | SND_ASYNC` to trigger Windows system sound ducking over third-party media streams.

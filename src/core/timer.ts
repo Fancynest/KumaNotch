@@ -409,7 +409,12 @@ export class TimerEngine {
   private triggerCompletionAlert(completedTimer: TimerData): void {
     const settings = globalSettingsEngine.getSettings()
     if (settings.timerChimeEnabled) {
-      startAlarmLoop(2400, (settings.timerChimeVolume || 80) / 100)
+      startAlarmLoop(
+        2400,
+        (settings.timerChimeVolume || 80) / 100,
+        Boolean(settings.timerNativeDucking),
+        45000,
+      )
     }
 
     const t = getT(settings.language)

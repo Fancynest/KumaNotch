@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import {
   Play,
   Pause,
+  Square,
   SkipBack,
   SkipForward,
   ChevronDown,
@@ -228,7 +229,7 @@ export function ExpandedMusic({
           </div>
 
           {/* Playback Controls */}
-          <div className="flex items-center justify-center gap-5 pb-1 shrink-0">
+          <div className="flex items-center justify-center gap-4 pb-1 shrink-0">
             <button
               onClick={() => globalMediaEngine.previous()}
               className="p-1.5 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-transform active:scale-90"
@@ -247,6 +248,14 @@ export function ExpandedMusic({
               ) : (
                 <Play className="w-4 h-4 fill-current ml-0.5" />
               )}
+            </button>
+
+            <button
+              onClick={() => globalMediaEngine.stop()}
+              className="p-1.5 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-transform active:scale-90"
+              title={t.stop || 'Stop'}
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
             </button>
 
             <button
