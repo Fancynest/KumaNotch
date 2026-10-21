@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react'
 import {
   Play,
   Pause,
-  Square,
   SkipBack,
   SkipForward,
   ChevronDown,
@@ -13,7 +12,6 @@ import {
   formatMediaDuration,
   type MediaData,
 } from '../../core/media'
-import { AudioWaveform } from './AudioWaveform'
 import { getT } from '../../core/i18n'
 
 interface ExpandedMusicProps {
@@ -183,25 +181,19 @@ export function ExpandedMusic({
               )}
             </div>
 
-            {/* Title, Artist, & Live Equalizer Waveform */}
-            <div className="flex-1 min-w-0 pr-1 flex items-center justify-between">
-              <div className="min-w-0 mr-2">
-                <h3 className="text-xs font-bold text-white tracking-tight truncate leading-tight">
-                  {media?.title || t.noTrack}
-                </h3>
-                <p className="text-[11px] text-white/60 truncate font-medium mt-0.5 leading-tight">
-                  {media?.artist || t.unknownArtist}
+            {/* Title, Artist, & Album */}
+            <div className="flex-1 min-w-0 pr-1">
+              <h3 className="text-xs font-bold text-white tracking-tight truncate leading-tight">
+                {media?.title || t.noTrack}
+              </h3>
+              <p className="text-[11px] text-white/60 truncate font-medium mt-0.5 leading-tight">
+                {media?.artist || t.unknownArtist}
+              </p>
+              {media?.album && (
+                <p className="text-[9px] text-white/35 truncate mt-0.5 leading-tight">
+                  {media.album}
                 </p>
-                {media?.album && (
-                  <p className="text-[9px] text-white/35 truncate mt-0.5 leading-tight">
-                    {media.album}
-                  </p>
-                )}
-              </div>
-
-              <div className="shrink-0 pl-1">
-                <AudioWaveform isPlaying={isPlaying} barCount={4} size="sm" />
-              </div>
+              )}
             </div>
           </div>
 
@@ -229,10 +221,10 @@ export function ExpandedMusic({
           </div>
 
           {/* Playback Controls */}
-          <div className="flex items-center justify-center gap-4 pb-1 shrink-0">
+          <div className="flex items-center justify-center gap-7 pb-1 shrink-0">
             <button
               onClick={() => globalMediaEngine.previous()}
-              className="p-1.5 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-transform active:scale-90"
+              className="p-2 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-transform active:scale-90"
               title={t.previousTrack}
             >
               <SkipBack className="w-4 h-4 fill-current" />
@@ -240,27 +232,19 @@ export function ExpandedMusic({
 
             <button
               onClick={() => globalMediaEngine.togglePlayPause()}
-              className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-lg"
+              className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-lg"
               title={isPlaying ? t.pause : t.play}
             >
               {isPlaying ? (
-                <Pause className="w-4 h-4 fill-current" />
+                <Pause className="w-4.5 h-4.5 fill-current" />
               ) : (
-                <Play className="w-4 h-4 fill-current ml-0.5" />
+                <Play className="w-4.5 h-4.5 fill-current ml-0.5" />
               )}
             </button>
 
             <button
-              onClick={() => globalMediaEngine.stop()}
-              className="p-1.5 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-transform active:scale-90"
-              title={t.stop || 'Stop'}
-            >
-              <Square className="w-3.5 h-3.5 fill-current" />
-            </button>
-
-            <button
               onClick={() => globalMediaEngine.next()}
-              className="p-1.5 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-transform active:scale-90"
+              className="p-2 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-transform active:scale-90"
               title={t.nextTrack}
             >
               <SkipForward className="w-4 h-4 fill-current" />
