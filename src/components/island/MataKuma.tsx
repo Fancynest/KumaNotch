@@ -295,7 +295,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
       window.removeEventListener('mouseleave', handleMouseLeave)
       document.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [isVisible])
+  }, [isVisible, isTransitioning])
 
   // ─── Autonomous Organic Mood Cycle During Idle ────────────────────
   useEffect(() => {
@@ -352,7 +352,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
       active = false
       if (initialTimer) clearTimeout(initialTimer)
     }
-  }, [isVisible, isBusy])
+  }, [isVisible, isBusy, isTransitioning])
 
   // ─── Periodic Micro-Gaze (Looking Around) ─────────────────────────
   useEffect(() => {
@@ -379,7 +379,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
     return () => {
       active = false
     }
-  }, [isVisible])
+  }, [isVisible, isTransitioning])
 
   // ─── Natural Blink Engine with Double-Blink ───────────────────────
   useEffect(() => {
@@ -429,7 +429,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
       if (blinkTimeout) clearTimeout(blinkTimeout)
       if (resetTimeout) clearTimeout(resetTimeout)
     }
-  }, [isVisible, currentEmotion])
+  }, [isVisible, currentEmotion, isTransitioning])
 
   if (!isVisible) return null
 
@@ -532,35 +532,11 @@ export const MataKuma: React.FC<MataKumaProps> = ({
 
   return (
     <div className="relative flex items-center justify-center select-none py-1">
-      {/* Main Face Container: Dances when supported artist is playing, enters still calm pose when paused */}
-      <motion.div
-        key={isDancing ? 'kuma-dancing' : 'kuma-still'}
-        animate={
-          isDancing
-            ? {
-                y: [0, -5.0, 1.0, -3.2, 0],
-                rotate: [-6, 6, -4, 4, -6],
-                scale: [1, 1.08, 0.96, 1.04, 1],
-              }
-            : {
-                y: 0,
-                rotate: 0,
-                scale: 1,
-              }
-        }
-        transition={
-          isDancing
-            ? {
-                duration: 0.92,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }
-            : {
-                duration: 0.25,
-                ease: 'easeOut',
-              }
-        }
-        className="flex items-center justify-center gap-1.5 relative px-1 origin-center"
+      {/* Main Face Container: Pure CSS groove when supported artist is playing, enters upright still pose when paused */}
+      <div
+        className={`flex items-center justify-center gap-1.5 relative px-1 origin-center ${
+          isDancing ? 'kuma-dancing-active' : 'kuma-dancing-still'
+        }`}
       >
         {/* Left Eye with Outer Cheek Blush */}
         <div className="relative shrink-0 flex items-center justify-center">
@@ -618,7 +594,7 @@ export const MataKuma: React.FC<MataKumaProps> = ({
             />
           )}
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

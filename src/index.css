@@ -30,3 +30,34 @@ html, body, #root {
   -webkit-user-drag: element !important;
   user-drag: element !important;
 }
+
+/* Kuma continuous rhythmic groove (GPU accelerated, unaffected by React re-renders) */
+@keyframes kuma-groove {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+  }
+  20% {
+    transform: translateY(-2.2px) rotate(-2deg) scale(1.02);
+  }
+  40% {
+    transform: translateY(0.4px) rotate(0deg) scale(0.99);
+  }
+  65% {
+    transform: translateY(-1.8px) rotate(2deg) scale(1.02);
+  }
+  85% {
+    transform: translateY(0.3px) rotate(0deg) scale(0.99);
+  }
+}
+
+.kuma-dancing-active {
+  animation: kuma-groove 1.2s ease-in-out infinite !important;
+  will-change: transform;
+}
+
+.kuma-dancing-still {
+  transform: translateY(0px) rotate(0deg) scale(1) !important;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  will-change: transform;
+}
+
