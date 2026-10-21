@@ -58,32 +58,24 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
         <motion.div
           key="bubble-timer"
           initial={{
-            x: -38,
-            scaleX: 1.55,
-            scaleY: 0.6,
             scale: 0.35,
             opacity: 0,
+            clipPath: 'circle(0% at 50% 50%)',
           }}
           animate={{
-            x: 0,
-            scaleX: 1,
-            scaleY: 1,
             scale: 1,
             opacity: 1,
+            clipPath: 'circle(100% at 50% 50%)',
           }}
           exit={{
-            x: -38,
-            scaleX: 1.4,
-            scaleY: 0.6,
-            scale: 0.2,
+            scale: 0.3,
             opacity: 0,
-            transition: { duration: 0.22, ease: 'easeIn' },
+            clipPath: 'circle(0% at 50% 50%)',
+            transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] },
           }}
           transition={{
-            type: 'spring',
-            stiffness: 320,
-            damping: 20,
-            mass: 0.75,
+            duration: 0.52,
+            ease: [0.16, 1, 0.3, 1],
           }}
           whileHover={{ scale: 1.14 }}
           whileTap={{ scale: 0.94 }}
@@ -97,41 +89,57 @@ const RightBubbleComponent: React.FC<RightBubbleProps> = ({
           style={{
             width: 32,
             height: 32,
-            transformOrigin: 'left center',
+            transformOrigin: 'center center',
           }}
           className="relative rounded-full bg-black border border-amber-500/50 flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
           title={`${timerData?.label || timerTitle}: ${formatTimeDisplay(remainingSeconds)} • ${clickToOpenTitle}`}
         >
-          <svg className="w-6 h-6 -rotate-90 absolute" viewBox="0 0 24 24">
-            <circle
-              cx="12"
-              cy="12"
-              r="8.5"
-              fill="none"
-              stroke="rgba(255, 255, 255, 0.15)"
-              strokeWidth="2"
-            />
-            <circle
-              cx="12"
-              cy="12"
-              r="8.5"
-              fill="none"
-              stroke={isPomodoroBreak ? '#10b981' : '#ff9500'}
-              strokeWidth="2"
-              strokeDasharray={53.4}
-              strokeDashoffset={53.4 * (1 - timerProgress)}
-              strokeLinecap="round"
-              className="transition-all duration-300"
-            />
-          </svg>
+          {/* Gentle water-parting liquid ripple expanding outward from center on reveal */}
+          <motion.div
+            initial={{ scale: 0.15, opacity: 0.85 }}
+            animate={{ scale: 1.45, opacity: 0 }}
+            transition={{ duration: 0.58, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-0 rounded-full border border-amber-400/60 pointer-events-none"
+          />
 
-          {timerData?.status === 'paused' ? (
-            <Pause className="w-2.5 h-2.5 text-amber-400 fill-amber-400 relative z-10" />
-          ) : (
-            <span className="text-[9px] font-mono font-bold text-amber-300 tracking-tighter relative z-10 leading-none">
-              {formatCompactRemaining(remainingSeconds)}
-            </span>
-          )}
+          {/* Inner content revealed fluidly from center */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.88 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.42, delay: 0.05, ease: 'easeOut' }}
+            className="w-full h-full flex items-center justify-center overflow-hidden rounded-full relative"
+          >
+            <svg className="w-6 h-6 -rotate-90 absolute" viewBox="0 0 24 24">
+              <circle
+                cx="12"
+                cy="12"
+                r="8.5"
+                fill="none"
+                stroke="rgba(255, 255, 255, 0.15)"
+                strokeWidth="2"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="8.5"
+                fill="none"
+                stroke={isPomodoroBreak ? '#10b981' : '#ff9500'}
+                strokeWidth="2"
+                strokeDasharray={53.4}
+                strokeDashoffset={53.4 * (1 - timerProgress)}
+                strokeLinecap="round"
+                className="transition-all duration-300"
+              />
+            </svg>
+
+            {timerData?.status === 'paused' ? (
+              <Pause className="w-2.5 h-2.5 text-amber-400 fill-amber-400 relative z-10" />
+            ) : (
+              <span className="text-[9px] font-mono font-bold text-amber-300 tracking-tighter relative z-10 leading-none">
+                {formatCompactRemaining(remainingSeconds)}
+              </span>
+            )}
+          </motion.div>
 
           {activeCount > 1 && (
             <span

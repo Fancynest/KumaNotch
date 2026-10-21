@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { globalShelfEngine } from '../core/shelf'
 import { globalTimerEngine } from '../core/timer'
 import { globalSettingsEngine, type AppSettings } from '../core/settings'
-import type { IslandView, ExpandedActivity, SystemMode } from '../core/islandStore'
+import { useIslandStore, type IslandView, type ExpandedActivity, type SystemMode } from '../core/islandStore'
 
 interface UseIslandEventsOptions {
   currentView: IslandView
@@ -14,6 +14,7 @@ interface UseIslandEventsOptions {
   settings: AppSettings
   systemMode: SystemMode
   setSystemMode: (mode: SystemMode) => void
+  setIsFullscreen?: (isFullscreen: boolean) => void
   setExpandedActivity: (activity: ExpandedActivity) => void
   setHomePage: (page: number) => void
   setIsDragOver: (isDragOver: boolean) => void
@@ -27,6 +28,7 @@ export function useIslandEvents({
   settings,
   systemMode,
   setSystemMode,
+  setIsFullscreen,
   setExpandedActivity,
   setHomePage,
   setIsDragOver,
@@ -86,19 +88,39 @@ export function useIslandEvents({
   useEffect(() => {
     let unlisten: (() => void) | undefined
 
-    invoke<string>('get_app_mode')
-      .then((mode) => {
-        if (mode === 'app' || mode === 'desktop' || mode === 'hidden') {
+    interface AppModeResponse {
+      mode: SystemMode
+      is_fullscreen?: boolean
+    }
+
+    invoke<AppModeResponse | string>('get_app_mode')
+      .then((res) => {
+        const mode = typeof res === 'string' ? (res as SystemMode) : res.mode
+        const isFs = typeof res === 'object' ? Boolean(res.is_fullscreen) : mode === 'fullscreen'
+        if (mode === 'app' || mode === 'desktop' || mode === 'fullscreen' || mode === 'hidden') {
           setSystemMode(mode)
+        }
+        if (setIsFullscreen) {
+          setIsFullscreen(isFs)
+        } else {
+          useIslandStore.getState().setIsFullscreen(isFs)
         }
       })
       .catch(() => {})
 
-    listen<{ mode: 'desktop' | 'app' | 'hidden' }>('app_mode_changed', (event) => {
-      setSystemMode(event.payload.mode)
+    listen<AppModeResponse>('app_mode_changed', (event) => {
+      const mode = event.payload.mode
+      const isFs = mode === 'fullscreen' || Boolean(event.payload.is_fullscreen)
+      setSystemMode(mode)
+      if (setIsFullscreen) {
+        setIsFullscreen(isFs)
+      } else {
+        useIslandStore.getState().setIsFullscreen(isFs)
+      }
       if (
-        event.payload.mode === 'hidden' ||
-        (event.payload.mode === 'app' && settings.hideOnFullscreen)
+        mode === 'hidden' ||
+        (mode === 'app' && settings.hideOnFullscreen) ||
+        (isFs && settings.hideOnFullscreen)
       ) {
         getCurrentWebviewWindow().hide().catch(() => {})
       } else {
@@ -113,11 +135,11 @@ export function useIslandEvents({
     return () => {
       if (unlisten) unlisten()
     }
-  }, [setSystemMode, settings.hideOnFullscreen])
+  }, [setSystemMode, setIsFullscreen, settings.hideOnFullscreen])
 
-  // React to hideOnFullscreen setting change in app mode
+  // React to hideOnFullscreen setting change in app or fullscreen mode
   useEffect(() => {
-    if (systemMode === 'app') {
+    if (systemMode === 'app' || systemMode === 'fullscreen') {
       if (settings.hideOnFullscreen) {
         getCurrentWebviewWindow().hide().catch(() => {})
       } else {

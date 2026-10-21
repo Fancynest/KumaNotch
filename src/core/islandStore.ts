@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 export type DisplayState = 'capsule'
 export type ExpandedActivity = 'home' | 'timer' | 'music' | 'settings' | null
-export type SystemMode = 'desktop' | 'app' | 'hidden'
+export type SystemMode = 'desktop' | 'app' | 'fullscreen' | 'hidden'
 export type IslandView =
   | 'idle'
   | 'home'
@@ -18,6 +18,7 @@ interface IslandStoreState {
   expandedActivity: ExpandedActivity
   homePage: number // 0 = Music, 1 = Clock/Timer, 2 = Shelf
   systemMode: SystemMode
+  isFullscreen: boolean
   isDwelling: boolean
   hoveredTarget: 'timer' | 'music' | null
   isDragOver: boolean
@@ -28,6 +29,7 @@ interface IslandStoreState {
   setExpandedActivity: (activity: ExpandedActivity) => void
   setHomePage: (page: number) => void
   setSystemMode: (mode: SystemMode) => void
+  setIsFullscreen: (isFullscreen: boolean) => void
   setIsDwelling: (dwelling: boolean) => void
   setHoveredTarget: (target: 'timer' | 'music' | null) => void
   setIsDragOver: (isDragOver: boolean) => void
@@ -41,6 +43,7 @@ export const useIslandStore = create<IslandStoreState>((set) => ({
   expandedActivity: null,
   homePage: 1,
   systemMode: 'desktop',
+  isFullscreen: false,
   isDwelling: false,
   hoveredTarget: null,
   isDragOver: false,
@@ -58,7 +61,9 @@ export const useIslandStore = create<IslandStoreState>((set) => ({
     set(() => ({
       systemMode,
       ...(systemMode === 'desktop' ? { displayState: 'capsule', isDwelling: false } : {}),
+      isFullscreen: systemMode === 'fullscreen',
     })),
+  setIsFullscreen: (isFullscreen) => set({ isFullscreen }),
   setIsDwelling: (isDwelling) => set({ isDwelling }),
   setHoveredTarget: (hoveredTarget) => set({ hoveredTarget }),
   setIsDragOver: (isDragOver) => set({ isDragOver }),

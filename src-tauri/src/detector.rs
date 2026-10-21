@@ -5,11 +5,12 @@ use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Clone, serde::Serialize)]
 pub struct AppModePayload {
-    pub mode: String, // "desktop", "app", "hidden"
+    pub mode: String, // "desktop", "app", "fullscreen", "hidden"
+    pub is_fullscreen: bool,
 }
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-static LAST_MODE: AtomicU8 = AtomicU8::new(0); // 0: unset, 1: desktop, 2: app, 3: hidden
+static LAST_MODE: AtomicU8 = AtomicU8::new(0); // 0: unset, 1: desktop, 2: app, 3: hidden, 4: fullscreen
 static DEBOUNCE_TX: OnceLock<std::sync::mpsc::Sender<()>> = OnceLock::new();
 
 #[repr(C)]
@@ -105,7 +106,7 @@ fn trigger_debounced_check() {
     }
 }
 
-pub fn query_foreground_mode() -> &'static str {
+pub fn query_foreground_mode() -> (&'static str, bool) {
     #[cfg(windows)]
     unsafe {
         // Query monitor where KumaNotch sits
@@ -133,10 +134,10 @@ pub fn query_foreground_mode() -> &'static str {
                     if fg_mon != 0 && fg_mon != notch_mon {
                         // Fullscreen game is on secondary monitor, notch stays visible
                     } else {
-                        return "hidden";
+                        return ("hidden", true);
                     }
                 } else {
-                    return "hidden";
+                    return ("hidden", true);
                 }
             }
         }
@@ -144,14 +145,14 @@ pub fn query_foreground_mode() -> &'static str {
         // 2. Check foreground window
         let hwnd = GetForegroundWindow();
         if hwnd == 0 || IsWindowVisible(hwnd) == 0 {
-            return "desktop";
+            return ("desktop", false);
         }
 
         // 3. Ignore our own process window to avoid mode bouncing
         let mut pid = 0u32;
         GetWindowThreadProcessId(hwnd, &mut pid);
         if pid == GetCurrentProcessId() {
-            return ""; // No change
+            return ("", false); // No change
         }
 
         // 4. Check window class: Desktop/Taskbar or transient shell windows
@@ -164,7 +165,7 @@ pub fn query_foreground_mode() -> &'static str {
                 || class_str == "Shell_TrayWnd"
                 || class_str == "Shell_SecondaryTrayWnd"
             {
-                return "desktop";
+                return ("desktop", false);
             }
 
             // Ignore transient shell windows (Start menu, Task View, Alt+Tab, Search flyout)
@@ -177,23 +178,13 @@ pub fn query_foreground_mode() -> &'static str {
                 || class_str == "TopLevelWindowForOverflowXamlIsland"
                 || class_str == "ForegroundStaging"
             {
-                return ""; // Ignore transient shell, do not change mode
+                return ("", false); // Ignore transient shell, do not change mode
             }
         }
 
-        // 5. Compare foreground window monitor with notch monitor
         let fg_mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-        if notch_mon != 0 && fg_mon != 0 && fg_mon != notch_mon {
-            // Foreground window is on another monitor; notch monitor is unobstructed
-            return "desktop";
-        }
 
-        // 6. Check if window is maximized (IsZoomed)
-        if IsZoomed(hwnd) != 0 {
-            return "app";
-        }
-
-        // 7. Check if window covers entire monitor (borderless fullscreen / video fullscreen)
+        // 5. Check if window covers entire monitor (borderless fullscreen / video fullscreen / F11)
         if fg_mon != 0 {
             let mut mi = MONITORINFO {
                 cb_size: std::mem::size_of::<MONITORINFO>() as u32,
@@ -209,23 +200,34 @@ pub fn query_foreground_mode() -> &'static str {
                         && rect.right >= mi.rc_monitor.right
                         && rect.bottom >= mi.rc_monitor.bottom
                     {
-                        return "app";
+                        return ("fullscreen", true);
                     }
                 }
             }
         }
 
+        // 6. Compare foreground window monitor with notch monitor
+        if notch_mon != 0 && fg_mon != 0 && fg_mon != notch_mon {
+            // Foreground window is on another monitor; notch monitor is unobstructed
+            return ("desktop", false);
+        }
+
+        // 7. Check if window is maximized (IsZoomed)
+        if IsZoomed(hwnd) != 0 {
+            return ("app", false);
+        }
+
         // Normal unmaximized floating window
-        "desktop"
+        ("desktop", false)
     }
     #[cfg(not(windows))]
     {
-        "desktop"
+        ("desktop", false)
     }
 }
 
 pub fn check_and_emit_foreground_state() {
-    let mode = query_foreground_mode();
+    let (mode, is_fullscreen) = query_foreground_mode();
     if mode.is_empty() {
         return;
     }
@@ -233,6 +235,7 @@ pub fn check_and_emit_foreground_state() {
     let mode_id = match mode {
         "desktop" => 1,
         "app" => 2,
+        "fullscreen" => 4,
         "hidden" => 3,
         _ => 1,
     };
@@ -243,6 +246,7 @@ pub fn check_and_emit_foreground_state() {
                 "app_mode_changed",
                 AppModePayload {
                     mode: mode.to_string(),
+                    is_fullscreen,
                 },
             );
 
@@ -365,11 +369,14 @@ pub fn start_detector(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn get_app_mode() -> String {
-    let mode = query_foreground_mode();
-    if mode.is_empty() {
-        "desktop".to_string()
-    } else {
-        mode.to_string()
+pub fn get_app_mode() -> AppModePayload {
+    let (mode, is_fullscreen) = query_foreground_mode();
+    AppModePayload {
+        mode: if mode.is_empty() {
+            "desktop".to_string()
+        } else {
+            mode.to_string()
+        },
+        is_fullscreen,
     }
 }

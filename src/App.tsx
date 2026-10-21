@@ -28,6 +28,8 @@ export default function App() {
     expandedActivity,
     homePage,
     systemMode,
+    isFullscreen,
+    setIsFullscreen,
     hoveredTarget,
     isDragOver,
     showCustomInput,
@@ -95,7 +97,9 @@ export default function App() {
   const isTimerActive = activeTimersList.length > 0
   const isMediaActive = mediaData !== null && mediaData.isActive
   const isExpanded = expandedActivity !== null || timerData?.status === 'completed'
-  const hasMusic = isMediaActive && !isExpanded && !isDragOver
+  // When listening to music or watching video in fullscreen mode, hide circular playback indicator completely
+  const isMusicIndicatorVisible = isMediaActive && !isFullscreen
+  const hasMusic = isMusicIndicatorVisible && !isExpanded && !isDragOver
   const hasTimer = isTimerActive && !isExpanded && !isDragOver
   const hasLeftAux = hasMusic
   const hasRightAux = hasTimer
@@ -309,6 +313,7 @@ export default function App() {
     settings,
     systemMode,
     setSystemMode,
+    setIsFullscreen,
     setExpandedActivity,
     setHomePage,
     setIsDragOver,
@@ -335,7 +340,7 @@ export default function App() {
         <LeftBubble
           isExpanded={isExpanded}
           isDragOver={isDragOver}
-          isMediaActive={isMediaActive}
+          isMediaActive={isMusicIndicatorVisible}
           mediaData={mediaData}
           hoveredTarget={hoveredTarget}
           musicTitle={t.music}

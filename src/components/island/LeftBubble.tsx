@@ -37,32 +37,24 @@ const LeftBubbleComponent: React.FC<LeftBubbleProps> = ({
         <motion.div
           key="bubble-music"
           initial={{
-            x: 38,
-            scaleX: 1.55,
-            scaleY: 0.6,
             scale: 0.35,
             opacity: 0,
+            clipPath: 'circle(0% at 50% 50%)',
           }}
           animate={{
-            x: 0,
-            scaleX: 1,
-            scaleY: 1,
             scale: 1,
             opacity: 1,
+            clipPath: 'circle(100% at 50% 50%)',
           }}
           exit={{
-            x: 38,
-            scaleX: 1.4,
-            scaleY: 0.6,
-            scale: 0.2,
+            scale: 0.3,
             opacity: 0,
-            transition: { duration: 0.22, ease: 'easeIn' },
+            clipPath: 'circle(0% at 50% 50%)',
+            transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] },
           }}
           transition={{
-            type: 'spring',
-            stiffness: 320,
-            damping: 20,
-            mass: 0.75,
+            duration: 0.52,
+            ease: [0.16, 1, 0.3, 1],
           }}
           whileHover={{ scale: 1.14 }}
           whileTap={{ scale: 0.94 }}
@@ -76,25 +68,41 @@ const LeftBubbleComponent: React.FC<LeftBubbleProps> = ({
           style={{
             width: 32,
             height: 32,
-            transformOrigin: 'right center',
+            transformOrigin: 'center center',
           }}
           className="relative rounded-full bg-black border border-[#1ed760]/50 flex items-center justify-center cursor-pointer overflow-hidden shrink-0"
           title={`${mediaData?.title || musicTitle} • ${clickToOpenTitle}`}
         >
-          {mediaData?.thumbnailBase64 ? (
-            <img
-              src={mediaData.thumbnailBase64}
-              alt={mediaData.title}
-              className="w-full h-full object-cover rounded-full"
-            />
-          ) : (
-            <AudioWaveform
-              isPlaying={mediaData?.playbackStatus === 'playing'}
-              barCount={3}
-              size="sm"
-              isTransitioning={isTransitioning}
-            />
-          )}
+          {/* Gentle water-parting liquid ripple expanding outward from center on reveal */}
+          <motion.div
+            initial={{ scale: 0.15, opacity: 0.85 }}
+            animate={{ scale: 1.45, opacity: 0 }}
+            transition={{ duration: 0.58, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-0 rounded-full border border-[#1ed760]/60 pointer-events-none"
+          />
+
+          {/* Inner content revealed fluidly from center */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.88 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.42, delay: 0.05, ease: 'easeOut' }}
+            className="w-full h-full flex items-center justify-center overflow-hidden rounded-full"
+          >
+            {mediaData?.thumbnailBase64 ? (
+              <img
+                src={mediaData.thumbnailBase64}
+                alt={mediaData.title}
+                className="w-full h-full object-cover rounded-full pointer-events-none"
+              />
+            ) : (
+              <AudioWaveform
+                isPlaying={mediaData?.playbackStatus === 'playing'}
+                barCount={3}
+                size="sm"
+                isTransitioning={isTransitioning}
+              />
+            )}
+          </motion.div>
 
           {hoveredTarget === 'music' && (
             <motion.div
